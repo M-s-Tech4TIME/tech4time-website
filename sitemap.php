@@ -86,7 +86,7 @@ const SITEMAP_STATIC = [
     ['/pages/company-profile/',            'company',  '2026-08-20', 'monthly', '0.7'],
     ['/pages/careers/',                    'careers',  '2026-08-21', 'weekly',  '0.7'],
     ['/pages/contact/',                    'contact',  '2026-08-20', 'yearly',  '0.7'],
-    ['/pages/resource-certifications/',    null,       '2026-08-21', 'monthly', '0.6'],
+    ['/pages/resource-certifications/',    'certifications', '2026-08-21', 'monthly', '0.6'],
     ['/pages/branding-and-advertisement/', null,       '2026-08-21', 'yearly',  '0.4'],
     ['/pages/privacy-policy/',             null,       '2026-08-21', 'yearly',  '0.3'],
 ];

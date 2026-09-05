@@ -67,6 +67,7 @@ COMPANY = ROOT / "content" / "company.json"
 ABOUT = ROOT / "content" / "about.json"
 HOME = ROOT / "content" / "home.json"
 SERVICES = ROOT / "content" / "services.json"
+CERTIFICATIONS = ROOT / "content" / "certifications.json"
 
 MARK = "PUBLISHMARK"
 
@@ -359,6 +360,7 @@ def run(base: str, key: bytes, r: Results) -> None:
     home_round_trip(base, key, r)
     services_round_trip(base, key, r)
     services_seventh(base, key, r)
+    certifications_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -1140,6 +1142,144 @@ def services_seventh(base: str, key: bytes, r: Results) -> None:
             f"status {status}")
 
 
+def certifications_round_trip(base: str, key: bytes, r: Results) -> None:
+    """Every field the certifications model declares, set and read off the page.
+
+    THIS IS WHAT check_content_model.py POINTS AT, for the reason
+    about_round_trip() is and one level deeper: a role group walks its roles
+    and its certifications, so a regex over the renderer finds $group and
+    $cert rather than a field name. Put a distinguishable value in every
+    field, publish it, and look for it in the HTML a visitor would get.
+
+    It also checks the things the renderer DRAWS rather than stores -- the
+    count on each group heading, the glyph beside every certification, and the
+    totals filled into the prose. Those cannot be proved by a marker, because
+    nothing types them: they are proved by being consistent with the rows they
+    come from, and by MOVING when those rows do.
+    """
+    print("\nthe certifications page travels the same road")
+
+    page_url = "/pages/resource-certifications/"
+
+    data = json.loads(CERTIFICATIONS.read_text())
+    data["revision"] = 50
+
+    data["meta"]["title"] = f"{MARK}-tab"
+    data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["description"] = f"{MARK}-desc {{certifications}} held"
+    data["hero"]["title"] = f"{MARK}-hero"
+    data["hero"]["subtitle"] = f"{MARK}-sub"
+    data["certs"]["eyebrow"] = f"{MARK}-eyebrow"
+    data["certs"]["title"] = f"{MARK}-bandtitle"
+    data["certs"]["lead"] = (f"{MARK}-lead {{certifications}} across {{groups}} "
+                             f"({{groups-word}}), {{roles}} roles")
+    data["cta"]["title"] = f"{MARK}-ctatitle"
+    data["cta"]["text"] = f"{MARK}-ctatext"
+
+    data["certs"]["items"] = [
+        {"id": "alpha", "slug": "alpha", "icon": "cogs", "blurb": f"{MARK}-blurb",
+         "status": "shown", "open": True,
+         "roles": [{"id": "r1", "name": f"{MARK}-role1", "status": "shown"},
+                   {"id": "r2", "name": f"{MARK}-role2", "status": "shown"},
+                   {"id": "r3", "name": f"{MARK}-rolehidden", "status": "hidden"}],
+         "items": [{"id": "c1", "name": f"{MARK}-cert1", "status": "shown"},
+                   {"id": "c2", "name": f"{MARK}-cert2", "status": "shown"},
+                   {"id": "c3", "name": f"{MARK}-certhidden", "status": "hidden"}]},
+        {"id": "beta", "slug": "beta", "icon": "first-aid", "blurb": "beta blurb",
+         "status": "shown", "open": False,
+         "roles": [{"id": "r4", "name": "Beta Role", "status": "shown"}],
+         "items": [{"id": "c4", "name": "Beta Cert", "status": "shown"}]},
+        {"id": "gamma", "slug": "gamma", "icon": "cogs", "blurb": f"{MARK}-neverseen",
+         "status": "hidden", "open": False,
+         "roles": [{"id": "r5", "name": f"{MARK}-hiddenrole", "status": "shown"}],
+         "items": [{"id": "c5", "name": f"{MARK}-hiddencert", "status": "shown"}]},
+    ]
+    data["cta"]["items"] = [
+        {"id": "b1", "label": f"{MARK}-btn", "href": "/pages/contact/", "icon": "",
+         "style": "primary", "status": "shown"},
+        {"id": "b2", "label": f"{MARK}-btnhidden", "href": "/x/", "icon": "",
+         "style": "ghost", "status": "hidden"},
+    ]
+
+    status, answer = publish(base, key, "certifications", data)
+    r.check("a validly signed payload is accepted",
+            status == 200 and answer.get("ok") is True, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the page is served", status == 200, f"status {status}")
+
+    for field in ("tab", "share", "hero", "sub", "eyebrow", "bandtitle",
+                  "blurb", "role1", "role2", "cert1", "cert2",
+                  "ctatitle", "ctatext", "btn"):
+        r.check(f"{field} reaches the visitor", f"{MARK}-{field}" in page)
+
+    r.check("the tab title is the tab title",
+            f"<title>{MARK}-tab</title>" in page)
+    r.check("and the share title is separate",
+            f'property="og:title" content="{MARK}-share"' in page)
+
+    print("\nwhat is hidden is not there at all")
+
+    for gone in ("rolehidden", "certhidden", "neverseen", "hiddenrole",
+                 "hiddencert", "btnhidden"):
+        r.check(f"{gone} is absent", f"{MARK}-{gone}" not in page)
+
+    r.check("a hidden group takes its whole panel with it",
+            'id="gamma"' not in page)
+
+    print("\nthe counts are drawn, not stored")
+
+    # Two shown certifications in the first group, one in the second.
+    r.check("each group heading counts the certifications shown inside it",
+            '<span class="cert-group__count">2 certifications</span>' in page
+            and '<span class="cert-group__count">1 certification</span>' in page,
+            "counts: " + str(re.findall(r'cert-group__count">([^<]*)<', page)))
+
+    r.check("one certification is not 'certifications'",
+            "1 certifications</span>" not in page)
+
+    r.check("nothing anywhere claims the hidden one",
+            "3 certifications" not in page)
+
+    print("\nthe totals in the prose are drawn too")
+
+    # Three shown certifications, two shown groups, three shown role names.
+    r.check("the lead resolves its digits",
+            f"{MARK}-lead 3 across 2" in page,
+            [line for line in page.splitlines() if f"{MARK}-lead" in line][:1])
+    r.check("and its spelled form", "(two), 3 roles" in page)
+    r.check("the meta description resolves too",
+            f'content="{MARK}-desc 3 held"' in page)
+    r.check("no token is left showing to a visitor",
+            "{certifications}" not in page and "{groups}" not in page
+            and "{roles}" not in page)
+
+    print("\nthe rest of what the renderer draws")
+
+    r.check("every certification carries the same glyph, and it is not stored",
+            page.count('<use href="#certificate"></use>') == 3,
+            str(page.count('<use href="#certificate"></use>')))
+    r.check("the group that says it is open is the one that is",
+            re.search(r'<details[^>]*id="alpha"[^>]*\sopen>', page) is not None
+            and re.search(r'<details[^>]*id="beta"[^>]*\sopen>', page) is None)
+    r.check("two role names are slashed apart",
+            page.count('class="cert-group__role-sep"') == 1,
+            "one separator between two roles, and none after the last")
+    r.check("a group's anchor is its slug",
+            'id="alpha"' in page and 'id="beta"' in page)
+
+    print("\nand a band can be switched off whole")
+
+    data["revision"] = 51
+    data["cta"]["status"] = "hidden"
+    status, answer = publish(base, key, "certifications", data)
+    r.check("hiding the closing band publishes", status == 200, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the whole band is gone", f"{MARK}-ctatitle" not in page)
+    r.check("but the page is still a page", f"{MARK}-hero" in page)
+
+
 def home_round_trip(base: str, key: bytes, r: Results) -> None:
     """Every field the home model declares, set and then read off the page.
 
@@ -1401,6 +1541,8 @@ def main() -> None:
         about_backup = ABOUT.read_text() if ABOUT.is_file() else None
         home_backup = HOME.read_text() if HOME.is_file() else None
         services_backup = SERVICES.read_text() if SERVICES.is_file() else None
+        certifications_backup = (CERTIFICATIONS.read_text()
+                                 if CERTIFICATIONS.is_file() else None)
 
         server = subprocess.Popen(
             ["php", "-S", f"127.0.0.1:{port}", "-t", str(ROOT),
@@ -1435,7 +1577,8 @@ def main() -> None:
             # of, and is refused as not-newer. home.json was that one.
             for path, backup in ((CAREERS, careers_backup), (CONTACT, contact_backup),
                                  (COMPANY, company_backup), (ABOUT, about_backup),
-                                 (HOME, home_backup), (SERVICES, services_backup)):
+                                 (HOME, home_backup), (SERVICES, services_backup),
+                                 (CERTIFICATIONS, certifications_backup)):
                 if backup is not None:
                     path.write_text(backup)
                 bak = path.with_suffix(".json.bak")

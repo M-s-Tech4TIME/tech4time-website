@@ -371,6 +371,64 @@ is switched off.
 
 **There are no pictures on any of these pages, and no rich text anywhere in the document.**
 
+## `content/certifications.json`
+
+The resource certifications page: role groups, the roles each covers, and the certifications the
+people in those roles hold. **A list inside a list** — the only document shaped that way.
+
+```json
+{
+  "updated":  "…",
+  "revision": 0,
+  "meta":     { "title": "…", "description": "…", "share_title": "…" },
+  "hero":     { "title": "…", "subtitle": "…" },
+  "certs":    { "status": "shown", "eyebrow": "…", "title": "…", "lead": "…", "items": [] },
+  "cta":      { "status": "shown", "title": "…", "text": "…", "items": [] }
+}
+```
+
+### A role group
+
+```json
+{
+  "id":     "security-analyst",
+  "slug":   "security-analyst",
+  "icon":   "shield-halved",
+  "blurb":  "…",
+  "status": "shown",
+  "open":   true,
+  "roles":  [ { "id": "…", "name": "Security Analyst", "status": "shown" } ],
+  "items":  [ { "id": "…", "name": "CompTIA Security+",  "status": "shown" } ]
+}
+```
+
+`slug` is the anchor the group's `<details>` carries, so `#security-analyst` links to it. It is
+minted from the **first role name** — a group has no title of its own, it *is* its roles — and then
+frozen, because a link into the page is a promise. A group still carrying the placeholder id it was
+created with is the one exception: that was never a real address.
+
+`open` is the group that starts expanded. More than one may be, and none has to be.
+
+### Three things are NOT in the file
+
+- **the count on a group heading** — *"27 certifications"* is however many are **shown** in it;
+- **a certification's icon** — all of them carry `certificate`, so it is a constant in the renderer;
+- **the `/` between role names** — markup, emitted between them, and hidden from a screen reader so
+  two roles are not read as a fraction.
+
+### The totals in the prose are not in the file either
+
+The lead and the search description may hold `{certifications}`, `{groups}` and `{roles}`, and the
+renderer replaces each with the live figure as it draws. Every one has a `-word` form as well —
+`{groups-word}` is *"four"* — because the page writes one of its numbers as a numeral and the other
+as a word, and a token that could only produce digits would have reworded the page the first time
+it rendered.
+
+A typed number is wrong the moment somebody adds a certification, and nothing on the page or in any
+check would notice: it is a true sentence that has quietly stopped being true. Counting and
+substitution live in `lib/contract.php` rather than in either renderer, so the editor's preview and
+the published page cannot disagree about what a token means.
+
 ## Which pictures get a light/dark pair, and which do not
 
 Asked and settled on 2026-08-31. Every managed picture on the site, and why it is or is not a pair:

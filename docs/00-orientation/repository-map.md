@@ -54,12 +54,12 @@ because `.htaccess` resolves it. The homepage is the exception: it stays at the 
 | Company profile | `pages/company-profile/index.php` | **dynamic** — renders `content/company.json` |
 | Careers | `pages/careers/index.php` | **dynamic** — renders `content/careers.json` |
 | Contact | `pages/contact/index.php` | **dynamic** — renders `content/contact.json` |
-| Resource certifications | `pages/resource-certifications/index.html` | |
+| Resource certifications | `pages/resource-certifications/index.php` | **dynamic** — renders `content/certifications.json` |
 | Branding & advertisement | `pages/branding-and-advertisement/index.html` | |
 | Privacy policy | `pages/privacy-policy/index.html` | |
 | Not found | `404.html` | at the repository root |
 
-Four static, twelve dynamic. Adding one:
+Three static, thirteen dynamic. Adding one:
 [adding-a-page.md](../10-development/frontend/adding-a-page.md).
 
 **The seven services pages are one document, not seven.** `content/services.json` holds the index

@@ -118,6 +118,9 @@ off. [javascript.md](frontend/javascript.md) · [motion.md](frontend/motion.md)
 | A service, its solutions, or the services page | **`https://admin.tech4time.bd/?s=services`** — not a file, and not here |
 | How a services page is drawn | `lib/services.php` — one renderer behind all seven pages |
 | Adding a whole new service | **the editor** — it needs no file here. `pages/services/detail.php` serves any slug the document has |
+| A certification, a role, or a whole role group | **`https://admin.tech4time.bd/?s=certifications`** — not a file, and not here |
+| How the certifications page is drawn | `lib/certifications.php` |
+| The number in "54 certifications across the four specialist roles" | nowhere: the text holds `{certifications}` and `{groups-word}`, and the renderer fills them in |
 | What HTML is allowed in rich text | `lib/html.php` — the sanitiser |
 | How JSON is read and written | `lib/store.php` |
 

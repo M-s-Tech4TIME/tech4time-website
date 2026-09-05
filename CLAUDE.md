@@ -43,7 +43,7 @@ its record before acting.
 
 | | |
 |---|---|
-| `pages/` `index.php` | the sixteen pages — twelve are `.php` and render from `content/` |
+| `pages/` `index.php` | the sixteen pages — thirteen are `.php` and render from `content/` |
 | `pages/services/detail.php` | not a page: it serves any service the editor added that has no directory |
 | `sitemap.php` | generated, and served at `/sitemap.xml` — the address must not change |
 | `assets/` | css, js, fonts, icons, images — all self-hosted |
@@ -72,7 +72,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
 | Header / footer | `tools/templates/` → `propagate_shared.py` |
 | An icon | the markup, then `python3 tools/inject_icons.py` |
-| A job post, a contact detail, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
+| A job post, a contact detail, a certification, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
 | The shape of editable content | `lib/contract.php` — **and the same file in the backend** |
 | How a document is signed | `lib/publish.php` — likewise byte-identical |
 | Add a page | [adding-a-page.md](docs/10-development/frontend/adding-a-page.md) |

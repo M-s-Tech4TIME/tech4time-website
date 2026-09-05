@@ -22,6 +22,7 @@ store they read from is outside the document root entirely.
 | [`about.php`](#aboutphp) | what this side does with the about page | `contract`, `store` |
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | the services index and its six detail pages | `contract`, `store`, `html` |
+| [`certifications.php`](#certificationsphp) | the resource certifications page | `contract`, `store`, `html` |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
 | [`footer-fingerprint.php`](#footer-fingerprintphp) *(frontend, generated)* | what this site's footers currently say | — |
@@ -300,6 +301,39 @@ practice; flattening them into one would lose the shorter.
 
 **`tools/apply_reveals.py` does not govern these pages**, for the reason it does not govern the
 home page: it skips anything built with a PHP loop. The reveal markers are emitted by the renderer.
+
+### `certifications.php`
+
+`certifications_load()` · `certifications_save()` · `certifications_validate()` *(backend)* ·
+the renderers *(frontend)*
+
+One document, `content/certifications.json`, holding the page's four role groups, the ten role
+names spread across them and the fifty-four certifications inside them. Groups, roles and
+certifications are each a list: any of them can be added to, reordered, renamed or hidden, and a
+role group added in the editor arrives hidden so a half-filled category is never live.
+
+**Every field is plain text.** No rich text anywhere on the page — see the `certifications` branch
+of `contract_sanitise()`.
+
+**Three things are drawn and never stored:**
+
+- *"27 certifications"* on a group heading is the count of the certifications **shown** inside it;
+- every certification's glyph is one constant, `CERTIFICATIONS_CERT_GLYPH` — all 54 carry the same
+  one and always did, so a per-certification icon field would be 54 chances to disagree;
+- the `/` between two role names is emitted between them, as markup rather than text, because a
+  screen reader should hear two roles and not a fraction.
+
+**The totals in the prose are drawn too.** The lead and the meta description hold
+`{certifications}` and `{groups-word}`, which `certifications_fill()` replaces as the page
+renders. A typed number goes stale the moment somebody adds a certification, and nothing on the
+page or in any check would notice — it is a true sentence that has quietly stopped being true.
+Both digit and spelled forms exist because the page writes one of its numbers as a numeral and the
+other as a word, and a token that could only produce digits would have reworded the page.
+See `CERTIFICATIONS_TOKENS` in `contract.php`.
+
+**The icons come from a second sprite.** A group's glyph is chosen in the editor, so
+`inject_icons.py` cannot see it; `certifications_sprite()` emits what the document actually uses,
+the same arrangement `services.php` has and for the same reason.
 
 ### `publish.php`
 
