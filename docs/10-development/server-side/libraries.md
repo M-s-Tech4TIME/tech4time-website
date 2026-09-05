@@ -23,6 +23,8 @@ store they read from is outside the document root entirely.
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | the services index and its six detail pages | `contract`, `store`, `html` |
 | [`certifications.php`](#certificationsphp) | the resource certifications page | `contract`, `store`, `html` |
+| [`branding.php`](#brandingphp) | the branding & advertisement page | `contract`, `store`, `html` |
+| [`svg.php`](#svgphp) **shared** | what a publishable vector file is |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
 | [`footer-fingerprint.php`](#footer-fingerprintphp) *(frontend, generated)* | what this site's footers currently say | — |
@@ -334,6 +336,68 @@ See `CERTIFICATIONS_TOKENS` in `contract.php`.
 **The icons come from a second sprite.** A group's glyph is chosen in the editor, so
 `inject_icons.py` cannot see it; `certifications_sprite()` emits what the document actually uses,
 the same arrangement `services.php` has and for the same reason.
+
+### `branding.php`
+
+`branding_load()` · `branding_save()` · `branding_validate()` *(backend)* · the renderers *(frontend)*
+
+One document, `content/branding.json`, holding the page's logo variants, the files each one offers
+for download, and the disclaimer. Variants and their files are each a list: either can be added to,
+reordered, renamed or hidden, and a variant added in the editor arrives hidden so a half-filled
+card is never live.
+
+**The preview and the download are not the same picture.** `image` is the small thing drawn on the
+card; `files[]` is what a visitor came for. On the page as it ships those are an 800px preview and
+a 1600px download of the same mark, so collapsing them would either serve the big file to everyone
+who merely looks at the page or hand out the small one to everyone who came for the logo.
+
+**Three things are drawn and never stored:**
+
+- the dimensions in a meta line come off that file's own record, so they cannot claim
+  *1600 × 570* about a file that is no longer that size — the adjective beside them
+  (*"Transparent"*) stays authored, because that part is editorial;
+- *"Download PNG"* states the file's own format, read from its extension;
+- the glyph on every button is one constant, `BRANDING_DOWNLOAD_GLYPH`.
+
+**The disclaimer is rich text**, and the only rich text on the page — see the `branding` branch of
+`contract_sanitise()`. It is a legal notice, and the sentence asking a rights holder to get in
+touch is a link waiting to happen.
+
+**The breadcrumb carries its own name.** Unlike the about, company and certifications pages, whose
+breadcrumb follows `hero.title`, this page is titled *"Branding Assets & Guidelines"* and named
+*"Branding & Advertisement"* everywhere it is linked from. Both are authored; see `meta.breadcrumb`.
+
+**No second sprite.** Nothing on this page picks an icon at run time, so `inject_icons.py` sees
+every glyph it draws.
+
+### `svg.php`
+
+**Shared — byte-identical in both repositories.**
+
+`svg_sanitise()` · `svg_problem()` · `svg_looks_like()`
+
+What a publishable vector file is. ADR 0019 refused SVG outright and its reasoning was right — an
+SVG is a document, and re-encoding does not make it not one. This answers that rather than avoiding
+it, twice over.
+
+**It is read and replaced, not checked and kept.** The same rule the raster path follows: the file
+is parsed into a DOM, walked against an allow-list, and re-serialised, and what is stored is *that*
+— never the bytes that arrived. Anything outside the list makes the whole file refused, with a
+sentence naming what was found, because silently dropping an element would hand somebody back a
+different logo than the one they published.
+
+**And it is never served as a document.** `/uploads/*.svg` goes out with `Content-Disposition:
+attachment` and `default-src 'none'; sandbox` on both hosts, so it downloads and never renders in
+this origin. The branding page links to it and no page ever draws one.
+
+**It is idempotent, and that is load-bearing.** `svg_sanitise(svg_sanitise(x))` equals
+`svg_sanitise(x)`. The receiving host relies on it: it sanitises what arrived and refuses anything
+that is not already its own output — proving the bytes are clean *without changing them*, which it
+could not do otherwise, because the file's name is a hash of its contents and both hosts compute it
+independently.
+
+**It needs `ext-dom`**, which the live hosts have and Ubuntu's `php-cli` does not. `svg_problem()`
+says so plainly and the byte-level refusals still hold without it; CI installs `php-xml`.
 
 ### `publish.php`
 

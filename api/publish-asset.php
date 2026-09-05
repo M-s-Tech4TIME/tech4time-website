@@ -104,7 +104,11 @@ if ($fault !== '') {
 
 /* ------------------------------------------------------ what it actually is */
 
-$kind = publish_asset_type($body);
+/* Raster from its header, vector by being re-sanitised and found unchanged.
+   Neither answer is taken from the sender: the Content-Type header, if there
+   even is one, is a thing somebody chose. See publish_asset_svg(), which is
+   where this side refuses to trust that the admin host cleaned anything. */
+$kind = publish_asset_any($body);
 
 if ($kind === null) {
     asset_refuse(415, 'not-an-image');

@@ -121,6 +121,10 @@ off. [javascript.md](frontend/javascript.md) · [motion.md](frontend/motion.md)
 | A certification, a role, or a whole role group | **`https://admin.tech4time.bd/?s=certifications`** — not a file, and not here |
 | How the certifications page is drawn | `lib/certifications.php` |
 | The number in "54 certifications across the four specialist roles" | nowhere: the text holds `{certifications}` and `{groups-word}`, and the renderer fills them in |
+| A logo file people download, or the terms covering its use | **`https://admin.tech4time.bd/?s=branding`** — not a file, and not here |
+| How the branding page is drawn | `lib/branding.php` |
+| The size beside a download, or the words on its button | nowhere: both are read off the file itself by `branding_meta_line()` and `branding_download_label()` |
+| What a vector file is allowed to contain | `lib/svg.php` — **and the same file in the backend** |
 | What HTML is allowed in rich text | `lib/html.php` — the sanitiser |
 | How JSON is read and written | `lib/store.php` |
 

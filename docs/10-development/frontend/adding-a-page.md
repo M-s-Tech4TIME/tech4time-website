@@ -8,13 +8,13 @@ From nothing to a page that passes every check. About twenty minutes.
 
 ## Decide first: static or dynamic?
 
-**Static `.html`** — now the smaller half. **Four** of the sixteen pages are static: the resource
-certifications, branding and advertisement, the privacy policy and the 404. Content changes by
-editing the file and redeploying.
+**Static `.html`** — now the smaller half by a long way. **Two** of the sixteen pages are
+static: the privacy policy and the 404. Content changes by editing the file and redeploying.
 
-**Dynamic `.php`** — **thirteen** of the sixteen, and the right answer whenever the page says
+**Dynamic `.php`** — **fourteen** of the sixteen, and the right answer whenever the page says
 something that changes on its own schedule, without a redeploy: the home page, about, careers,
-contact, the company profile, the services index and the six service pages. Making a page dynamic
+contact, the company profile, the services index and the six service pages, the resource
+certifications, and branding and advertisement. Making a page dynamic
 means building an editor for it, a content model, and a renderer — see *adding-an-editor.md* (in
 tech4time-website-backend).
 

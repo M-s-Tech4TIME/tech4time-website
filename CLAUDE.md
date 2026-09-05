@@ -31,8 +31,9 @@ its record before acting.
 6. **Never commit anything from the private store** (`t4t-private/`, `*.key`).
 7. **`content/` is a replica.** It is written by `api/publish.php` and by nothing else — not by
    hand, not on the server, not by a deploy. The next publish overwrites anything you put there.
-8. **`lib/html.php`, `lib/contract.php` and `lib/publish.php` are byte-identical** with
-   `tech4time-website-backend`. Change one and you change both, in the same breath.
+8. **`lib/html.php`, `lib/contract.php`, `lib/publish.php` and `lib/svg.php` are
+   byte-identical** with `tech4time-website-backend`. Change one and you change both, in the
+   same breath.
 9. **`tools/` is never deployed.**
 10. **Never edit a header or footer in a page file.** Edit `tools/templates/`, then
     `python3 tools/propagate_shared.py`.
@@ -43,7 +44,7 @@ its record before acting.
 
 | | |
 |---|---|
-| `pages/` `index.php` | the sixteen pages — thirteen are `.php` and render from `content/` |
+| `pages/` `index.php` | the sixteen pages — fourteen are `.php` and render from `content/` |
 | `pages/services/detail.php` | not a page: it serves any service the editor added that has no directory |
 | `sitemap.php` | generated, and served at `/sitemap.xml` — the address must not change |
 | `assets/` | css, js, fonts, icons, images — all self-hosted |
@@ -72,7 +73,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
 | Header / footer | `tools/templates/` → `propagate_shared.py` |
 | An icon | the markup, then `python3 tools/inject_icons.py` |
-| A job post, a contact detail, a certification, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
+| A job post, a contact detail, a certification, a logo file, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
 | The shape of editable content | `lib/contract.php` — **and the same file in the backend** |
 | How a document is signed | `lib/publish.php` — likewise byte-identical |
 | Add a page | [adding-a-page.md](docs/10-development/frontend/adding-a-page.md) |

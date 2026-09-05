@@ -68,6 +68,7 @@ ABOUT = ROOT / "content" / "about.json"
 HOME = ROOT / "content" / "home.json"
 SERVICES = ROOT / "content" / "services.json"
 CERTIFICATIONS = ROOT / "content" / "certifications.json"
+BRANDING = ROOT / "content" / "branding.json"
 
 MARK = "PUBLISHMARK"
 
@@ -361,6 +362,7 @@ def run(base: str, key: bytes, r: Results) -> None:
     services_round_trip(base, key, r)
     services_seventh(base, key, r)
     certifications_round_trip(base, key, r)
+    branding_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -1280,6 +1282,210 @@ def certifications_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("but the page is still a page", f"{MARK}-hero" in page)
 
 
+def branding_round_trip(base: str, key: bytes, r: Results) -> None:
+    """Every field the branding model declares, set and read off the page.
+
+    THIS IS WHAT check_content_model.py POINTS AT, for the reason
+    certifications_round_trip() is: a logo card walks the files inside it, so a
+    regex over the renderer finds $asset and $file rather than a field name.
+    Put a distinguishable value in every field, publish it, and look for it in
+    the HTML a visitor would get.
+
+    It also checks the three things the renderer DRAWS rather than stores -- the
+    size in a meta line, the format on a download button, and the glyph beside
+    it. Those cannot be proved by a marker, because nothing types them: they are
+    proved by being consistent with the record they come from and by MOVING
+    when it does.
+
+    AND IT CHECKS THE TWO PICTURES STAY APART. A card holds a preview and a
+    download, and on the real page they are an 800px file and a 1600px one. A
+    renderer that confused them would look completely fine and hand out the
+    wrong file, so the sizes here are deliberately different and both are
+    asserted where they belong.
+    """
+    print("\nthe branding page travels the same road")
+
+    page_url = "/pages/branding-and-advertisement/"
+
+    data = json.loads(BRANDING.read_text())
+    data["revision"] = 60
+
+    data["meta"]["title"] = f"{MARK}-tab"
+    data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["description"] = f"{MARK}-desc"
+    data["meta"]["breadcrumb"] = f"{MARK}-crumb"
+    data["hero"]["title"] = f"{MARK}-hero"
+    data["hero"]["subtitle"] = f"{MARK}-sub"
+    data["assets"]["eyebrow"] = f"{MARK}-eyebrow"
+    data["assets"]["title"] = f"{MARK}-bandtitle"
+    data["assets"]["lead"] = f"{MARK}-lead"
+    data["legal"]["title"] = f"{MARK}-legaltitle"
+    data["cta"]["title"] = f"{MARK}-ctatitle"
+    data["cta"]["text"] = f"{MARK}-ctatext"
+
+    png = "/assets/images/branding/logo-light-transparent-full.png"
+    preview = "/assets/images/branding/logo-light-transparent.png"
+
+    data["assets"]["items"] = [
+        {"id": "alpha", "title": f"{MARK}-title1", "text": f"{MARK}-text1",
+         "alt": f"{MARK}-alt1", "plate": "light", "status": "shown",
+         "image": {"src": preview, "webp": preview.replace(".png", ".webp"),
+                   "width": 800, "height": 285},
+         "files": [
+             {"id": "f1", "label": f"{MARK}-label1",
+              "filename": f"{MARK}-saved1.png", "status": "shown",
+              "file": {"src": png, "webp": "", "width": 1600, "height": 570}},
+             # A second file on the same card: a vector, which the page LINKS
+             # to and must never draw.
+             {"id": "f2", "label": f"{MARK}-label2",
+              "filename": f"{MARK}-saved2.svg", "status": "shown",
+              "file": {"src": "/uploads/" + "b" * 16 + ".svg", "webp": "",
+                       "width": 512, "height": 182}},
+             {"id": "f3", "label": f"{MARK}-filehidden",
+              "filename": f"{MARK}-nope.png", "status": "hidden",
+              "file": {"src": png, "webp": "", "width": 10, "height": 10}},
+         ]},
+        {"id": "beta", "title": "Beta Logo", "text": "beta text",
+         "alt": "beta alt", "plate": "neutral", "status": "shown",
+         "image": {"src": preview, "webp": "", "width": 800, "height": 450},
+         "files": [{"id": "f4", "label": "Plated PNG", "filename": "beta.png",
+                    "status": "shown",
+                    "file": {"src": png, "webp": "", "width": 1600, "height": 900}}]},
+        {"id": "gamma", "title": f"{MARK}-neverseen", "text": f"{MARK}-hiddentext",
+         "alt": "x", "plate": "dark", "status": "hidden",
+         "image": {"src": preview, "webp": "", "width": 800, "height": 285},
+         "files": [{"id": "f5", "label": f"{MARK}-hiddenfile", "filename": "x.png",
+                    "status": "shown",
+                    "file": {"src": png, "webp": "", "width": 1, "height": 1}}]},
+    ]
+
+    data["legal"]["items"] = [
+        {"id": "n1", "text": f"<p>{MARK}-note1 <strong>{MARK}-bold</strong></p>",
+         "status": "shown"},
+        {"id": "n2", "text": f"<p>{MARK}-notehidden</p>", "status": "hidden"},
+    ]
+    data["cta"]["items"] = [
+        {"id": "b1", "label": f"{MARK}-btn", "href": "/pages/contact/",
+         "style": "primary", "status": "shown"},
+        {"id": "b2", "label": f"{MARK}-btnhidden", "href": "/x/", "style": "ghost",
+         "status": "hidden"},
+    ]
+
+    status, answer = publish(base, key, "branding", data)
+    r.check("a validly signed payload is accepted",
+            status == 200 and answer.get("ok") is True, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the page is served", status == 200, f"status {status}")
+
+    for field in ("tab", "share", "hero", "sub", "eyebrow", "bandtitle", "lead",
+                  "title1", "text1", "alt1", "legaltitle", "note1", "bold",
+                  "ctatitle", "ctatext", "btn"):
+        r.check(f"{field} reaches the visitor", f"{MARK}-{field}" in page)
+
+    r.check("the tab title is the tab title",
+            f"<title>{MARK}-tab</title>" in page)
+    r.check("and the share title is separate",
+            f'property="og:title" content="{MARK}-share"' in page)
+    r.check("the breadcrumb carries its OWN name, not the hero's",
+            f'"name": "{MARK}-crumb"' in page and f'"name": "{MARK}-hero"' not in page,
+            "the breadcrumb followed the hero title instead of its own field")
+
+    print("\nwhat is hidden is not there at all")
+
+    for gone in ("filehidden", "neverseen", "hiddentext", "hiddenfile",
+                 "notehidden", "btnhidden"):
+        r.check(f"{gone} is absent", f"{MARK}-{gone}" not in page)
+
+    print("\nthe preview and the download are different files")
+
+    r.check("the preview is drawn at the preview's size",
+            'width="800" height="285"' in page,
+            "the card is not using the preview's dimensions")
+    r.check("the download link points at the download",
+            f'href="{png}" download="{MARK}-saved1.png"' in page,
+            "the button does not point at the file it should")
+    r.check("the saved-as name is the authored one, not the file's own",
+            f'download="{MARK}-saved1.png"' in page
+            and 'download="logo-light-transparent-full.png"' not in page)
+    # Counted over the CARDS, not the page: the header and the footer carry
+    # <picture> elements of their own for the site logo, so a count of the
+    # whole document would be measuring the chrome.
+    wrapped = len(re.findall(
+        r'<picture><source srcset="[^"]*" type="image/webp"><img class="asset__image"', page))
+    total = page.count('<img class="asset__image"')
+    r.check("a preview with a WebP sibling gets a <picture>", wrapped == 1,
+            f"{wrapped} wrapped previews, wanted 1")
+    r.check("and one without gets a bare <img>", total == 2 and wrapped == 1,
+            f"{total} previews, {wrapped} of them wrapped")
+
+    print("\nthe meta line and the button are drawn, not stored")
+
+    r.check("the meta line quotes the DOWNLOAD's size",
+            f"{MARK}-label1 · 1600 × 570" in page,
+            [l.strip() for l in page.splitlines() if f"{MARK}-label1" in l][:1])
+    r.check("and not the preview's",
+            f"{MARK}-label1 · 800 × 285" not in page,
+            "the meta line is quoting the preview")
+    r.check("the vector's own size is its own",
+            f"{MARK}-label2 · 512 × 182" in page)
+    r.check("the button says what format the file is",
+            "Download PNG" in page and "Download SVG" in page,
+            "the derived button label is missing")
+    r.check("nothing published a button label",
+            "Download PNG" not in json.dumps(data))
+    r.check("every button carries the same glyph, and it is not stored",
+            page.count('<use href="#arrow-down"></use>') == 3,
+            str(page.count('<use href="#arrow-down"></use>')))
+
+    print("\na vector is linked and never drawn")
+
+    r.check("the SVG is a download target",
+            f'download="{MARK}-saved2.svg"' in page)
+    r.check("and nothing renders it",
+            '<img class="asset__image" src="/uploads/' not in page
+            and '<source srcset="/uploads/' not in page,
+            "an uploaded vector reached an <img> or a <source>")
+
+    print("\nthe plate is per card")
+
+    r.check("each card sits on the background it was given",
+            'asset__preview--light' in page and 'asset__preview--neutral' in page)
+    r.check("and the hidden card's plate went with it",
+            'asset__preview--dark' not in page)
+
+    print("\nthe disclaimer is the one place markup survives")
+
+    r.check("emphasis is printed rather than escaped",
+            f"<strong>{MARK}-bold</strong>" in page)
+
+    data["revision"] = 61
+    data["legal"]["items"][0]["text"] = (
+        f'<p>{MARK}-note1 <script>alert(1)</script></p>')
+    status, answer = publish(base, key, "branding", data)
+    r.check("a document with script in it still publishes",
+            status == 200, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("but the script does not reach the visitor",
+            "<script>alert(1)</script>" not in page and "alert(1)" not in page,
+            "the receiving side did not re-sanitise")
+    r.check("and the rest of the paragraph did", f"{MARK}-note1" in page)
+
+    print("\nand a band can be switched off whole")
+
+    data["revision"] = 62
+    data["cta"]["status"] = "hidden"
+    data["legal"]["status"] = "hidden"
+    status, answer = publish(base, key, "branding", data)
+    r.check("hiding two bands publishes", status == 200, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("both are gone",
+            f"{MARK}-ctatitle" not in page and f"{MARK}-legaltitle" not in page)
+    r.check("but the page is still a page", f"{MARK}-hero" in page)
+
+
 def home_round_trip(base: str, key: bytes, r: Results) -> None:
     """Every field the home model declares, set and then read off the page.
 
@@ -1543,6 +1749,7 @@ def main() -> None:
         services_backup = SERVICES.read_text() if SERVICES.is_file() else None
         certifications_backup = (CERTIFICATIONS.read_text()
                                  if CERTIFICATIONS.is_file() else None)
+        branding_backup = BRANDING.read_text() if BRANDING.is_file() else None
 
         server = subprocess.Popen(
             ["php", "-S", f"127.0.0.1:{port}", "-t", str(ROOT),
@@ -1578,7 +1785,8 @@ def main() -> None:
             for path, backup in ((CAREERS, careers_backup), (CONTACT, contact_backup),
                                  (COMPANY, company_backup), (ABOUT, about_backup),
                                  (HOME, home_backup), (SERVICES, services_backup),
-                                 (CERTIFICATIONS, certifications_backup)):
+                                 (CERTIFICATIONS, certifications_backup),
+                                 (BRANDING, branding_backup)):
                 if backup is not None:
                     path.write_text(backup)
                 bak = path.with_suffix(".json.bak")

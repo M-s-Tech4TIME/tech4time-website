@@ -67,7 +67,8 @@ that writes to it.
 | `test_contact_handler.py` | `contact-handler.php`, including header injection and the captured message |
 | `test_store.py` | `lib/store.php`: reading, writing, and the rule that a damaged file never becomes the backup |
 | `test_publish.py` | `api/publish.php` and `publish_push()` over real HTTP: the happy path, and every way past it that does not involve holding the key |
-| `test_publish_asset.py` | the endpoint pictures arrive on: a signed picture accepted, everything else refused — a PHP script, an SVG, a GIF, a script wearing a PNG header, and a header claiming a picture nobody could hold. Also that the name is always this side's and never the sender's |
+| `test_publish_asset.py` | the endpoint pictures arrive on: a signed picture accepted, everything else refused — a PHP script, a GIF, a script wearing a PNG header, and a header claiming a picture nobody could hold. Also that a vector file is accepted only when it is already the sanitiser's own output, so this host proves it rather than trusting the sender, and that the name is always this side's and never the sender's |
+| `test_svg.py` **shared** | the SVG sanitiser, tested as the security boundary it is: a real logo survives and still draws, sanitising it twice changes nothing — which is what lets the receiving host prove bytes are clean without editing them — and script, event handlers, entities, embedded rasters, animation, filters and any reference off the file are each refused rather than quietly stripped |
 
 ### In a real browser
 

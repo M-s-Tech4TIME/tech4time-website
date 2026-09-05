@@ -126,16 +126,29 @@ EXPECT = [
 
     # uploads/ is the one directory on this host that is BOTH written over the
     # network and served to the public, so it is the one worth asserting hardest
-    # about. .htaccess serves exactly sixteen hex characters and three raster
-    # extensions there and refuses everything else — the third of the three
-    # layers in ADR 0019, and the only one that still holds if the other two are
+    # about. .htaccess serves exactly sixteen hex characters and one of four
+    # extensions there and refuses everything else — the fourth of the five
+    # layers in ADR 0019, and one of the two that still hold if the others are
     # wrong. None of this is testable against the dev server, which does not
     # read .htaccess, so here is the only place it is ever checked.
     ("/uploads/",                 (403, 404),  "uploads/ does not list its contents"),
     ("/uploads/x.php",            (403, 404),  "and a .php there is refused before any handler sees it"),
     ("/uploads/../lib/contract.php", (400, 403, 404), "nor does a path climb out of it"),
     ("/uploads/notahexname.webp", (403, 404),  "a name this site did not mint is refused"),
-    ("/uploads/0123456789abcdef.svg", (403, 404), "and so is an extension it does not serve"),
+    ("/uploads/0123456789abcdef.gif", (403, 404), "and so is an extension it does not serve"),
+
+    # A vector file IS served now, so the assertion here is the opposite one and
+    # the status has to be exact: 404 means the rewrite let this shape through
+    # to the filesystem and there is simply no such file, which is what should
+    # happen. A 403 would mean the allow-list is still refusing .svg and every
+    # logo the branding page offers is a dead link.
+    #
+    # What makes serving one SAFE — Content-Disposition: attachment and a
+    # sandboxed CSP — cannot be asserted from here without a real published
+    # file to ask for. It is proved instead by tools/test_publish_asset.py at
+    # the endpoint, and by tools/dev-router.php locally, which carries the same
+    # two headers for the same paths.
+    ("/uploads/0123456789abcdef.svg", (404,), "but a vector file is allowed through to be served"),
 ]
 
 # (path, header, what must be in its value)

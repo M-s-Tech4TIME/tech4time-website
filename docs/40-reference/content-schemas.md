@@ -429,6 +429,73 @@ check would notice: it is a true sentence that has quietly stopped being true. C
 substitution live in `lib/contract.php` rather than in either renderer, so the editor's preview and
 the published page cannot disagree about what a token means.
 
+## `content/branding.json`
+
+The branding & advertisement page: the logo files people download, and the terms covering their
+use. Edited at `/?s=branding`.
+
+```
+meta    { title, description, share_title, breadcrumb }
+hero    { title, subtitle }
+assets  { status, eyebrow, title, lead, items[] }
+legal   { status, title, items[] }
+cta     { status, title, text, items[] }
+```
+
+One `assets.items[]` row is a logo variant:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | minted from the title |
+| `title` `text` | string | the card's heading and its one line of description |
+| `alt` | string | read instead of the preview picture |
+| `plate` | string | `light`, `dark` or `neutral` — the background behind the preview |
+| `status` | string | `shown` or hidden |
+| `image` | picture | the preview drawn on the card |
+| `files[]` | list | what a visitor can download |
+
+And one `files[]` row:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | minted from the label, or the format when there is none |
+| `label` | string | the adjective in the meta line — *"Transparent PNG"* |
+| `filename` | string | the `download=` attribute: what the visitor's computer calls it. No separators; `branding_safe_filename()` empties anything with one |
+| `status` | string | `shown` or hidden |
+| `file` | picture | the file itself, which may be a vector |
+
+`legal.items[]` rows are `{ id, text, status }` and `text` is **rich text** — the only rich text on
+the page, because it is a legal notice and the sentence asking a rights holder to get in touch is a
+link waiting to happen. It goes through `rt_sanitise_html()` on save and again on receipt.
+
+### The preview and the download are two different pictures
+
+`image` is the small thing on the card; `files[].file` is what somebody came for. On the page as it
+ships those are an 800px preview and a 1600px download of the same mark. Collapsing them would
+either serve the big file to everyone who merely looks at the page, or hand out the small one to
+everyone who came for the logo.
+
+A download may be an **SVG**; a preview may not. The page *links* to a vector file and never draws
+one — see [0019](../90-decisions/0019-uploaded-images-travel-their-own-channel.md) and `lib/svg.php`.
+A download is also allowed up to `UPLOAD_MAX_DOWNLOAD_DIMENSION` (3000px) rather than the 1600px
+every displayed picture is reduced to, because it is the deliverable rather than decoration.
+
+### Three things are not in the file
+
+- **the size in a meta line** — *"1600 × 570"* is read off the file's own record, so it cannot claim
+  a size the file no longer has. Only the adjective beside it is stored, because *"Transparent"* is
+  editorial;
+- **the words on a download button** — *"Download PNG"* states the file's own format;
+- **the glyph on it** — every button carries `arrow-down`, so it is a constant in the renderer.
+
+### The breadcrumb is its own field
+
+The page is titled *"Branding Assets & Guidelines"* and called *"Branding & Advertisement"*
+everywhere it is linked from. The about, company and certifications pages let their breadcrumb
+follow `hero.title` because on those three the two strings are the same; here they differ, so a
+breadcrumb that followed the hero would quietly rename the page in every search result that shows a
+trail.
+
 ## Which pictures get a light/dark pair, and which do not
 
 Asked and settled on 2026-08-31. Every managed picture on the site, and why it is or is not a pair:

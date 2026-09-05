@@ -36,11 +36,12 @@ python3 tools/check_shared_repos.py      # the three files both halves hold iden
 ```bash
 python3 tools/test_publish.py          # the one endpoint that writes, over HTTP
 python3 tools/test_publish_asset.py    # the other one — pictures arrive there
+python3 tools/test_svg.py              # the SVG sanitiser, which is a security boundary
 python3 tools/test_contact_handler.py  # the enquiry form's endpoint
 python3 tools/test_store.py            # the JSON store itself
 ```
 
-Touched `lib/contract.php`, `lib/publish.php` or `lib/html.php`? Then also:
+Touched `lib/contract.php`, `lib/publish.php`, `lib/html.php` or `lib/svg.php`? Then also:
 
 ```bash
 python3 tools/check_shared_lib.py --update    # re-record the digests

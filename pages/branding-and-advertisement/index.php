@@ -1,11 +1,43 @@
+<?php
+/**
+ * Tech4TIME — the branding & advertisement page.
+ *
+ * PHP, and not HTML, because its content is edited at admin.tech4time.bd and
+ * arrives here as content/branding.json. Rendered on the server, on this
+ * request, from a file on this disk: no fetch, no framework, and the page works
+ * with JavaScript switched off. See ADR 0003 and ADR 0010.
+ *
+ * Everything editable goes through h() EXCEPT the disclaimer's paragraphs,
+ * which are rich text and are printed bare — sanitised on the way in by
+ * contract_sanitise(), and again on receipt, because a signature proves where
+ * a document came from and not what is inside it.
+ *
+ * The header, footer, dock and hero circuit are shared markup and stay
+ * literal; tools/check_shared_markup.py holds them byte-identical to
+ * tools/templates/. The scroll-reveal markers below are hand-maintained,
+ * because tools/apply_reveals.py reports and skips any page that builds part
+ * of itself with a loop, which this one now does.
+ *
+ * UNLIKE THE CERTIFICATIONS PAGE, THIS ONE NEEDS NO SECOND SPRITE. Nothing
+ * here picks an icon at run time: every download button carries #arrow-down,
+ * one constant, and it stays a literal href="#arrow-down" below where
+ * tools/inject_icons.py can see it. See BRANDING_DOWNLOAD_GLYPH.
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/../../lib/branding.php';
+
+$data = branding_load();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Branding Assets &amp; Guidelines | Tech4TIME</title>
-<meta name="description" content="Download the Tech4TIME logo in four variants for light and dark backgrounds, transparent or plated, with the terms covering their use.">
+<title><?= h($data['meta']['title']) ?></title>
+<meta name="description" content="<?= h($data['meta']['description']) ?>">
 <link rel="canonical" href="https://tech4time.bd/pages/branding-and-advertisement/">
 
 <!-- Crawling. Large image previews and full snippets are allowed so rich
@@ -23,8 +55,8 @@
 <meta property="og:type" content="website">
 <meta property="og:locale" content="en_US">
 <meta property="og:site_name" content="Tech4TIME">
-<meta property="og:title" content="Branding Assets &amp; Guidelines | Tech4TIME">
-<meta property="og:description" content="Download the Tech4TIME logo in four variants for light and dark backgrounds, transparent or plated, with the terms covering their use.">
+<meta property="og:title" content="<?= h($data['meta']['share_title']) ?>">
+<meta property="og:description" content="<?= h($data['meta']['description']) ?>">
 <meta property="og:url" content="https://tech4time.bd/pages/branding-and-advertisement/">
 <meta property="og:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
 <meta property="og:image:width" content="1200">
@@ -33,8 +65,8 @@
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Branding Assets &amp; Guidelines | Tech4TIME">
-<meta name="twitter:description" content="Download the Tech4TIME logo in four variants for light and dark backgrounds, transparent or plated, with the terms covering their use.">
+<meta name="twitter:title" content="<?= h($data['meta']['share_title']) ?>">
+<meta name="twitter:description" content="<?= h($data['meta']['description']) ?>">
 <meta name="twitter:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
 <meta name="twitter:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
 
@@ -67,7 +99,7 @@
 <link rel="stylesheet" href="/assets/css/layout.css?v=4">
 <link rel="stylesheet" href="/assets/css/components.css">
 <link rel="stylesheet" href="/assets/css/animations.css">
-<link rel="stylesheet" href="/assets/css/pages/branding.css">
+<link rel="stylesheet" href="/assets/css/pages/branding.css?v=2">
 
 <!-- Colour mode, applied before first paint to avoid a flash of the wrong
      theme. Deliberately NOT deferred; see the comment in the file itself. -->
@@ -254,7 +286,7 @@
     {
       "@type": "ListItem",
       "position": 2,
-      "name": "Branding & Advertisement",
+      "name": <?= json_encode($data['meta']['breadcrumb'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>,
       "item": "https://tech4time.bd/pages/branding-and-advertisement/"
     }
   ]
@@ -599,141 +631,89 @@
 <!--hero-circuit:end-->
 
 <div class="container page-hero__inner">
-      <h1 class="page-hero__title">Branding Assets &amp; Guidelines</h1>
-      <p class="page-hero__subtitle">Our Logo, and How to Use It</p>
+      <h1 class="page-hero__title"><?= h($data['hero']['title']) ?></h1>
+      <p class="page-hero__subtitle"><?= h($data['hero']['subtitle']) ?></p>
     </div>
   </section>
 
   <!-- ============================ Assets ============================= -->
+<?php if (branding_band_shown($data, 'assets')): ?>
   <section class="section assets" aria-labelledby="assets-heading">
     <div class="container">
       <div data-reveal data-reveal-delay class="section__header">
-        <span class="section__eyebrow">Downloads</span>
-        <h2 class="section__title" id="assets-heading">Tech4TIME Logos for Branding &amp; Advertisement</h2>
+        <span class="section__eyebrow"><?= h($data['assets']['eyebrow']) ?></span>
+        <h2 class="section__title" id="assets-heading"><?= h($data['assets']['title']) ?></h2>
         <p class="section__lead">
-          Four variants of the mark. Pick the one that matches the background it
-          will sit on — the light-theme logo is dark ink for pale backgrounds,
-          the dark-theme logo pale ink for dark ones.
+          <?= h($data['assets']['lead']) ?>
         </p>
       </div>
 
       <div class="assets__grid">
+<?php foreach (branding_rows_shown($data['assets']['items']) as $asset): ?>
         <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--light">
-            <picture>
-              <source srcset="/assets/images/branding/logo-light-transparent.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-light-transparent.png"
-                   alt="Tech4TIME logo in dark ink on a transparent background"
-                   width="800" height="285" loading="lazy" decoding="async">
-            </picture>
+          <div class="asset__preview asset__preview--<?= h($asset['plate']) ?>">
+            <?= branding_picture($asset['image'], 'asset__image', (string)$asset['alt']) ?>
           </div>
           <div class="asset__body">
-            <h3 class="asset__title">Light Theme Logo</h3>
-            <p class="asset__text">The primary mark, for placing on white or any pale background.</p>
-            <p class="asset__meta">Transparent PNG · 1600 × 570</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-light-transparent-full.png" download="tech4time-logo-light-theme.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
+            <h3 class="asset__title"><?= h($asset['title']) ?></h3>
+            <p class="asset__text"><?= h($asset['text']) ?></p>
+            <?php /* The wrapper is what pins the buttons to a common line
+                     across the row, and it exists because there can be more
+                     than one of them: two anchors each claiming
+                     margin-block-start:auto would split the free space between
+                     themselves instead. One file or five, the group moves as
+                     one. */ ?>
+            <div class="asset__files">
+<?php foreach (branding_rows_shown($asset['files']) as $file): ?>
+              <p class="asset__meta"><?= h(branding_meta_line($file)) ?></p>
+              <a class="btn btn--primary asset__download"
+                 href="<?= h($file['file']['src']) ?>" download="<?= h($file['filename']) ?>">
+                <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
+                <?= h(branding_download_label($file)) ?>
+              </a>
+<?php endforeach; ?>
+            </div>
           </div>
         </article>
-
-        <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--dark">
-            <picture>
-              <source srcset="/assets/images/branding/logo-dark-transparent.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-dark-transparent.png"
-                   alt="Tech4TIME logo in pale ink on a transparent background"
-                   width="800" height="285" loading="lazy" decoding="async">
-            </picture>
-          </div>
-          <div class="asset__body">
-            <h3 class="asset__title">Dark Theme Logo</h3>
-            <p class="asset__text">The same mark in pale ink, for placing on black or any dark background.</p>
-            <p class="asset__meta">Transparent PNG · 1600 × 570</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-dark-transparent-full.png" download="tech4time-logo-dark-theme.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
-          </div>
-        </article>
-
-        <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--neutral">
-            <picture>
-              <source srcset="/assets/images/branding/logo-light-background.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-light-background.jpg"
-                   alt="Tech4TIME logo in dark ink on a light background plate"
-                   width="800" height="450" loading="lazy" decoding="async">
-            </picture>
-          </div>
-          <div class="asset__body">
-            <h3 class="asset__title">Light Theme With Background</h3>
-            <p class="asset__text">The light mark supplied on its own pale plate, for use where a transparent file cannot be placed.</p>
-            <p class="asset__meta">PNG · 1600 × 900</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-light-background-full.png" download="tech4time-logo-light-theme-background.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
-          </div>
-        </article>
-
-        <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--neutral">
-            <picture>
-              <source srcset="/assets/images/branding/logo-dark-background.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-dark-background.jpg"
-                   alt="Tech4TIME logo in pale ink on a dark background plate"
-                   width="800" height="450" loading="lazy" decoding="async">
-            </picture>
-          </div>
-          <div class="asset__body">
-            <h3 class="asset__title">Dark Theme With Background</h3>
-            <p class="asset__text">The dark mark supplied on its own dark plate, for use where a transparent file cannot be placed.</p>
-            <p class="asset__meta">PNG · 1600 × 900</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-dark-background-full.png" download="tech4time-logo-dark-theme-background.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
-          </div>
-        </article>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
+<?php endif; ?>
 
   <!-- ========================== Disclaimer =========================== -->
+<?php if (branding_band_shown($data, 'legal')): ?>
   <section class="section section--surface disclaimer" aria-labelledby="disclaimer-heading">
     <div class="container">
       <div data-reveal data-reveal-delay class="section__header">
-        <h2 class="section__title" id="disclaimer-heading">Disclaimer</h2>
+        <h2 class="section__title" id="disclaimer-heading"><?= h($data['legal']['title']) ?></h2>
       </div>
 
       <div class="disclaimer__body">
-        <p data-reveal data-reveal-delay class="disclaimer__text">All logos, trademarks, service marks, trade names, designs, and other proprietary assets displayed on this website or in any associated materials of M/s. Tech4TIME are the exclusive property of their respective owners and are protected under applicable intellectual property laws of Bangladesh, including but not limited to the Copyright Act, 2000 and the Trademarks Act, 2009, as well as relevant international conventions.</p>
-        <p data-reveal data-reveal-delay class="disclaimer__text">Any third-party logos or assets used herein are presented strictly for identification, informational, or reference purposes only. Their inclusion does not constitute or imply any form of affiliation, partnership, endorsement, or sponsorship by the respective owners, unless expressly stated in writing.</p>
-        <p data-reveal data-reveal-delay class="disclaimer__text">Unauthorized use, reproduction, modification, distribution, or exploitation of any logos or proprietary assets, in whole or in part, without prior written consent from the rightful owner is strictly prohibited and may result in legal action under applicable laws and regulations.</p>
-        <p data-reveal data-reveal-delay class="disclaimer__text">M/s. Tech4TIME respects the intellectual property rights of all entities. If you are the owner of any logo or asset featured and believe it has been used in a manner that constitutes infringement or is otherwise inappropriate, you are requested to contact us immediately for prompt review and necessary corrective action.</p>
+<?php foreach (branding_rows_shown($data['legal']['items']) as $note): ?>
+        <p data-reveal data-reveal-delay class="disclaimer__text"><?= $note['text'] ?></p>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
+<?php endif; ?>
 
   <!-- ============================== CTA ============================== -->
+<?php if (branding_band_shown($data, 'cta')): ?>
   <section class="cta-band cta-band--base">
     <div class="container cta-band__inner">
-      <h2 data-reveal data-reveal-delay class="cta-band__title">Need something not listed here?</h2>
+      <h2 data-reveal data-reveal-delay class="cta-band__title"><?= h($data['cta']['title']) ?></h2>
       <p data-reveal data-reveal-delay class="cta-band__text">
-        For permission to use these marks outside the terms above, or for a
-        format we have not published, write to us.
+        <?= h($data['cta']['text']) ?>
       </p>
       <div data-reveal data-reveal-delay class="cta-band__actions">
-        <a class="btn btn--primary btn--lg" href="/pages/contact/">Contact Us</a>
+<?php foreach (branding_rows_shown($data['cta']['items']) as $button): ?>
+        <a class="btn btn--<?= h($button['style']) ?> btn--lg" href="<?= h($button['href']) ?>"><?= h($button['label']) ?></a>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
+<?php endif; ?>
 
 </main>
 

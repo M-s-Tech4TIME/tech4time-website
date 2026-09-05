@@ -100,6 +100,11 @@ class Results:
     def __init__(self) -> None:
         self.passed = 0
         self.failed: list[str] = []
+        self.skipped = 0
+
+    def skip(self, case: str) -> None:
+        self.skipped += 1
+        print(f"  --    {case}  (needs ext-dom)")
 
     def check(self, case: str, ok: bool, detail: str = "") -> bool:
         if ok:
@@ -112,7 +117,8 @@ class Results:
 
     def report(self) -> int:
         total = self.passed + len(self.failed)
-        print(f"\n{self.passed}/{total} checks passed")
+        tail = f" ({self.skipped} skipped, no ext-dom)" if self.skipped else ""
+        print(f"\n{self.passed}/{total} checks passed{tail}")
         if self.failed:
             print("\nfailed:")
             for case in self.failed:
@@ -212,6 +218,28 @@ def send(base: str, key: bytes, blob: bytes, *, mime="image/png",
         "X-T4T-Timestamp": str(ts),
         "X-T4T-Signature": signature,
     }, ASSET_ENDPOINT)
+
+
+def has_dom() -> bool:
+    """Whether this PHP can parse XML at all.
+
+    lib/svg.php refuses everything without ext-dom, which would make the cases
+    below pass for the wrong reason. Skipped rather than faked; CI installs
+    php-xml. Same bargain test_upload.py takes with GD.
+    """
+    return subprocess.run(["php", "-r", "exit(class_exists('DOMDocument') ? 0 : 1);"],
+                          cwd=ROOT, capture_output=True).returncode == 0
+
+
+def php_sanitised(svg: str) -> bytes:
+    """What lib/svg.php makes of this document — which is what the backend
+    would actually have sent."""
+    out = subprocess.run(
+        ["php", "-r", "require 'lib/svg.php';"
+         "$r = svg_sanitise(file_get_contents('php://stdin'));"
+         "echo $r['svg'] ?? '';"],
+        cwd=ROOT, input=svg.encode(), capture_output=True)
+    return out.stdout
 
 
 def held() -> list[str]:
@@ -344,6 +372,81 @@ def run(base: str, key: bytes, r: Results) -> None:
             status == 413 and answer.get("code") == "asset-too-large",
             f"{status} {answer}")
 
+    # ---------------------------------------------------------------- vectors
+    #
+    # THE POINT OF THIS SECTION IS THAT THIS HOST DOES NOT TRUST THE OTHER ONE.
+    # The backend sanitises an SVG and sends its own output. Everything below
+    # is signed exactly as a legitimate publish would be — so a signature is
+    # never what refuses it. What refuses it is this side sanitising the bytes
+    # again and finding they are not already the sanitiser's own output.
+    #
+    # If the admin host were ever compromised, that is the property that keeps
+    # a document out of /uploads/. See publish_asset_svg() in lib/publish.php.
+
+    print("\na vector file, checked here rather than taken on trust")
+
+    if not has_dom():
+        for case in ("a clean vector is accepted", "it is stored as .svg",
+                     "and its size came from the viewBox",
+                     "one carrying script is refused",
+                     "one carrying an event handler is refused",
+                     "one declaring an entity is refused",
+                     "one reaching off the file is refused",
+                     "a vector that was not sanitised is refused",
+                     "only the clean one was written"):
+            r.skip(case)
+        return
+
+    before = held()
+
+    clean = php_sanitised(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 182">'
+        '<path d="M10 10H500V170H10Z" fill="#0b0b0c"/></svg>')
+
+    status, answer = send(base, key, clean, mime="image/svg+xml")
+    r.check("a clean vector is accepted",
+            status == 200 and answer.get("ok") is True, f"{status} {answer}")
+    r.check("it is stored as .svg",
+            str(answer.get("asset", "")).endswith(".svg"), str(answer))
+    r.check("and its size came from the viewBox",
+            (answer.get("width"), answer.get("height")) == (512, 182), str(answer))
+    answer_asset = str(answer.get("asset", ""))
+
+    for label, doc in [
+        ("one carrying script is refused",
+         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+         "<script>alert(1)</script></svg>"),
+        ("one carrying an event handler is refused",
+         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" '
+         'onload="alert(1)"><path d="M0 0"/></svg>'),
+        ("one declaring an entity is refused",
+         '<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]>'
+         '<svg xmlns="http://www.w3.org/2000/svg"><text>&x;</text></svg>'),
+        ("one reaching off the file is refused",
+         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+         '<path d="M0 0" fill="url(https://evil.example/a.png)"/></svg>'),
+    ]:
+        status, answer = send(base, key, doc.encode(), mime="image/svg+xml")
+        r.check(label, status == 415 and answer.get("code") == "not-an-image",
+                f"{status} {answer}")
+
+    # The one that matters most: a document that IS a perfectly ordinary,
+    # harmless SVG but is not byte-for-byte what the sanitiser would produce.
+    # It is refused, because "already sanitised" is the only thing this side
+    # can prove without editing bytes whose hash is their name.
+    unclean = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+               "<!-- a comment the sanitiser would drop -->"
+               '<path d="M0 0"/></svg>')
+    status, answer = send(base, key, unclean.encode(), mime="image/svg+xml")
+    r.check("a vector that was not sanitised is refused",
+            status == 415 and answer.get("code") == "not-an-image",
+            f"{status} {answer}")
+
+    added = sorted(set(held()) - set(before))
+    r.check("only the clean one was written",
+            len(added) == 1 and added[0] == answer_asset,
+            f"{added} appeared in uploads/, wanted just the accepted vector")
+
 
 # --------------------------------------------------------------------- main
 
@@ -394,7 +497,8 @@ def main() -> None:
             print(f"  - {case}")
         sys.exit(1)
 
-    print(f"\n{r.passed}/{total} checks passed")
+    tail = f" ({r.skipped} skipped, no ext-dom)" if r.skipped else ""
+    print(f"\n{r.passed}/{total} checks passed{tail}")
 
 
 if __name__ == "__main__":

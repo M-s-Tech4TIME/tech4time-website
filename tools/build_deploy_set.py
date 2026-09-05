@@ -107,6 +107,8 @@ REQUIRED = [
     "lib/services.php",   # and the bands of all seven are drawn by this
     "pages/resource-certifications/index.php",
     "lib/certifications.php",
+    "pages/branding-and-advertisement/index.php",
+    "lib/branding.php",
     # /sitemap.xml is a rewrite onto this file. Missing, the sitemap 404s and
     # Search Console reports the whole site's index as failing to refresh.
     "sitemap.php",

@@ -255,13 +255,30 @@ def check_one_writer() -> None:
 
     for needle, label in (
         ("publish_verify(", "the asset endpoint verifies the signature too"),
-        ("publish_asset_type(", "and decides what a file is from its own header"),
+        # publish_asset_any(), not publish_asset_type(): the endpoint has two
+        # formats to decide between now, and the union is what it must call.
+        # A raster is read from its header; a vector is re-sanitised and
+        # refused unless it is already the sanitiser's own output. Calling
+        # only the raster half would silently stop accepting vectors; calling
+        # neither would take the sender's word for what arrived.
+        ("publish_asset_any(", "and decides what a file is from the bytes themselves"),
         ("publish_asset_name(", "and names it from the bytes, never from the sender"),
     ):
         if needle in asset:
             ok(label)
         else:
             bad(label, f"api/publish-asset.php no longer calls {needle}")
+
+    # ...and that the union is genuinely both halves, because the endpoint's
+    # one call is now the whole of its decision.
+    shared = (ROOT / "lib" / "publish.php").read_text()
+    body = shared.split("function publish_asset_any(", 1)
+    if len(body) == 2 and "publish_asset_type($bytes)" in body[1][:400] \
+            and "publish_asset_svg($bytes)" in body[1][:400]:
+        ok("which is the raster header AND the vector sanitiser, not one of them")
+    else:
+        bad("which is the raster header AND the vector sanitiser, not one of them",
+            "publish_asset_any() in lib/publish.php no longer calls both")
 
     # The name it writes must be computed, never taken from the request. This
     # looks for the shape of the mistake rather than its absence: any $_SERVER,

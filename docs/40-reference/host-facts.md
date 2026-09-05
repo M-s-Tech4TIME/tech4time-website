@@ -171,7 +171,8 @@ allowance up, which would stop the genuine reset from being delivered at the mom
 
 `~/public_html/uploads/` on this host, `~/admin.tech4time.bd/public/uploads/` on the other. Neither
 is in a repository, both are on the deploy **protect list**, and both are served by an `.htaccess`
-allow-list of sixteen hex characters and three raster extensions —
+allow-list of sixteen hex characters and four extensions — three raster, plus `svg`, which is
+served `Content-Disposition: attachment` and sandboxed so it downloads and never renders —
 [0019](../90-decisions/0019-uploaded-images-travel-their-own-channel.md).
 
 Proven end to end on **2026-08-28**: a picture re-encoded on the admin host, signed, posted to
