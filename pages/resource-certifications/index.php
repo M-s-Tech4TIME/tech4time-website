@@ -536,6 +536,10 @@ $meta_description = certifications_fill((string)$data['meta']['description'], $c
               <span class="contact-item__label">Malaysia</span>
               <a href="tel:+60198527096">+60 198527096</a>
               <span class="contact-item__note">Monday – Friday</span>
+
+              <span class="contact-item__label">Belgium</span>
+              <a href="tel:+3225557525">+32 2 555 75 25</a><br>
+              <a href="tel:+3229995575">+32 2 999 55 75</a>
             </div>
           </div>
 

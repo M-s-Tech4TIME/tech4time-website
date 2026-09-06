@@ -73,6 +73,12 @@ function seo_identity(): array
     return seo_load()['identity'];
 }
 
+/** What robots.txt is told, and what connects this site to somebody's console. */
+function seo_crawl(): array
+{
+    return seo_load()['crawl'];
+}
+
 /** The 404 page's meta band. The same shape every page's is. */
 function seo_notfound(): array
 {

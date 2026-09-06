@@ -96,6 +96,30 @@ const HEAD_CSP = "default-src 'self'; img-src 'self' data:; style-src 'self'; "
                . "script-src 'self'; font-src 'self'; form-action 'self'; "
                . "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
 
+/**
+ * The same policy, widened by exactly what Google Analytics needs.
+ *
+ * THIS IS THE ONE PLACE THE "NO EXTERNAL ORIGIN" RULE IS BROKEN, and it is
+ * broken only while somebody has put a measurement id in the editor. With the
+ * field empty seo_head() sends HEAD_CSP above, unchanged, byte for byte -- so
+ * the site's default state is the state it has always shipped in, and clearing
+ * the field puts it back with a save rather than a deploy.
+ *
+ * .htaccess has to name these origins unconditionally, because a header cannot
+ * read a JSON file. This policy is what actually keeps them shut: a browser
+ * enforces every policy it is given, so the strict one above wins whenever it
+ * is the one sent. See ADR 0021.
+ */
+const HEAD_CSP_ANALYTICS =
+      "default-src 'self'; "
+    . "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com; "
+    . "style-src 'self'; "
+    . "script-src 'self' https://www.googletagmanager.com; "
+    . "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com "
+    . "https://*.googletagmanager.com; "
+    . "font-src 'self'; form-action 'self'; "
+    . "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+
 /** The pretty-printing every JSON-LD block on this site uses. */
 const HEAD_JSON_FLAGS = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
 
@@ -115,6 +139,8 @@ function seo_head(string $route, array $meta, array $styles = [],
 
     $title       = (string)($meta['title'] ?? '');
     $description = (string)($meta['description'] ?? '');
+    $keywords    = (string)($meta['keywords'] ?? '');
+    $analytics   = (string)(seo_crawl()['analytics_id'] ?? '');
     $shareTitle  = (string)($meta['share_title'] ?? '') !== ''
         ? (string)$meta['share_title'] : $title;
     $robots      = (string)($meta['robots'] ?? 'index');
@@ -125,6 +151,17 @@ function seo_head(string $route, array $meta, array $styles = [],
     $out[] = '';
     $out[] = '<title>' . h($title) . '</title>';
     $out[] = '<meta name="description" content="' . h($description) . '">';
+
+    /* KEYWORDS, AND WHAT THEY ARE AND ARE NOT WORTH. Google has ignored this
+       tag since 2009 and says so in public; Bing treats it as a spam signal
+       when it is stuffed. It is emitted because it is asked for, it is honest
+       when it is short and true of the page, and several smaller and regional
+       engines plus on-site search tools still read it. It is omitted entirely
+       when empty rather than sent blank, so a page that has not been given a
+       list makes no claim at all. */
+    if ($keywords !== '') {
+        $out[] = '<meta name="keywords" content="' . h($keywords) . '">';
+    }
 
     /* A canonical is a claim that this address is the right one for this page.
        The 404 is served at every address that does not exist, so it has no
@@ -170,7 +207,8 @@ function seo_head(string $route, array $meta, array $styles = [],
        turn 'self' into &#039;self&#039; and the browser would refuse the whole
        policy. The rule that everything editable goes through h() is intact --
        nothing here is editable. */
-    $out[] = '<meta http-equiv="Content-Security-Policy" content="' . HEAD_CSP . '">';
+    $out[] = '<meta http-equiv="Content-Security-Policy" content="'
+           . ($analytics !== '' ? HEAD_CSP_ANALYTICS : HEAD_CSP) . '">';
 
     $out[] = '';
     $out[] = '<!-- Open Graph -->';
@@ -245,6 +283,27 @@ function seo_head(string $route, array $meta, array $styles = [],
     $out[] = "<!-- Colour mode, applied before first paint to avoid a flash of the wrong\n"
            . "     theme. Deliberately NOT deferred; see the comment in the file itself. -->";
     $out[] = '<script src="/assets/js/theme-init.js"></script>';
+
+    /* MEASUREMENT, AND ONLY IF ASKED FOR. Two tags rather than the one Google
+       documents, because the second half of their snippet is an inline script
+       and script-src 'self' refuses those silently -- the page would look
+       right and measure nothing. analytics.js is this site's own file and
+       reads the id off its own data attribute.
+
+       The id has already been through SEO_ANALYTICS_ID in contract_normalise(),
+       so what reaches this line is letters, digits and dashes or nothing at
+       all; h() is still applied, because "it cannot get here" is a reason to
+       check, not a reason to skip. */
+    if ($analytics !== '') {
+        $out[] = '';
+        $out[] = '<!-- Google Analytics. Emitted only while a measurement id is set on'
+               . "\n     the SEO screen; clearing it removes these two lines and closes"
+               . "\n     the Content Security Policy above again. ADR 0021. -->";
+        $out[] = '<script async src="https://www.googletagmanager.com/gtag/js?id='
+               . h(rawurlencode($analytics)) . '"></script>';
+        $out[] = '<script src="/assets/js/analytics.js?v=1" data-ga="'
+               . h($analytics) . '" defer></script>';
+    }
 
     echo implode("\n", $out), "\n";
 }

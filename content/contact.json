@@ -1,10 +1,21 @@
 {
-    "updated": "",
+    "updated": "2026-08-26T20:06:00+00:00",
     "footer_synced": "4d3f0075b40b7fb4e5b594735a8fe790bb36281e7b5be26da3db77c0e7de857f",
     "meta": {
         "title": "Contact Us — Dhaka, Selangor & Brussels | Tech4TIME",
         "description": "Get in touch with Tech4TIME. Offices in Dhaka, Selangor and Brussels, email info@tech4time.bd, and a reply within one working day.",
-        "share_title": "Ask for a quote or just contact us"
+        "share_title": "Ask for a quote or just contact us",
+        "breadcrumb": "Contact Us",
+        "robots": "index",
+        "changefreq": "yearly",
+        "priority": "0.7",
+        "share": {
+            "src": "",
+            "webp": "",
+            "width": 0,
+            "height": 0
+        },
+        "share_alt": ""
     },
     "hero": {
         "title": "Contact Us",
@@ -34,7 +45,8 @@
                 "values": [
                     "info@tech4time.bd"
                 ],
-                "text": ""
+                "text": "",
+                "status": "shown"
             },
             {
                 "icon": "phone",
@@ -45,7 +57,8 @@
                     "+880 1881873463",
                     "+880 1847313835"
                 ],
-                "text": ""
+                "text": "",
+                "status": "shown"
             },
             {
                 "icon": "clock",
@@ -54,7 +67,8 @@
                 "values": [
                     "Within one working day"
                 ],
-                "text": ""
+                "text": "",
+                "status": "shown"
             },
             {
                 "icon": "linkedin",
@@ -63,9 +77,11 @@
                 "values": [
                     "https://www.linkedin.com/company/tech4time-bd/"
                 ],
-                "text": "Tech4TIME"
+                "text": "Tech4TIME",
+                "status": "shown"
             }
-        ]
+        ],
+        "status": "shown"
     },
     "offices": {
         "eyebrow": "Where We Are",
@@ -94,6 +110,12 @@
                     "region": "",
                     "postal_code": "1206",
                     "country": "BD"
+                },
+                "image": {
+                    "src": "",
+                    "webp": "",
+                    "width": 0,
+                    "height": 0
                 }
             },
             {
@@ -115,6 +137,12 @@
                     "region": "Selangor",
                     "postal_code": "",
                     "country": "MY"
+                },
+                "image": {
+                    "src": "",
+                    "webp": "",
+                    "width": 0,
+                    "height": 0
                 }
             },
             {
@@ -123,9 +151,8 @@
                 "flag": "belgium",
                 "address": "367, Avenue Louise, Brussels, Belgium",
                 "phones": [
-                    "+880 1320571562",
-                    "+880 1881873463",
-                    "+880 1847313835"
+                    "+32 2 555 75 25",
+                    "+32 2 999 55 75"
                 ],
                 "hours": "",
                 "languages": [
@@ -138,8 +165,16 @@
                     "region": "",
                     "postal_code": "",
                     "country": "BE"
+                },
+                "image": {
+                    "src": "",
+                    "webp": "",
+                    "width": 0,
+                    "height": 0
                 }
             }
-        ]
-    }
+        ],
+        "status": "shown"
+    },
+    "revision": 1
 }

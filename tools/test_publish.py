@@ -466,6 +466,7 @@ def company_round_trip(base: str, key: bytes, r: Results) -> None:
     data["meta"]["title"] = f"{MARK}-tab"
     data["meta"]["description"] = f"{MARK}-desc"
     data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["keywords"] = f"{MARK}-kw"
     data["hero"]["title"] = f"{MARK}-hero"
     data["hero"]["subtitle"] = f"{MARK}-sub"
     data["milestones"]["eyebrow"] = f"{MARK}-m-eyebrow"
@@ -518,7 +519,7 @@ def company_round_trip(base: str, key: bytes, r: Results) -> None:
     _, page = get(base, "/pages/company-profile/")
 
     missing = [k for k in (
-        "tab", "desc", "share", "hero", "sub",
+        "tab", "desc", "share", "kw", "hero", "sub",
         "m-eyebrow", "m-title", "m-lead", "m-row", "m-text",
         "b-eyebrow", "b-title", "x-title", "x-label",
         "c-title", "c-name", "j-title", "j-lead", "j-alt",
@@ -528,6 +529,13 @@ def company_round_trip(base: str, key: bytes, r: Results) -> None:
     ) if f"{MARK}-{k}" not in page]
     r.check("every field the model declares reaches the page",
             not missing, "never rendered: " + ", ".join(missing))
+
+    # Not just present -- present as the tag it is meant to be. A keyword list
+    # that reached the page inside some other element would satisfy the marker
+    # walk above and tell a search engine nothing.
+    r.check("the keywords reach the page as a keywords tag",
+            f'<meta name="keywords" content="{MARK}-kw">' in page,
+            "the marker arrived, but not in the tag it is for")
 
     r.check("the figure keeps its count-up hook", 'data-count-up>42+<' in page)
     r.check("the slideshow carries the interval it was given",
@@ -1731,6 +1739,7 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
 
     data["crawl"]["verify_google"] = f"{MARK}-googletoken"
     data["crawl"]["verify_bing"] = f"{MARK}-bingtoken"
+    data["crawl"]["analytics_id"] = "G-PUBLISHED1"
     data["crawl"]["robots_extra"] = ["/contact-handler.php", f"/{MARK}-disallowed"]
 
     data["manifest"]["short_name"] = f"{MARK}-shortname"
@@ -1759,6 +1768,17 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
          f'name="google-site-verification" content="{MARK}-googletoken"'),
         ("the Bing verification tag",
          f'name="msvalidate.01" content="{MARK}-bingtoken"'),
+
+        # THE ONE FIELD THAT REACHES ANOTHER COMPANY'S SERVERS. Both halves are
+        # named: the loader Google serves, and this site's own configuration
+        # file, which exists because their second <script> is inline and
+        # script-src 'self' refuses those without a word.
+        ("the analytics loader",
+         '<script async src="https://www.googletagmanager.com/gtag/js?id=G-PUBLISHED1">'),
+        ("and the configuration script, which is this site's own file",
+         '<script src="/assets/js/analytics.js?v=1" data-ga="G-PUBLISHED1" defer>'),
+        ("and the policy widened to let exactly that through",
+         "script-src 'self' https://www.googletagmanager.com"),
     ]:
         r.check(f"  {what}", needle in page, needle)
 

@@ -118,6 +118,24 @@ having to tell the two apart.
 This is why the rich-text sanitiser has no `style` attribute and why alignment is a class from a
 fixed list.
 
+### There are two policies, and the stricter one decides
+
+`.htaccess` sets one as a header; `lib/head.php` sends one as a `<meta>` with every page. A browser
+enforces **every** policy it is handed, so what applies is the intersection — which is what makes
+the following arrangement work.
+
+`.htaccess` names `googletagmanager.com` and the Google Analytics endpoints unconditionally,
+because a header cannot read `content/seo.json` and so cannot know whether anybody has asked for
+analytics. The page-level policy stays `script-src 'self'` **until a measurement id is set on the
+SEO screen** — so with the field empty, which is how the site ships, the effective policy is the
+strict one above and no page reaches another origin at all.
+
+The cost is stated rather than hidden: for those Google origins only, one layer of defence in depth
+is spent, so that switching analytics on and off is a save rather than a deploy.
+`tools/audit_pages.py` asserts the result from the rendered pages — with no id, *any* external
+origin is a failure; with one, that origin is expected and every other one still fails.
+[ADR 0021](../90-decisions/0021-analytics-is-off-until-somebody-turns-it-on.md)
+
 ### Other headers
 
 `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and HSTS

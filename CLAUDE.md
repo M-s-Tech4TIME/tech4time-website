@@ -21,7 +21,11 @@ its record before acting.
 
 1. **No build step, no framework, no bundler, no package manager.** The files here are the files
    that run on the server.
-2. **No CDN and no external origin.** Everything is self-hosted.
+2. **No CDN and no external origin.** Everything is self-hosted — with **one** exception, which is
+   off unless somebody has switched it on: Google Analytics, from
+   `?s=seo&site=crawl`. With that field empty no page reaches another origin at all and the CSP is
+   unchanged; `tools/audit_pages.py` refuses any other external origin either way.
+   [ADR 0021](docs/90-decisions/0021-analytics-is-off-until-somebody-turns-it-on.md)
 3. **No inline styles or scripts.** The CSP is `style-src 'self'; script-src 'self'` — a `style=`
    attribute, a `<style>` block or an `onclick` will be refused by the browser.
 4. **Every page must work with JavaScript off.** Progressive enhancement is a hard rule. Motion may
@@ -74,7 +78,8 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
 | Header / footer | `tools/templates/` → `propagate_shared.py` |
 | Anything in a page's `<head>` | `lib/head.php` if it is code, **`https://admin.tech4time.bd/?s=seo`** if it is words. Never a page file |
-| A title, description, share card, crawl setting, the sitemap, `robots.txt`, the manifest | **`https://admin.tech4time.bd/?s=seo`** |
+| A title, description, keywords, share card, crawl setting, the sitemap, `robots.txt`, the manifest | **`https://admin.tech4time.bd/?s=seo`** |
+| Whether Google Analytics runs, and against which property | **`https://admin.tech4time.bd/?s=seo&site=crawl`** — a field, not a deploy |
 | An icon | the markup, then `python3 tools/inject_icons.py` |
 | A job post, a contact detail, a certification, a logo file, the privacy policy, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
 | A page's address | `SEO_ROUTES` in `lib/contract.php`, and `.htaccess`. A route is code; the editor cannot add, rename or remove one |

@@ -181,6 +181,13 @@ HEADERS = [
     # type is what tells the client which -- and this site sends
     # X-Content-Type-Options: nosniff, so nothing will guess on its behalf. A
     # sitemap served as text/html is a sitemap Google will not read.
+    # Proof that the CSP header on the host is the current one. The Google
+    # origins are what make the analytics switch a save rather than a deploy;
+    # a host still serving the older header would refuse the script and the
+    # editor's field would appear to do nothing. What actually decides whether
+    # anything loads is the page's own <meta> policy — see ADR 0021.
+    ("/", "content-security-policy", "googletagmanager.com"),
+
     ("/robots.txt",       "content-type", "text/plain"),
     ("/sitemap.xml",      "content-type", "application/xml"),
     ("/site.webmanifest", "content-type", "application/manifest+json"),

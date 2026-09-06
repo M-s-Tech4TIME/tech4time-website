@@ -25,6 +25,7 @@ Exits non-zero if anything fails, so it can gate the Phase 5 audit.
 """
 
 import json
+import functools
 import re
 import shutil
 import subprocess
@@ -288,6 +289,31 @@ def resolve_internal(href: str) -> Path | None:
     return target
 
 
+@functools.lru_cache(maxsize=None)
+def php_value(code: str) -> str:
+    """Ask lib/ for something, rather than keeping a second copy of it here.
+
+    THE LENGTH LIMITS USED TO BE TYPED IN THIS FILE. 65, 50 and 165 appeared
+    here and again in lib/contract.php, and the documentation quoted a third
+    pair of numbers -- 150-160 -- so the project had three answers to "how long
+    may a description be" and no way to notice. They are read now, so the model
+    is the only place they exist and the editor and this check cannot drift.
+    """
+    php = shutil.which("php")
+    if not php:
+        return ""
+
+    result = subprocess.run(
+        [php, "-r", "declare(strict_types=1); " + code],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"php could not read a value this check needs:\n{result.stderr.strip()[:300]}")
+
+    return result.stdout.strip()
+
+
 def render_php(path: Path, service: str | None = None) -> tuple[str, str | None]:
     """Run a .php page and return what it sends to a browser.
 
@@ -413,8 +439,10 @@ def audit_page(path: Path, seen_titles: dict, seen_descriptions: dict,
     if not parser.title:
         fail("missing <title>")
     else:
-        if len(parser.title) > 65:
-            fail(f"title is {len(parser.title)} chars (aim for <=65): {parser.title!r}")
+        title_max = int(php_value("require 'lib/contract.php'; echo SEO_TITLE_MAX;") or 65)
+        if len(parser.title) > title_max:
+            fail(f"title is {len(parser.title)} chars (aim for <={title_max}): "
+                 f"{parser.title!r}")
         if parser.title in seen_titles:
             fail(f"duplicate title, also on {seen_titles[parser.title]}")
         else:
@@ -424,8 +452,10 @@ def audit_page(path: Path, seen_titles: dict, seen_descriptions: dict,
         fail("missing meta description")
     else:
         n = len(parser.description)
-        if not 50 <= n <= 165:
-            fail(f"meta description is {n} chars (aim for 50-165)")
+        low = int(php_value("require 'lib/contract.php'; echo SEO_DESC_MIN;") or 50)
+        high = int(php_value("require 'lib/contract.php'; echo SEO_DESC_MAX;") or 165)
+        if not low <= n <= high:
+            fail(f"meta description is {n} chars (aim for {low}-{high})")
         if parser.description in seen_descriptions:
             fail(f"duplicate description, also on {seen_descriptions[parser.description]}")
         else:
@@ -536,6 +566,105 @@ def audit_page(path: Path, seen_titles: dict, seen_descriptions: dict,
         )
 
     return problems
+
+
+# The tags a browser fetches from without being told to, and the attribute on
+# each that names what it fetches. <a> is absent on purpose, and so is <meta>.
+FETCHING_TAGS = {
+    "script": "src", "img": "src", "iframe": "src", "embed": "src",
+    "source": "srcset", "track": "src", "video": "src", "audio": "src",
+    "object": "data",
+}
+
+# <link> fetches for some values of rel and not for others: a stylesheet is a
+# request, a canonical is a statement.
+FETCHING_REL = {
+    "stylesheet", "preload", "prefetch", "preconnect", "dns-prefetch",
+    "modulepreload", "icon", "shortcut icon", "apple-touch-icon", "manifest",
+}
+
+
+def fetched_origins(html: str) -> set[str]:
+    """Every origin the rendered page pulls a file from."""
+    found: set[str] = set()
+
+    for tag, attrs in re.findall(r"<([a-zA-Z][\w-]*)\b([^>]*)>", html):
+        tag = tag.lower()
+
+        if tag == "link":
+            rel = re.search(r'rel="([^"]*)"', attrs)
+            if not rel or rel.group(1).strip().lower() not in FETCHING_REL:
+                continue
+            wanted = "href"
+        elif tag in FETCHING_TAGS:
+            wanted = FETCHING_TAGS[tag]
+        else:
+            continue
+
+        value = re.search(rf'{wanted}="([^"]*)"', attrs)
+        if not value:
+            continue
+
+        # srcset is a comma-separated list of candidates with descriptors.
+        for candidate in value.group(1).split(","):
+            url = candidate.strip().split(" ")[0]
+            if url.startswith(("http://", "https://")):
+                found.add("/".join(url.split("/")[:3]))
+
+    return found
+
+
+def check_no_external_origin(pages: list[tuple]) -> list[str]:
+    """Nothing on this site is fetched from anybody else's server.
+
+    ADR 0002's rule, asserted rather than remembered. Every font, script,
+    stylesheet and image is served from this host, and the reasons are not
+    aesthetic: a third-party origin is an outage this site cannot fix, a
+    tracker it cannot see, and a name in the Content Security Policy that
+    weakens the policy for everything else.
+
+    THE ONE EXCEPTION IS DELIBERATE AND IS SWITCHED OFF BY DEFAULT. Google
+    Analytics can be turned on from the SEO screen, and while it is on these
+    pages do reach googletagmanager.com -- ADR 0021. So this reads the document
+    rather than a list: with no measurement id set, ANY external origin is a
+    failure; with one set, those origins are expected and everything else is
+    still a failure.
+
+    Checked against the rendered page, not the source, because the source is
+    where the intention is and the render is where the truth is.
+
+    A LINK IS NOT A FETCH. The footer links to LinkedIn and GitHub and the
+    careers page to a Google form, and a visitor choosing to go somewhere is
+    not this site loading something from there. Only the attributes a browser
+    fetches without being asked are read: src, srcset, and href on the kinds of
+    <link> that pull a file. A canonical is a <link> and fetches nothing.
+    """
+    analytics = php_value("require 'lib/seo.php'; echo seo_crawl()['analytics_id'];")
+    allowed = {
+        "https://www.googletagmanager.com",
+    } if analytics else set()
+
+    problems: list[str] = []
+
+    for path, service in pages:
+        html, error = ((render_php(path, service)) if path.suffix == ".php"
+                       else (path.read_text(), None))
+        if error:
+            continue
+        for origin in fetched_origins(html):
+            if origin in allowed:
+                continue
+            problems.append(
+                f"{path.name} fetches from {origin} — this site is self-hosted "
+                f"(ADR 0002). If this is Google Analytics, it is off: no "
+                f"measurement id is set on the SEO screen."
+            )
+
+    if analytics and not problems:
+        print(f"\n  Google Analytics is ON ({analytics}); only its own origin "
+              f"is reached  — OK")
+
+    return sorted(set(problems))
 
 
 def check_admin_is_hidden() -> list[str]:
@@ -666,6 +795,12 @@ def main() -> None:
         print(f"\n{len(pending)} link(s) to pages not built yet (expected during Phase 2):")
         for p in sorted(set(pending))[:20]:
             print(f"  {p}")
+
+    external = check_no_external_origin(work)
+    if external:
+        failures.extend(external)
+    else:
+        print("\n  every asset is served from this host  — OK")
 
     admin_problems = check_admin_is_hidden()
     if admin_problems:
