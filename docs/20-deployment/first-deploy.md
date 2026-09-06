@@ -36,11 +36,16 @@ Full detail in [cpanel-host-setup.md](cpanel-host-setup.md). The short version:
 
 ```
 public_html/
-├── index.php    404.html
+├── index.php    404.php
 ├── pages/  assets/  lib/  api/  content/
 ├── contact-handler.php
-├── .htaccess    robots.txt   sitemap.php   site.webmanifest
+├── .htaccess    robots.php   sitemap.php   manifest.php
 ```
+
+`robots.php`, `sitemap.php` and `manifest.php` are **served at** `/robots.txt`, `/sitemap.xml` and
+`/site.webmanifest` — internal rewrites in `.htaccess`, so the addresses a crawler remembers do not
+change. There is no `robots.txt` or `site.webmanifest` file any more; if one is left on the host
+from an older deploy, the rewrite is unconditional and the generated file still wins.
 
 Everything else stays here: `tools/`, `docs/`, `references/`, `.git/`, `.claude/`, `.gitignore`,
 `.gitattributes` and every Markdown file.
@@ -49,8 +54,8 @@ Rather than pick those out by hand, build the upload set and check it:
 
 ```bash
 zip -r /tmp/tech4time-deploy.zip \
-  index.php 404.html contact-handler.php \
-  .htaccess robots.txt sitemap.php site.webmanifest \
+  index.php 404.php contact-handler.php \
+  .htaccess robots.php sitemap.php manifest.php \
   pages assets lib api content \
   -x '*/.DS_Store' -x '*.bak'
 
@@ -79,7 +84,10 @@ the one that counts.
 - [ ] `https://tech4time.bd/pages/about/` resolves **without** `.html`
 - [ ] `https://tech4time.bd/pages/careers/` renders job posts
 - [ ] `https://tech4time.bd/pages/contact/` renders offices
-- [ ] A nonsense URL renders `404.html`
+- [ ] A nonsense URL renders `404.php`, **and the response status is 404** — not 200
+- [ ] `/robots.txt` answers 200 as `text/plain` and names the sitemap
+- [ ] `/sitemap.xml` answers 200 as `application/xml`
+- [ ] `/site.webmanifest` answers 200 as `application/manifest+json`
 - [ ] `https://tech4time.bd/lib/auth.php` is **403**
 - [ ] `https://tech4time.bd/content/careers.json` is **403**
 - [ ] `https://tech4time.bd/tools/` is **403**

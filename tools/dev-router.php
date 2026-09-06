@@ -95,6 +95,21 @@ if ($path === '/sitemap.xml') {
     return true;
 }
 
+/* robots.txt and site.webmanifest are generated too, and .htaccess rewrites
+   both internally for the same reasons it rewrites the sitemap: their contents
+   are fields in content/seo.json now, and neither address may change. Without
+   these two the local server 404s on both, which looks like the rewrite is
+   broken when it is only absent. */
+if ($path === '/robots.txt') {
+    require $root . '/robots.php';
+    return true;
+}
+
+if ($path === '/site.webmanifest') {
+    require $root . '/manifest.php';
+    return true;
+}
+
 /* Apache's DirectorySlash, and the first of .htaccess section 3's two service
    rules. On the host a directory asked for without its trailing slash is
    redirected to the slash — Apache does it for a real directory, and the
@@ -147,12 +162,12 @@ if (!is_file($target) && !is_dir($target)
    tree looking for an index file and serves the first one it finds — so
    /pages/services/Anything/ answered 200 with the services index rather than
    404. That is documented behaviour of `php -S` and it is not what the host
-   does: Apache 404s, and the visitor sees 404.html. A local server that
+   does: Apache 404s, and the visitor sees 404.php. A local server that
    answers a mistyped address with a real page is a local server that hides
    the fault being looked for. */
 if (!is_file($target)) {
     http_response_code(404);
-    require $root . '/404.html';
+    require $root . '/404.php';
     return true;
 }
 

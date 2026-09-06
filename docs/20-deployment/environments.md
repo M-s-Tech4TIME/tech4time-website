@@ -157,7 +157,7 @@ deploy.
 exercises the renderers, and an empty JSON file tests nothing. Keep it rich, keep it in git, and
 keep it away from the server.
 
-**Everything else** — the other fourteen pages — is part of the website itself, lives in the
+**Everything else** — the other fifteen pages — is part of the website itself, lives in the
 repository, and is deployed normally.
 
 **And on this side, `content/` is a replica.** It is written by `api/publish.php` and by nothing

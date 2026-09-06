@@ -56,10 +56,13 @@ ROOT = Path(__file__).resolve().parent.parent
 UPLOAD = [
     ".htaccess",          # headers, caching, and the rules that block lib/ and content/
     "index.php",          # the home page, rendered from content/home.json
-    "404.html",
-    "robots.txt",
-    "sitemap.php",       # generated: /sitemap.xml is a rewrite onto this
-    "site.webmanifest",
+    "404.php",
+    # All three are generated now, and all three keep their addresses:
+    # /robots.txt, /sitemap.xml and /site.webmanifest are internal rewrites
+    # onto these files. The static originals are gone.
+    "robots.php",
+    "sitemap.php",
+    "manifest.php",
     "contact-handler.php",
     "api/",               # where the admin host pushes content in
     "pages/",
@@ -87,7 +90,7 @@ DENY = [
 REQUIRED = [
     ".htaccess",
     "index.php",          # a missing home page is a 404 at the site's root
-    "404.html",
+    "404.php",
     "assets/css/base.css",
     "lib/private.php",
     "lib/contract.php",   # the shape both halves agree on
@@ -111,9 +114,20 @@ REQUIRED = [
     "lib/branding.php",
     "pages/privacy-policy/index.php",
     "lib/privacy.php",
-    # /sitemap.xml is a rewrite onto this file. Missing, the sitemap 404s and
-    # Search Console reports the whole site's index as failing to refresh.
+    # THE THREE THAT ARE ADDRESSES RATHER THAN PAGES. Each is reached by an
+    # internal rewrite from a URL that must not change, so a missing file is
+    # not a missing page: /sitemap.xml 404s and Search Console reports the
+    # whole site's index as failing to refresh; /robots.txt 404s, which most
+    # crawlers read as "crawl everything" but some read as "crawl nothing";
+    # /site.webmanifest 404s and every installed copy of the site loses its
+    # name and icon.
     "sitemap.php",
+    "robots.php",
+    "manifest.php",
+    # The head every page emits, and the record it emits from. Without either,
+    # all seventeen pages are a fatal error rather than a page.
+    "lib/head.php",
+    "lib/seo.php",
     "api/publish.php",    # the only route content takes to the live site
 ]
 

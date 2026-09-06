@@ -6,17 +6,16 @@ From nothing to a page that passes every check. About twenty minutes.
 
 ---
 
-## Decide first: static or dynamic?
+## There is no static half any more
 
-**Static `.html`** — now the smaller half by a long way. **Two** of the sixteen pages are
-static: the privacy policy and the 404. Content changes by editing the file and redeploying.
+Every page on this site is `.php` and renders from a document in `content/`. `404.html` was the last
+static one and became `404.php` when the head moved into `lib/head.php`; nothing static remains, and
+a new page should not be the first.
 
-**Dynamic `.php`** — **fourteen** of the sixteen, and the right answer whenever the page says
-something that changes on its own schedule, without a redeploy: the home page, about, careers,
-contact, the company profile, the services index and the six service pages, the resource
-certifications, and branding and advertisement. Making a page dynamic
-means building an editor for it, a content model, and a renderer — see *adding-an-editor.md* (in
-tech4time-website-backend).
+That is not a style preference. A static page's title and description can only be changed by a
+developer with a deploy, and the site's own SEO screen would have nothing to show for it — the page
+would be the one row on `?s=seo` that says "edit the file". Making a page dynamic means giving it a
+content model and an editor: see *adding-an-editor.md* (in tech4time-website-backend).
 
 **A page does not always need a document of its own.** The six service pages are rows of
 `content/services.json`, one template with six sets of words, because a seventh service has to be
@@ -32,18 +31,18 @@ rewrites `/pages/services/<slug>/` onto it when the request matches no file and 
 byte-for-byte the page a directory would have drawn — same renderer, same chrome — and a slug the
 document does not have, or whose service is hidden, answers 404.
 
-So adding a service needs no developer at all. What a directory still buys is the filesystem walk:
-`audit_pages.py` reads the document and audits directory-less services through `detail.php` anyway,
-but `check_shared_markup.py` and `inject_icons.py` have nothing to look at. Promoting a service to
-its own directory is therefore optional tidying, not a prerequisite for it to work.
-
-The rest of this page covers a static page. Note that the site itself no longer contains one besides `404.html` — every page renders from a document now — so a genuinely static addition is the rarer case, and the section after it on making a page dynamic is usually the one you want.
+So adding a service needs no developer at all, and it gets an SEO card on `?s=seo` by itself,
+because that screen reads the services document rather than a list of keys. What a directory still
+buys is the filesystem walk: `audit_pages.py` reads the document and audits directory-less services
+through `detail.php` anyway, but `check_shared_markup.py` and `inject_icons.py` have nothing to look
+at. Promoting a service to its own directory is optional tidying, not a prerequisite.
 
 ---
 
 ## 1. Write the `<main>`
 
-Just the `<main>` element — the head, header, footer and scripts come from the templates.
+Just the `<main>` element — the header, footer and scripts come from the templates, and the whole
+`<head>` is emitted by `lib/head.php`.
 
 ```html
 <main id="main">
@@ -66,19 +65,20 @@ Save it somewhere temporary — `/tmp/mdr-main.html`.
 
 ```json
 {
-  "out":         "pages/services/managed-detection/index.html",
+  "out":         "pages/services/managed-detection/index.php",
   "main":        "/tmp/mdr-main.html",
-  "title":       "Managed Detection and Response | Tech4TIME",
-  "og_title":    "Managed Detection and Response",
-  "description": "Round-the-clock threat monitoring and response for Bangladeshi businesses, delivered by Tech4TIME's security operations team.",
-  "canonical":   "https://tech4time.bd/pages/services/managed-detection/",
-  "og_type":     "website",
+  "route":       "/pages/services/managed-detection/",
+  "document":    "mdr",
   "page_css":    "service-detail",
   "nav_current": "/pages/services/"
 }
 ```
 
-`description` must be 150–160 characters and unique across the site — `audit_pages.py` checks both.
+**There is no `title`, `description` or `canonical` here.** The first two are content: they are
+seeded in that document's `*_defaults()` in `lib/contract.php` and edited from then on at
+`https://admin.tech4time.bd/?s=seo`. The canonical is derived from `route` and is not editable
+anywhere — one page, one address.
+
 `page_css` is optional and names a file in `assets/css/pages/`. `nav_current` marks the header link
 that should show as active.
 
@@ -89,19 +89,41 @@ python3 tools/assemble_page.py /tmp/mdr-spec.json
 ```
 
 This composes the page from `tools/templates/` so the shared blocks are byte-identical by
-construction, and `check_shared_markup.py` passes on the first try.
+construction, and `check_shared_markup.py` passes on the first try. It prints the four things it
+cannot do for you; they are steps 4 and 5 below.
 
 > **Once the page exists, edit the file directly.** Re-running `assemble_page.py` discards hand
 > edits to `<main>`. It is for creating a page, not maintaining one.
 
-## 4. Icons and reveals
+## 4. Give it a model
+
+In `lib/contract.php` — **and the same file in tech4time-website-backend, byte-identical**:
+
+1. the document in `CONTRACT_DOCUMENTS`, a `*_defaults()`, a `*_TEXT_FIELDS`, a `contract_normalise()`
+   arm and a `contract_sanitise()` branch. The `default` of each throws, deliberately, so a document
+   that is half-registered fails loudly rather than silently rendering nothing;
+2. a `meta` band in its defaults — `title`, `description`, `share_title`, `breadcrumb`, `robots`,
+   `changefreq`, `priority`. `contract_meta_defaults()` fills the shape; you supply the words;
+3. **a `SEO_ROUTES` entry**: `'mdr' => ['/pages/services/managed-detection/', 'Managed Detection',
+   'mdr']`. Without it the page has no canonical, no sitemap row and no card on the SEO screen —
+   and none of those fails loudly, which is why the tool prints a reminder.
+
+Then a model file in `lib/`, named for the document, with a `<document>_load()` function — copy the
+shape from `lib/about.php` — and the section that edits it in the backend.
+
+The description's limits live in the model too, and are read from there rather than retyped:
+`SEO_TITLE_MAX` is 65, `SEO_DESC_MIN` 50 and `SEO_DESC_MAX` 165, with 150–160 the *ideal* the editor
+hints at and neither it nor `audit_pages.py` refuses. Uniqueness across the site is required by
+both.
+
+## 5. Icons and reveals
 
 ```bash
 python3 tools/inject_icons.py           # inline the symbols the page references
 python3 tools/apply_reveals.py --write  # mark the scroll-reveal targets
 ```
 
-## 5. Link it up
+## 6. Link it up
 
 A page nothing links to is a page nobody finds, and `audit_pages.py` reports it as orphaned.
 
@@ -110,17 +132,20 @@ A page nothing links to is a page nobody finds, and `audit_pages.py` reports it 
 - **A top-level page** → the header nav in `tools/templates/header.html`, if it belongs there. The
   header carries six routes and stays legible on purpose; the footer is where the rest live.
 
-Then add it to the sitemap — `SITEMAP_STATIC` in `sitemap.php`, which is served at
-`/sitemap.xml`. **A service does not need this**: every service is read from the document and listed
-automatically, which is the reason the sitemap is generated rather than typed.
+**The sitemap needs no edit.** `sitemap.php` walks `SEO_ROUTES` and the services document, reads
+each page's `meta` for `changefreq` and `priority`, and omits anything set to `noindex`. There is no
+list to keep in step — that list used to be `SITEMAP_STATIC` and its ten `lastmod` dates were months
+stale before anybody noticed.
 
-## 6. Check
+## 7. Check
 
 ```bash
-python3 tools/audit_pages.py            # SEO, a11y, structure, links
+python3 tools/audit_pages.py            # SEO, a11y, structure, links, canonicals
+python3 tools/test_sitemap.py           # the page is in the sitemap, once
 python3 tools/check_shared_markup.py    # no drift
 python3 tools/inject_icons.py --check
 python3 tools/check_contrast.py
+python3 tools/check_content_model.py    # every field the model defines is rendered
 python3 tools/check_docs.py             # the repository map lists every page
 ```
 
@@ -132,7 +157,7 @@ python3 tools/check_dark_mode.py        # both themes
 python3 tools/test_motion.py            # nothing left hidden
 ```
 
-## 7. Document it
+## 8. Document it
 
 Add the page to the table in
 [00-orientation/repository-map.md](../../00-orientation/repository-map.md). `check_docs.py` fails
@@ -148,9 +173,14 @@ Only when the styles are genuinely used on one page.
 assets/css/pages/<name>.css      ← create
 ```
 
-Link it via `page_css` in the spec. It loads **last**, after `animations.css`, so it can override
-anything. Shared furniture belongs in `components.css` instead — a second page needing the same card
-is the signal to move it.
+Link it via `page_css` in the spec, which becomes the third argument of the page's `seo_head()`
+call. It loads **last**, after `animations.css`, so it can override anything. Shared furniture
+belongs in `components.css` instead — a second page needing the same card is the signal to move it.
+
+If you later change that file, bump its version query in the `seo_head()` call — the home page
+carries `pages/home.css?v=2` for exactly this reason. `check_cache_bust.py` refuses a release where
+a changed stylesheet is still served from an unchanged URL, and it reads both the `seo_head()` calls
+and `HEAD_STYLES`.
 
 ---
 
@@ -158,10 +188,11 @@ is the signal to move it.
 
 - [ ] One `<h1>`, headings in order
 - [ ] `alt` on every image, accessible names on every control
-- [ ] Description 150–160 characters and unique
-- [ ] Canonical URL correct
+- [ ] The page is `.php` and renders from a document
+- [ ] A `meta` band in its defaults: title ≤ 65, description 50–165 and unique
+- [ ] **A `SEO_ROUTES` entry** — no canonical, no sitemap row and no SEO card without it
+- [ ] `lib/contract.php` copied to the backend, `check_shared_lib.py --update` run
 - [ ] Linked from the hub, the footer, or the header
-- [ ] Added to `SITEMAP_STATIC` in `sitemap.php` (not needed for a service)
 - [ ] Icons injected, reveals applied
 - [ ] Listed in `repository-map.md`
 - [ ] Every check passes

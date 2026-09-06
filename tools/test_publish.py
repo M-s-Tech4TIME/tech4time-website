@@ -70,6 +70,7 @@ SERVICES = ROOT / "content" / "services.json"
 CERTIFICATIONS = ROOT / "content" / "certifications.json"
 BRANDING = ROOT / "content" / "branding.json"
 PRIVACY = ROOT / "content" / "privacy.json"
+SEO = ROOT / "content" / "seo.json"
 
 MARK = "PUBLISHMARK"
 
@@ -365,6 +366,7 @@ def run(base: str, key: bytes, r: Results) -> None:
     certifications_round_trip(base, key, r)
     branding_round_trip(base, key, r)
     privacy_round_trip(base, key, r)
+    seo_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -1676,6 +1678,201 @@ def privacy_round_trip(base: str, key: bytes, r: Results) -> None:
             f"<p>{MARK}-nested</p>" not in page and f"{MARK}-nested" in page,
             "the <p> survived into a field the renderer already wraps")
 
+
+def seo_round_trip(base: str, key: bytes, r: Results) -> None:
+    """The site-wide record, and the page fields that have never been tested.
+
+    THIS DOCUMENT IS NOT A PAGE, which is what makes it worth a round trip of
+    its own. Nothing renders content/seo.json on its own; it is read by every
+    page's <head>, by the Organization graph, by /robots.txt and by
+    /site.webmanifest. A field that stopped arriving would show up as a missing
+    line in seventeen heads at once and in nothing a person looks at.
+
+    THE PAGE FIELDS ARE HERE TOO. meta.breadcrumb, meta.robots, meta.changefreq
+    and meta.priority are new on every document, and check_content_model.py
+    cannot see them: they are read by lib/head.php in a loop over an array the
+    page hands it, not named in any page file. So they are proved by round trip,
+    which is what COVERED_ELSEWHERE points at.
+    """
+    print("\nthe site-wide SEO record travels the same road")
+
+    data = json.loads(SEO.read_text())
+    data["revision"] = 80
+
+    data["site"]["name"] = f"{MARK}-sitename"
+    data["site"]["lang"] = "en-GB"
+    data["site"]["locale"] = f"{MARK}_LOCALE"
+    data["site"]["twitter_card"] = "summary"
+    data["site"]["theme_light"] = "#fedcba"
+    data["site"]["theme_dark"] = "#123456"
+    data["site"]["share_alt"] = f"{MARK}-sharealt"
+    data["site"]["description"] = f"{MARK}-sitedescription"
+
+    data["identity"]["legal_name"] = f"{MARK}-legalname"
+    data["identity"]["alternate_name"] = f"{MARK}-alsoknown"
+    data["identity"]["slogan"] = f"{MARK}-slogan"
+    data["identity"]["description"] = f"{MARK}-orgdescription"
+    data["identity"]["founded"] = "2001-02-03"
+    data["identity"]["price_range"] = f"{MARK}-price"
+    data["identity"]["area_served"] = f"{MARK}-area"
+    data["identity"]["service_types"] = [f"{MARK}-servicetype"]
+    data["identity"]["knows_about"] = [f"{MARK}-knowsabout"]
+
+    data["sameas"]["items"] = [
+        {"id": "one", "label": "One", "url": f"https://example.com/{MARK}-profile",
+         "status": "shown"},
+        {"id": "two", "label": "Two", "url": "https://example.com/hidden",
+         "status": "hidden"},
+    ]
+    data["hours"]["items"] = [
+        {"id": "bd", "label": "Bangladesh office", "days": ["Monday"],
+         "opens": "07:00", "closes": "19:00", "status": "shown"},
+    ]
+
+    data["crawl"]["verify_google"] = f"{MARK}-googletoken"
+    data["crawl"]["verify_bing"] = f"{MARK}-bingtoken"
+    data["crawl"]["robots_extra"] = ["/contact-handler.php", f"/{MARK}-disallowed"]
+
+    data["manifest"]["short_name"] = f"{MARK}-shortname"
+    data["manifest"]["display"] = "minimal-ui"
+    data["manifest"]["background"] = "#abcdef"
+    data["manifest"]["theme"] = "#fedcba"
+
+    data["notfound"]["title"] = f"{MARK}-notfoundtitle"
+    data["notfound"]["description"] = f"{MARK}-notfounddescription"
+
+    status, _ = publish(base, key, "seo", data)
+    r.check("the site-wide record is accepted", status == 200, f"status {status}")
+
+    _s, page = get(base, "/pages/about/")
+
+    print("  what every page's head now says")
+    for what, needle in [
+        ("the site name", f'property="og:site_name" content="{MARK}-sitename"'),
+        ("the language", 'lang="en-GB"'),
+        ("the sharing locale", f'property="og:locale" content="{MARK}_LOCALE"'),
+        ("the card shape", 'name="twitter:card" content="summary"'),
+        ("the light theme colour", 'content="#fedcba"'),
+        ("the dark theme colour", 'content="#123456"'),
+        ("the share picture's description", f"{MARK}-sharealt"),
+        ("the Google verification tag",
+         f'name="google-site-verification" content="{MARK}-googletoken"'),
+        ("the Bing verification tag",
+         f'name="msvalidate.01" content="{MARK}-bingtoken"'),
+    ]:
+        r.check(f"  {what}", needle in page, needle)
+
+    print("  and the Organization graph, on a page that is not the contact page")
+    graph = next((g for g in json_ld(page) if isinstance(g, dict) and "@graph" in g), None)
+    r.check("  the graph is there", graph is not None)
+    nodes = {n.get("@type"): n for n in (graph or {}).get("@graph", [])} if graph else {}
+
+    org = nodes.get("Organization", {})
+    r.check("  the legal name", org.get("name") == f"{MARK}-sitename", str(org.get("name")))
+    r.check("  the also-known-as", org.get("alternateName") == f"{MARK}-alsoknown")
+    r.check("  the slogan", org.get("slogan") == f"{MARK}-slogan")
+    r.check("  the description", org.get("description") == f"{MARK}-orgdescription")
+    r.check("  the founding date", org.get("foundingDate") == "2001-02-03")
+    r.check("  a shown profile is listed",
+            f"https://example.com/{MARK}-profile" in org.get("sameAs", []))
+    r.check("  A HIDDEN PROFILE IS NOT",
+            "https://example.com/hidden" not in org.get("sameAs", []),
+            "hiding a row has to mean it is not published")
+
+    r.check("  THE ADDRESSES STILL COME FROM THE CONTACT DOCUMENT",
+            len(org.get("address", [])) > 0 and MARK not in json.dumps(org.get("address")),
+            "the offices belong to content/contact.json and must not be in this one")
+
+    svc = nodes.get("ProfessionalService", {})
+    r.check("  the price range", svc.get("priceRange") == f"{MARK}-price")
+    r.check("  the services offered", svc.get("serviceType") == [f"{MARK}-servicetype"])
+    r.check("  the subjects known", svc.get("knowsAbout") == [f"{MARK}-knowsabout"])
+    hours = svc.get("openingHoursSpecification", [])
+    r.check("  the opening hours",
+            hours and hours[0].get("opens") == "07:00" and hours[0].get("dayOfWeek") == ["Monday"],
+            str(hours))
+
+    print("  one LocalBusiness per office, which the site has never had")
+    offices = [n for n in (graph or {}).get("@graph", [])
+               if isinstance(n, dict) and n.get("@type") == "LocalBusiness"]
+    r.check("  there is one per shown office", len(offices) == 3, str(len(offices)))
+    r.check("  each has an address of its own",
+            all(isinstance(o.get("address"), dict) for o in offices))
+    r.check("  each says which organisation it belongs to",
+            all(o.get("parentOrganization", {}).get("@id", "").endswith("#organization")
+                for o in offices))
+    bd = next((o for o in offices if "bangladesh" in o.get("@id", "")), {})
+    r.check("  and the hours row named after an office reaches that office",
+            bd.get("openingHoursSpecification", [{}])[0].get("opens") == "07:00",
+            str(bd.get("openingHoursSpecification")))
+
+    print("  the three generated files")
+    _s, robots = get(base, "/robots.txt")
+    r.check(f"  robots.txt carries the extra rule", f"/{MARK}-disallowed" in robots)
+    r.check("  and still allows the whole site", "Allow: /" in robots)
+
+    _s, manifest = get(base, "/site.webmanifest")
+    app = json.loads(manifest)
+    r.check("  the manifest takes its name from the site band",
+            app["name"] == f"{MARK}-sitename")
+    r.check("  its short name from its own", app["short_name"] == f"{MARK}-shortname")
+    r.check("  and its display mode", app["display"] == "minimal-ui")
+
+    print("  the error page, whose record is in this document")
+    _s, notfound = get(base, "/404.php")
+    r.check(f"  its title arrives", f"<title>{MARK}-notfoundtitle</title>" in notfound)
+    r.check("  it is noindex", 'name="robots" content="noindex, follow"' in notfound)
+    r.check("  AND IT HAS NO CANONICAL", "rel=\"canonical\"" not in notfound,
+            "a page served at every address that does not exist has no address "
+            "of its own to claim")
+
+    print("\nthe meta fields every document gained")
+
+    about = json.loads(ABOUT.read_text())
+    about["revision"] = 81
+    about["meta"]["breadcrumb"] = f"{MARK}-crumb"
+    about["meta"]["changefreq"] = "hourly"
+    about["meta"]["priority"] = "0.2"
+    about["updated"] = "2031-07-09T10:11:12+00:00"
+    status, _ = publish(base, key, "about", about)
+    r.check("a page document with the new fields is accepted", status == 200)
+
+    _s, page = get(base, "/pages/about/")
+    crumbs = next((b for b in json_ld(page)
+                   if isinstance(b, dict) and b.get("@type") == "BreadcrumbList"), None)
+    r.check("the breadcrumb reaches the trail",
+            crumbs and crumbs["itemListElement"][-1]["name"] == f"{MARK}-crumb",
+            str(crumbs))
+
+    webpage = next((b for b in json_ld(page)
+                    if isinstance(b, dict) and b.get("@type") == "WebPage"), None)
+    r.check("the page has a WebPage node, which it never had", webpage is not None)
+    r.check("it names this address", webpage and webpage["url"].endswith("/pages/about/"))
+    r.check("it says which site it is part of",
+            webpage and webpage["isPartOf"]["@id"].endswith("#website"))
+    r.check("AND IT CARRIES THE DAY THE PAGE CHANGED",
+            webpage and webpage.get("dateModified") == "2031-07-09",
+            "every document has carried an updated stamp and no page emitted it")
+    r.check("which is also an Open Graph tag",
+            'property="og:updated_time" content="2031-07-09"' in page)
+
+    _s, sitemap = get(base, "/sitemap.xml")
+    r.check("the sitemap takes its change frequency from the page",
+            "<changefreq>hourly</changefreq>" in sitemap)
+    r.check("and its priority", "<priority>0.2</priority>" in sitemap)
+    r.check("and its date", "<lastmod>2031-07-09</lastmod>" in sitemap)
+
+    about["revision"] = 82
+    about["meta"]["robots"] = "noindex"
+    publish(base, key, "about", about)
+    _s, sitemap = get(base, "/sitemap.xml")
+    r.check("A PAGE SET TO NOINDEX LEAVES THE SITEMAP",
+            "https://tech4time.bd/pages/about/" not in sitemap,
+            "membership is derived from robots, so the two cannot disagree")
+    _s, page = get(base, "/pages/about/")
+    r.check("and says so in its own head",
+            'name="robots" content="noindex, follow"' in page)
+
 def home_round_trip(base: str, key: bytes, r: Results) -> None:
     """Every field the home model declares, set and then read off the page.
 
@@ -1941,6 +2138,7 @@ def main() -> None:
                                  if CERTIFICATIONS.is_file() else None)
         branding_backup = BRANDING.read_text() if BRANDING.is_file() else None
         privacy_backup = PRIVACY.read_text() if PRIVACY.is_file() else None
+        seo_backup = SEO.read_text() if SEO.is_file() else None
 
         server = subprocess.Popen(
             ["php", "-S", f"127.0.0.1:{port}", "-t", str(ROOT),
@@ -1978,7 +2176,8 @@ def main() -> None:
                                  (HOME, home_backup), (SERVICES, services_backup),
                                  (CERTIFICATIONS, certifications_backup),
                                  (BRANDING, branding_backup),
-                                 (PRIVACY, privacy_backup)):
+                                 (PRIVACY, privacy_backup),
+                                 (SEO, seo_backup)):
                 if backup is not None:
                     path.write_text(backup)
                 bak = path.with_suffix(".json.bak")

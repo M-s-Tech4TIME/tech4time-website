@@ -122,6 +122,30 @@
 
     RewriteRule ^sitemap\.xml$ /sitemap.php [L]
 
+    # robots.txt and site.webmanifest, the same way and for the same reasons
+    # ----------------------------------------------------------------------
+    # Both stopped being static files when their contents came under the
+    # editor: the crawl rules and the app's name, description and colours are
+    # fields in content/seo.json now. Neither address changed, and neither may
+    # -- /robots.txt is where every crawler looks and nowhere else, and
+    # /site.webmanifest is named by a <link rel="manifest"> in every page that
+    # has already been cached by returning visitors.
+    #
+    # Same shape as the sitemap above: a 301 for anyone who asks for the .php
+    # file by name so neither is served at two URLs, guarded on THE_REQUEST so
+    # the internal rewrite below does not feed itself back into it; then the
+    # unconditional internal rewrite, so a stale robots.txt or site.webmanifest
+    # left on the host by an older deploy cannot shadow the generated one.
+    RewriteCond %{THE_REQUEST} \s/robots\.php[\s?] [NC]
+    RewriteRule ^robots\.php$ /robots.txt [R=301,L]
+
+    RewriteRule ^robots\.txt$ /robots.php [L]
+
+    RewriteCond %{THE_REQUEST} \s/manifest\.php[\s?] [NC]
+    RewriteRule ^manifest\.php$ /site.webmanifest [R=301,L]
+
+    RewriteRule ^site\.webmanifest$ /manifest.php [L]
+
     # Send /pages/about -> /pages/about/  (only where the directory exists)
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteCond %{REQUEST_URI} !/$
@@ -159,13 +183,13 @@
 </IfModule>
 
 <IfModule mod_dir.c>
-    DirectoryIndex index.html index.php
+    DirectoryIndex index.php index.html
 </IfModule>
 
 # --------------------------------------------------------------------------
 # 4. Error documents
 # --------------------------------------------------------------------------
-ErrorDocument 404 /404.html
+ErrorDocument 404 /404.php
 
 # Never expose directory listings for asset folders.
 Options -Indexes
@@ -278,10 +302,11 @@ Options -Indexes
     Require all denied
 </Files>
 
-# site.webmanifest is JSON but must stay public.
-<Files "site.webmanifest">
-    Require all granted
-</Files>
+# There is no site.webmanifest file any more, and so no exception for one.
+# /site.webmanifest is an internal rewrite onto manifest.php (section 3), and
+# the rewrite is unconditional, so a stale copy left by an older deploy is
+# never served either. The exception that stood here granted access to a file
+# that no longer ships; it is gone rather than left to be read as a rule.
 
 <IfModule mod_rewrite.c>
     RewriteEngine On

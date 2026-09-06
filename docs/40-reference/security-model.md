@@ -132,7 +132,7 @@ fixed list.
 ```apache
 <FilesMatch "^\.">                          Require all denied
 <FilesMatch "\.(md|py|sh|json|lock|yml|yaml)$">  Require all denied
-<Files "site.webmanifest">                  Require all granted   # the one public .json
+# no exception for site.webmanifest: it is a rewrite onto manifest.php now
 RewriteRule ^tools/       - [F,L]
 RewriteRule ^lib/         - [F,L]
 RewriteRule ^content/     - [F,L]

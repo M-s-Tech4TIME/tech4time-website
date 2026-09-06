@@ -8,17 +8,23 @@ Build tool. NOT deployed to the web server (see tools/README.md).
     python3 tools/sync_site_contact.py --dry-run  # show what would change
 
 WHY THIS EXISTS
-/pages/contact/ renders content/contact.json, so editing an address in /admin/
-changes that page the moment it is saved. The same facts also appear in two
-places this project deliberately keeps as literal markup in every page file:
+/pages/contact/ renders content/contact.json, so editing an address in the
+admin changes that page the moment it is saved. The same facts also appear in
+the footer's contact block, which this project deliberately keeps as literal
+markup in every page file.
 
-  1. the footer's contact block, on all sixteen pages;
-  2. the Organization structured data in each page's <head>, which carries the
-     postal addresses and the phone numbers a search engine reads.
+Runtime partials are ruled out, so nothing on the server can update that from a
+file. This does it here, before a deploy, and stamps a fingerprint the editor
+reads back so it can say whether the two are still in step.
 
-Runtime partials are ruled out, so nothing on the server can update those from
-a file. This does it here, before a deploy, and stamps a fingerprint into
-contact.json so the editor can say whether the two are still in step.
+IT USED TO DO TWO THINGS
+The second was the Organization structured data, pasted into all seventeen
+heads. That is gone: seo_graph() in lib/head.php builds the graph from
+content/contact.json on the request, so the addresses and telephone numbers a
+search engine reads are never a copy and can never be stale. Nothing needs to
+run before a deploy for them to be right. See ADR 0020.
+
+The footer is still literal markup, so this tool is still needed for it.
 
 THE ORDER TO RUN THINGS IN
   1. download content/contact.json from the host — the server's copy is the
@@ -61,8 +67,6 @@ CONTACT_BLOCK = re.compile(
     r'<address class="site-footer__contact">.*?</address>', re.S
 )
 
-LD_BLOCK = re.compile(r'<script type="application/ld\+json">\s*(\{.*?\})\s*</script>', re.S)
-
 # "Sun – Thu: 9:00 AM – 6:00 PM" -> "Sunday – Thursday". The footer says which
 # days beside the numbers as well as beside the hours, because the question at
 # the numbers is "can I ring now" and at the hours is "when are they open".
@@ -71,20 +75,6 @@ DAY_NAMES = {
     "wed": "Wednesday", "thu": "Thursday", "thur": "Thursday", "thurs": "Thursday",
     "fri": "Friday", "sat": "Saturday",
 }
-
-
-def pages() -> list[Path]:
-    return sorted(
-        list(ROOT.glob("*.html"))
-        # The home page is index.php. Missing it here would be the worst of the
-        # six places this glob is repeated: the site's front door would keep
-        # showing an old address and an old phone number in its footer AND in
-        # its Organization structured data, which is what search results quote.
-        # Named, not "*.php" — contact-handler.php is an endpoint, not a page.
-        + list(ROOT.glob("index.php"))
-        + list(ROOT.glob("pages/**/*.html"))
-        + list(ROOT.glob("pages/**/*.php"))
-    )
 
 
 # ----------------------------------------------------------------- the model
@@ -279,165 +269,6 @@ def footer_block(data: dict, indent: str) -> str:
     return "\n".join(lines)
 
 
-# ------------------------------------------------------- structured data
-
-
-def schema_addresses(data: dict) -> list[dict]:
-    out = []
-    for office in shown_offices(data):
-        s = office.get("schema", {})
-        address = {"@type": "PostalAddress"}
-        for key, field in (("streetAddress", "street"), ("addressLocality", "locality"),
-                           ("addressRegion", "region"), ("postalCode", "postal_code")):
-            value = str(s.get(field, "")).strip()
-            if value:
-                address[key] = value
-        country = str(s.get("country", "")).strip().upper()
-        if country:
-            address["addressCountry"] = country
-        if len(address) > 2:
-            out.append(address)
-    return out
-
-
-def schema_points(data: dict) -> list[dict]:
-    """One ContactPoint per number.
-
-    Deduplicated on the dialled form, because an office that is reached on
-    another office's numbers — Brussels is reached in Dhaka — would otherwise
-    publish the same number twice under two countries, which reads to a search
-    engine as a mistake rather than as a shared line.
-    """
-    email = email_of(data)
-    seen: set[str] = set()
-    out = []
-    for office in shown_offices(data):
-        phones = [str(p).strip() for p in office.get("phones", []) if str(p).strip()]
-        languages = [str(l).strip() for l in office.get("languages", []) if str(l).strip()]
-        for phone in phones:
-            if tel(phone) in seen:
-                continue
-            seen.add(tel(phone))
-            point = {"@type": "ContactPoint", "telephone": tel(phone)}
-            if email:
-                point["email"] = email
-            point["contactType"] = "customer service"
-            country = str(office.get("schema", {}).get("country", "")).strip().upper()
-            if country:
-                point["areaServed"] = country
-            point["availableLanguage"] = languages or ["English"]
-            out.append(point)
-    return out
-
-
-def span_of_value(text: str, at: int) -> int:
-    """Where the JSON value starting at `at` ends.
-
-    Bracket counting, aware of strings and their escapes, so a "]" inside an
-    address does not end the array early. Returns the index one past the value.
-    """
-    opener = text[at]
-    closer = {"[": "]", "{": "}"}[opener]
-    depth = 0
-    in_string = False
-    i = at
-    while i < len(text):
-        ch = text[i]
-        if in_string:
-            if ch == "\\":
-                i += 2
-                continue
-            if ch == '"':
-                in_string = False
-        elif ch == '"':
-            in_string = True
-        elif ch == opener:
-            depth += 1
-        elif ch == closer:
-            depth -= 1
-            if depth == 0:
-                return i + 1
-        i += 1
-    raise ValueError("unbalanced JSON value")
-
-
-def splice(block: str, key: str, value: list, after: int) -> tuple[str, bool]:
-    """Replace one key's array inside a JSON block, leaving the rest alone.
-
-    The obvious implementation — json.loads, edit, json.dumps — reformats the
-    whole document, and these blocks are hand-laid-out: compact arrays on one
-    line, nested objects inline. That reformatting is a hundred-line diff on
-    sixteen pages saying nothing, and it would bury the two lines that did
-    change. So the value is found in the text and only it is rewritten.
-    """
-    marker = f'"{key}": ['
-    at = block.find(marker, after)
-    if at == -1:
-        return block, False
-
-    indent = block[:at].rpartition("\n")[2]
-    indent = indent if indent.strip() == "" else ""
-
-    body = json.dumps(value, indent=2, ensure_ascii=False)
-    body = "\n".join(
-        line if i == 0 else indent + line
-        for i, line in enumerate(body.split("\n"))
-    )
-
-    open_at = at + len(marker) - 1
-    return block[:open_at] + body + block[span_of_value(block, open_at):], True
-
-
-def rewrite_organization(html: str, data: dict) -> str:
-    """Replace address and contactPoint inside the base Organization node.
-
-    Only those two arrays, and only inside the node whose @type is
-    Organization: the same block also carries the WebSite and
-    ProfessionalService nodes, and nothing here has any business touching
-    their opening hours or the services they list.
-    """
-    addresses = schema_addresses(data)
-    points = schema_points(data)
-
-    def replace(match: re.Match) -> str:
-        block = match.group(1)
-
-        # Parsed once, to be sure this is the graph that carries the
-        # Organization — after which the edits are made in the text.
-        try:
-            doc = json.loads(block)
-        except json.JSONDecodeError:
-            return match.group(0)
-        nodes = doc.get("@graph")
-        if not isinstance(nodes, list):
-            return match.group(0)
-        if not any(isinstance(n, dict) and n.get("@type") == "Organization" for n in nodes):
-            return match.group(0)
-
-        at = block.find('"@type": "Organization"')
-        if at == -1:
-            return match.group(0)
-
-        changed = False
-        if addresses:
-            block, done = splice(block, "address", addresses, at)
-            changed = changed or done
-        if points:
-            block, done = splice(block, "contactPoint", points, at)
-            changed = changed or done
-
-        if not changed:
-            return match.group(0)
-
-        return match.group(0)[:match.start(1) - match.start(0)] + block + \
-               match.group(0)[match.end(1) - match.start(0):]
-
-    # Every ld+json block is examined, and replace() leaves alone any that is
-    # not the base Organization graph. Matching only the first would depend on
-    # the order pages happen to declare them in.
-    return LD_BLOCK.sub(replace, html)
-
-
 # -------------------------------------------------------------------- main
 
 
@@ -517,29 +348,13 @@ def main() -> None:
     if footer_changed and not args.dry_run:
         FOOTER.write_text(new_footer)
 
-    # ---- 2. the Organization schema on every page
-    schema_changed = []
-    for page in pages():
-        html = page.read_text()
-        new = rewrite_organization(html, data)
-        if new != html:
-            schema_changed.append(page.relative_to(ROOT))
-            if not args.dry_run:
-                page.write_text(new)
-
-    print(f"Organization structured data  —  "
-          f"{len(schema_changed)} page(s) "
-          + ("would change" if args.dry_run else "updated"))
-    for rel in schema_changed:
-        print(f"    {rel}")
-
-    # ---- 3. push the footer template into every page
+    # ---- 2. push the footer template into every page
     if footer_changed and not args.dry_run:
         print("\nPropagating the footer:")
         subprocess.run([sys.executable, str(ROOT / "tools" / "propagate_shared.py")],
                        check=True)
 
-    # ---- 4. stamp the fingerprint, so the editor stops warning
+    # ---- 3. stamp the fingerprint, so the editor stops warning
     digest = fingerprint(data)
     if read_stamp() != digest:
         print(f"\nfingerprint  —  {digest[:16]}…")

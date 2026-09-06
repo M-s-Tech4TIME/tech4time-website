@@ -8,11 +8,18 @@ The one place where a careless edit does damage that is invisible until a check 
 
 ## The problem this solves
 
-Runtime `fetch()` partials are forbidden — every page must be a complete, self-contained file that a
-crawler receives in one request. So the `<head>` block, the site header, the footer, the dock and the
-script tags exist as **literal markup in all sixteen pages**.
+Runtime `fetch()` partials are forbidden — every page must be a complete, self-contained document
+that a crawler receives in one request. So the site header, the footer, the dock, the hero circuit
+and the script tags exist as **literal markup in all sixteen pages**, and in
+`pages/services/detail.php`, which draws the services that have no directory of their own —
+seventeen files.
 
-That is sixteen copies of the same header, free to drift apart.
+That is seventeen copies of the same header, free to drift apart.
+
+**The `<head>` is no longer one of them** — see below. It is rendered on the request by
+`lib/head.php`, which is a different answer to the same problem: a page can be self-contained
+without its markup having been *typed* seventeen times, because PHP composes it before the response
+leaves the server.
 
 Three tools close the gap:
 
@@ -53,25 +60,46 @@ python3 tools/check_shared_markup.py
 
 | File | What it is |
 |---|---|
-| `head.html` | meta, SEO, Open Graph, favicons, stylesheets, `theme-init.js`. Contains `{{PLACEHOLDERS}}` filled in per page |
 | `header.html` | skip link, sticky header, nav drawer, theme toggle |
 | `footer.html` | the footer, **including the contact details**, and the back-to-top control |
 | `dock.html` | the floating dock |
 | `scripts.html` | the deferred script tags, in dependency order |
 | `hero-circuit.html` | the circuitry framing the title band: four corner clusters and a chevron band top and bottom, with a charge on every trace, painted by `circuit.js` on a canvas; the SVG carries 24 as the fallback |
-| `jsonld-base.html` | Organization + WebSite + ProfessionalService schema |
 
-### Placeholders in `head.html`
+`propagate_shared.py` carries the header, footer, dock and hero circuit.
+It does **not** carry `scripts.html`, which is read once by `assemble_page.py` when a page is
+created; after that each page holds its own copy and a script change is edited in every page.
 
-Filled in per page by `assemble_page.py` when a page is created.
+---
 
-| Placeholder | Example |
-|---|---|
-| `{{TITLE}}` | `Cybersecurity Services \| Tech4TIME` |
-| `{{DESCRIPTION}}` | 150–160 characters, unique per page |
-| `{{CANONICAL}}` | `https://tech4time.bd/pages/services/cybersecurity/` |
-| `{{OG_TITLE}}` | usually `{{TITLE}}` without the brand suffix |
-| `{{OG_TYPE}}` | `website` for every current page |
+## The `<head>` is not shared markup any more
+
+There were two more templates here: `head.html`, with `{{TITLE}}`, `{{DESCRIPTION}}`,
+`{{CANONICAL}}` and `{{OG_TYPE}}` placeholders, and `jsonld-base.html`, the Organization schema.
+Both were read **once per page, at birth**, by `assemble_page.py`, and never again. Nothing
+propagated them and `check_shared_markup.py` did not cover them, so seventeen heads of 222–308
+lines each were free to drift with nothing watching — and they did.
+
+They are gone. A page's head is two calls:
+
+```php
+<html lang="<?= h(seo_lang()) ?>">
+<head>
+<?php seo_head('/pages/about/', $data['meta'], ['pages/about.css'], $data['updated']); ?>
+<?php seo_jsonld('/pages/about/', $data['meta'], $data['updated']); ?>
+```
+
+`seo_head()` writes the charset, the title, the description, the canonical, the crawl directive, the
+share card, the icons, the stylesheets and `theme-init.js`. `seo_jsonld()` writes the graph — built
+from `content/contact.json` and `content/seo.json` rather than pasted, so it cannot go stale.
+
+The values are content: they are edited at `https://admin.tech4time.bd/?s=seo`, and a page's own
+title and description live in that page's own document.
+[seo.md](../../40-reference/seo.md) · [ADR 0020](../../90-decisions/0020-page-metadata-is-content.md)
+
+`check_shared_markup.py` still has one assertion about the head, and only one: that `theme-init.js`
+is emitted, once, for all seventeen files. That script is what prevents a flash of the wrong theme,
+and it is the only line of the head whose absence is invisible in a diff and obvious to a visitor.
 
 ---
 
@@ -82,10 +110,13 @@ Filled in per page by `assemble_page.py` when a page is created.
 That marker is the single legitimate per-page difference in shared markup, and a blind copy would
 wipe it from every page and mark the active link nowhere. `propagate_shared.py` reads it out of each
 page first — as the set of hrefs that page marks — and re-applies it afterwards. A page with no
-marker, like `404.html`, keeps none.
+marker, like `404.php`, keeps none.
 
 If you add another legitimate per-page difference, it has to be taught to the propagator the same
 way. Prefer not to.
+
+`404.php` is the page with no marker. It was `404.html` until the head moved into PHP; it is the
+only page not reachable from the nav, and the propagator gives it none.
 
 ---
 

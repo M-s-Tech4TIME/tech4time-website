@@ -1,8 +1,8 @@
 # Tech4TIME — frontend
 
 The public site at **`tech4time.bd`**: sixteen pages, a contact form, and one inbound endpoint that
-receives content from the admin. No build step, no framework — the files here are the files that run
-on the server.
+receives content from the admin. No build step, no framework — the files here are the files
+that run on the server.
 
 **The editor is not in this repository.** It is **`tech4time-website-backend`**, served at
 `admin.tech4time.bd`, and it owns the content. This site renders from a local replica it is *sent*;
@@ -44,9 +44,10 @@ its record before acting.
 
 | | |
 |---|---|
-| `pages/` `index.php` | the sixteen pages — fifteen are `.php` and render from `content/`; only `404.html` is static |
+| `pages/` `index.php` | the sixteen pages. **All of them are `.php`** now and render from `content/` — `404.php` was the last static one |
 | `pages/services/detail.php` | not a page: it serves any service the editor added that has no directory |
-| `sitemap.php` | generated, and served at `/sitemap.xml` — the address must not change |
+| `sitemap.php` `robots.php` `manifest.php` | generated, and served at `/sitemap.xml`, `/robots.txt` and `/site.webmanifest` — those addresses must not change |
+| `lib/head.php` | every page's `<head>`, emitted once. Not shared markup: there is nothing to propagate |
 | `assets/` | css, js, fonts, icons, images — all self-hosted |
 | `lib/` | server-side PHP: rendering, the contract, the publish format |
 | `api/publish.php` | where the backend's content arrives. The only thing here that writes |
@@ -72,8 +73,11 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Layout, components | `assets/css/layout.css`, `components.css` |
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
 | Header / footer | `tools/templates/` → `propagate_shared.py` |
+| Anything in a page's `<head>` | `lib/head.php` if it is code, **`https://admin.tech4time.bd/?s=seo`** if it is words. Never a page file |
+| A title, description, share card, crawl setting, the sitemap, `robots.txt`, the manifest | **`https://admin.tech4time.bd/?s=seo`** |
 | An icon | the markup, then `python3 tools/inject_icons.py` |
 | A job post, a contact detail, a certification, a logo file, the privacy policy, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
+| A page's address | `SEO_ROUTES` in `lib/contract.php`, and `.htaccess`. A route is code; the editor cannot add, rename or remove one |
 | The shape of editable content | `lib/contract.php` — **and the same file in the backend** |
 | How a document is signed | `lib/publish.php` — likewise byte-identical |
 | Add a page | [adding-a-page.md](docs/10-development/frontend/adding-a-page.md) |
@@ -87,9 +91,9 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 python3 tools/serve.py          # http://localhost:8000  — NOT python3 -m http.server
 ```
 
-Most of the site needs PHP now: the home page, about, careers, contact, the company profile, the
-services index and all six service pages, plus the contact handler, `sitemap.php` and
-`api/publish.php`.
+**Every page needs PHP now** — the head is emitted by `lib/head.php` on the request, so there is no
+page that is only markup. So do the contact handler, `api/publish.php`, and the three generated
+files: `sitemap.php`, `robots.php` and `manifest.php`.
 
 `tools/dev-router.php` is what makes the local server behave like the host — DirectoryIndex across
 both extensions, the trailing slash Apache's DirectorySlash adds, the services route, the
@@ -124,12 +128,18 @@ python3 tools/build_deploy_set.py --check
 
 Touched anything under `assets/`? Also **`python3 tools/check_cache_bust.py`** — filenames are not
 content-hashed and `.htaccess` caches them for a year, so a changed file behind an unchanged URL
-ships to new visitors only. Bump the version query in `tools/templates/` **and** in all sixteen
-pages: `propagate_shared.py` does not carry `head.html` or `scripts.html`.
+ships to new visitors only. A **stylesheet** is one edit — `HEAD_STYLES` in `lib/head.php` for the
+five shared ones, the `seo_head()` call for a page's own. A **script** is still every page plus
+`tools/templates/scripts.html`, which `propagate_shared.py` does not carry.
 
 Touched `api/publish.php`, `lib/contract.php` or `lib/publish.php`? Also `test_publish.py` **and
 `test_publish_asset.py`** — the second endpoint is easy to forget, and CI runs it — **and
 `check_shared_lib.py --update`, and copy the changed file to the backend.**
+
+Touched `lib/head.php`, `lib/seo.php`, `sitemap.php`, `robots.php` or `manifest.php`? Also
+**`python3 tools/test_sitemap.py`** and `audit_pages.py`. All three of those files are served at an
+address that looks static and none of them is; a PHP error in one ships as a 500 at a URL no page
+links to, which Google fetches and people do not.
 
 Touched the contact handler? Also `test_contact_handler.py`. Touched `lib/store.php`? Also
 `test_store.py`.

@@ -59,15 +59,20 @@ that a stray one could not.
 
 ```
 UPLOAD                          DO NOT UPLOAD
-  index.html  404.html            tools/
+  index.php   404.php             tools/
   pages/                          docs/
   assets/                         references/
   lib/                            .git/
   contact-handler.php             content/          ← after the first deploy
   .htaccess                       admin/            ← nothing, ever
-  robots.txt  sitemap.php
-  site.webmanifest
+  robots.php  sitemap.php
+  manifest.php
+  api/        ← the inbound endpoint
 ```
+
+`robots.php`, `sitemap.php` and `manifest.php` are **generated**, and are served at `/robots.txt`,
+`/sitemap.xml` and `/site.webmanifest` by internal rewrites — the addresses do not change.
+`tools/build_deploy_set.py` is the list that actually decides; this is the shape of it.
 
 `content/` is uploaded **once**, on the very first deploy, to seed the files. Never again.
 

@@ -477,7 +477,7 @@ def main() -> None:
         base = f"http://127.0.0.1:{port}"
         for _ in range(80):
             try:
-                urllib.request.urlopen(base + "/404.html", timeout=1)
+                urllib.request.urlopen(base + "/404.php", timeout=1)
                 break
             except Exception:
                 time.sleep(0.15)

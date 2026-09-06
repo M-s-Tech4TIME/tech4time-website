@@ -88,20 +88,27 @@ the CSS it needs, and defers all its JavaScript to the end of `<body>`. Nothing 
 another origin, and nothing is fetched from the backend — the words came out of a JSON file on this
 disk instead of being typed into the HTML.
 
-Every page but one now works this way. `privacy-policy` was the last to convert, and with it there
-is no page left whose wording needs a developer and a deploy.
+**Every page works this way.** `privacy-policy` was the last body to convert; `404.html` was the
+last file, and became `404.php` when the `<head>` stopped being pasted into each page. There is no
+page left whose wording needs a developer and a deploy, and no static page left at all.
 
-### A static page — `404.html`, and only that
+### The error page — `404.php`
 
 ```
 GET /pages/nothing-here/
-  → .htaccess: ErrorDocument
-  → 404.html is returned
+  → .htaccess: ErrorDocument 404 /404.php
+  → 404.php sets the status and emits its head like every other page
 ```
 
-No PHP runs. It stays static deliberately: it is the page served when something has already gone
-wrong, so it should depend on as little as possible — not on a document, not on `lib/`, not on PHP
-answering at all.
+It stayed static for a long time and for a good reason: it is served when something has already
+gone wrong, so it should depend on as little as possible. What changed is that the alternative was
+worse — a page whose 240-line `<head>` was a seventeenth pasted copy, whose title and description
+nobody could edit, and which four checks had stopped covering. It now renders from
+`lib/head.php` and `content/seo.json` like everything else.
+
+It is the one page with **no canonical and no `og:url`**: it is served at every address that does
+not exist and has none of its own. Its record is in `content/seo.json` under `notfound`, because it
+renders no content document and never will.
 
 **Why server-side and not `fetch()`:** a contact page whose addresses arrive by JavaScript is
 indexed unreliably, and it is the page most often searched for by name. See

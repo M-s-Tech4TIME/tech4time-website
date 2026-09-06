@@ -77,11 +77,13 @@ def normalise(markup: str) -> str:
 def pages() -> list[Path]:
     found = (
         list(ROOT.glob("*.html"))
-        # The home page is index.php. Without it the one page every visitor
-        # sees would be the one page whose header and footer nothing checked.
-        # Named, not globbed as "*.php": contact-handler.php is an endpoint,
-        # not a page, and has none of these blocks by design.
+        # The home page is index.php and the error page is 404.php. Without
+        # them the page every visitor sees and the page every lost visitor
+        # sees would be the two whose header and footer nothing checked.
+        # Named, not globbed as "*.php": contact-handler.php and sitemap.php
+        # are endpoints, not pages, and have none of these blocks by design.
         + list(ROOT.glob("index.php"))
+        + list(ROOT.glob("404.php"))
         + list(ROOT.glob("pages/**/*.html"))
         # The careers page is PHP because its content changes without a
         # redeploy. Its header and footer are still literal markup pasted in
@@ -140,7 +142,12 @@ def main() -> None:
         srcs = re.findall(r'<script src="(/assets/js/[^"]+)"[^>]*></script>', html)
         required = [s for s in srcs if s not in OPTIONAL_SCRIPTS]
         expected = [
-            "/assets/js/theme-init.js",
+            # theme-init.js is NOT here any more. It moved into lib/head.php
+            # with the rest of the <head>, so it is no longer a literal in any
+            # page and looking for one would fail on all seventeen. It is
+            # checked once, below, where it now lives -- losing it would bring
+            # back the flash of the wrong theme on first paint, which is the
+            # whole reason it is not deferred.
             "/assets/js/theme-toggle.js",
             "/assets/js/nav.js",
             "/assets/js/animations.js",
@@ -158,6 +165,19 @@ def main() -> None:
         print(f"  {rel}  — {'OK' if not issues else str(len(issues)) + ' issue(s)'}")
         for issue in issues:
             problems.append(f"{rel}: {issue}")
+
+    # The head is emitted rather than pasted now, so the one script that lives
+    # in it is checked in the file that emits it. This is the whole of what
+    # replaced seventeen copies, and it is one line -- but it is a line whose
+    # absence nothing else on this site would notice.
+    head = ROOT / "lib" / "head.php"
+    if not head.is_file():
+        problems.append("lib/head.php: missing, so no page has a <head> at all")
+    elif '<script src="/assets/js/theme-init.js"></script>' not in head.read_text():
+        problems.append("lib/head.php: does not emit theme-init.js, so every page "
+                        "flashes the wrong theme before first paint")
+    else:
+        print("  lib/head.php  — emits theme-init.js for all 17")
 
     if problems:
         print(f"\n{len(problems)} drift issue(s):\n")

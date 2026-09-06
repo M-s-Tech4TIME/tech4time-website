@@ -85,13 +85,13 @@ PAGES = [
     "/pages/resource-certifications/",
     "/pages/privacy-policy/",
     "/pages/contact/",
-    "/404.html",
+    "/404.php",
 ]
 
 # Pages that are meant to carry no reveals at all, so "nothing was hidden" is
 # not mistaken for proof. The 404 is a single short block holding that page's
 # <h1>; animating a dead end is neither useful nor kind.
-NO_REVEALS = {"/404.html"}
+NO_REVEALS = {"/404.php"}
 
 # Walk the document a viewport at a time so every observer has a chance to
 # fire, then settle. Reveals are 400ms plus up to seven 80ms steps of stagger,
@@ -418,7 +418,7 @@ def shine(b: Browser, origin: str, r: Results) -> None:
     # call to action should not behave differently from one page to the next.
     total, carrying = 0, 0
     for path in ("/", "/pages/about/", "/pages/contact/", "/pages/careers/",
-                 "/404.html"):
+                 "/404.php"):
         b.go(origin + path)
         d = b.js(
             "var all = document.querySelectorAll('.btn--primary');"
@@ -1155,7 +1155,7 @@ def hero_mesh(b: Browser, origin: str, r: Results) -> None:
     the kind of fault found by a visitor rather than by a check.
     """
     print("\nthe hero's neural mesh")
-    b.go(origin + "/404.html")          # a host for the frame; it has no mesh
+    b.go(origin + "/404.php")          # a host for the frame; it has no mesh
 
     for width in (1440, 820, 390):
         d = {"loading": True}
@@ -1437,7 +1437,7 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
     dock's circuit; this is its counterpart for the banner.
     """
     print("\nthe circuit around the page title")
-    b.go(origin + "/404.html")          # a host for the frame; it has no band
+    b.go(origin + "/404.php")          # a host for the frame; it has no band
 
     for width in (1440, 768, 390):
         d = {"loading": True}

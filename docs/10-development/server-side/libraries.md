@@ -25,6 +25,8 @@ store they read from is outside the document root entirely.
 | [`certifications.php`](#certificationsphp) | the resource certifications page | `contract`, `store`, `html` |
 | [`branding.php`](#brandingphp) | the branding & advertisement page | `contract`, `store`, `html` |
 | [`privacy.php`](#privacyphp) | the privacy policy | `contract`, `store`, `html` |
+| [`seo.php`](#seophp) | the site-wide SEO record, and what is derived from it | `contract`, `store`, `html`, `contact` |
+| [`head.php`](#headphp) *(frontend)* | the `<head>` every page emits, and its structured data | `seo` |
 | [`svg.php`](#svgphp) **shared** | what a publishable vector file is |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
@@ -473,6 +475,74 @@ The key is `publish.key` in the private store: 32 random bytes, **the same bytes
 never derived from `secret.key` (the two stores have different master keys, so anything derived
 would differ by construction). It is never created on demand — see
 [`make_publish_key.py`](../../40-reference/tools.md).
+
+### `seo.php`
+
+`seo_load()` · `seo_site()` · `seo_identity()` · `seo_notfound()` · `seo_breadcrumb()` ·
+`seo_sitemap_entries()` *(frontend)* · `seo_edit()` · `seo_meta_edit()` · `seo_validate()` ·
+`seo_pages()` *(backend)*
+
+One document, `content/seo.json`, and it is deliberately **not** where a page's own metadata
+lives. Every page's title, search description, share title, breadcrumb, crawl setting and sitemap
+row are in **that page's own document**, in the `meta` band every document has — the About page's
+title is in `content/about.json`, beside the About page's content, and always was. What moved is
+the editing: one screen, `?s=seo`, edits all of them. See
+[ADR 0020](../../90-decisions/0020-page-metadata-is-content.md).
+
+What `content/seo.json` holds is what belongs to the site rather than to any one page: the
+Organization / WebSite / ProfessionalService graph, the default share card, the colours, the
+`<html lang>`, `robots.txt`'s extra rules, the search-console verification tokens and the web
+manifest — plus the 404's own record, because that page renders no content document and never
+will.
+
+**`SEO_ROUTES` is code, not content.** It maps a route key to an address, a name and the document
+that holds that page's `meta`. The editor cannot add, rename, remove or reorder a row: adding a
+page stays a code change, and its card then appears by itself, which is what makes it impossible
+to orphan a record or point one at a URL that does not resolve. The service pages are not in it,
+because a service is a row of `content/services.json` and a seventh can be added at any time — its
+metadata is its row's own `meta` band, so there is nothing to keep in step and a slug rename
+cannot orphan anything.
+
+**Sitemap membership is derived from `robots`.** One control, not two, so a page cannot be listed
+in the sitemap and asking not to be indexed at the same time — which is a warning raised against
+the whole file.
+
+The backend copy adds the two saves. `seo_edit()` writes `content/seo.json`; `seo_meta_edit()` and
+`seo_service_meta_edit()` write **one band of another document** under `store_edit()`'s lock,
+because the screen holds one band of a document whose other twenty were never in the form. A
+whole-document rebuild there would empty the page.
+
+### `head.php`
+
+`seo_head()` · `seo_jsonld()` · `seo_graph()` · `seo_offices()` · `seo_lang()` — frontend only.
+
+The `<head>` of every page, emitted once. It used to be pasted: seventeen copies of between 222
+and 308 lines, about 4,250 lines in all, with no propagation tool and no drift check over any of
+it — `check_shared_markup.py` covers the header, footer, dock and hero-circuit, and the head was
+never in that set.
+
+It drifted exactly as that guarantees. The Organization graph carried three office addresses and
+four telephone numbers as literal JSON in sixteen of the seventeen heads; only the contact page
+rendered them from `content/contact.json`. Editing an office in the admin left sixteen pages
+advertising the old one, and `sync_site_contact.py` was written to paste the new values back
+before a deploy. The graph is built here now, on the request, from the document that owns the
+facts — and that half of `sync_site_contact.py` is gone.
+
+A page hands in **its own address** and **its own `meta` band**:
+
+```php
+seo_head('/pages/about/', $data['meta'], ['pages/about.css'], $data['updated']);
+seo_jsonld('/pages/about/', $data['meta'], $data['updated']);
+```
+
+The address rather than a key, because a service page's address is a row's slug and is in no
+constant — and because the canonical is then the argument itself, which `audit_pages.py` checks
+against the directory the file actually sits in. A miscopied argument is the one mistake an
+emitted head makes possible, and that is the check that catches it.
+
+Nothing editable reaches the head unescaped, and the canonical, the CSP, the favicon list, the
+font preload and the stylesheet order are code. An editor able to break the Content Security
+Policy is a hazard, not a feature.
 
 ### `publish_client.php`
 

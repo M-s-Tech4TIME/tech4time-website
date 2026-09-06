@@ -56,8 +56,8 @@ Start at **[docs/README.md](docs/README.md)**, which routes by intent.
 ## The shape of it
 
 ```
-index.html  404.html      the homepage and the error page
-pages/                    the other fourteen — two are .php and render from content/
+index.php   404.php       the homepage and the error page
+pages/                    the other fourteen — every one renders from content/
 assets/                   css, js, fonts, icons, images — all self-hosted
 lib/                      server-side PHP: rendering, the contract, the publish format
 api/publish.php           where the backend's content arrives — the only thing here that writes

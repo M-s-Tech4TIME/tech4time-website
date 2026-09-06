@@ -116,6 +116,12 @@ jobs:
       # and every way past it that does not involve holding the key.
       - run: python3 tools/test_publish.py
       - run: python3 tools/test_publish_asset.py
+      # The three files that are generated rather than stored: the sitemap, the
+      # robots file and the web manifest. Each is served at an address that
+      # looks like a static file and none of them is one any more, so a PHP
+      # error in any of the three ships as a 500 at a URL no page links to and
+      # nobody visits — /sitemap.xml is fetched by Google, not by people.
+      - run: python3 tools/test_sitemap.py
 
   browser:
     name: firefox

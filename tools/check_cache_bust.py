@@ -56,6 +56,19 @@ WATCHED = re.compile(r"^assets/.*\.(css|js)$")
 # on purpose -- it is the thing being checked.
 REFERENCE = re.compile(r'(?:href|src)="(/assets/[^"]+)"')
 
+# A stylesheet is no longer named by an href. Since the seventeen heads were
+# collapsed into lib/head.php the URL is ASSEMBLED -- '/assets/css/' . $sheet --
+# from two places: HEAD_STYLES for the five every page loads, and the third
+# argument of each page's own seo_head() call for the one that is its own.
+#
+# This matters more than it looks. Neither is an href= for the regex above to
+# find, so without reading them the check finds no stylesheet anywhere on the
+# site and reports every one of them as "no page references it directly;
+# skipped" -- passing, in silence, about the exact thing it was written to
+# refuse. That is how it behaved for one commit, and it is why these two are
+# parsed rather than left to a glob.
+STYLE_ENTRY = re.compile(r"'([^']+\.css(?:\?[^']*)?)'")
+
 
 def git(*args: str) -> str:
     out = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
@@ -65,10 +78,55 @@ def git(*args: str) -> str:
 
 
 def pages() -> list[str]:
-    """Every file that can carry a reference, as repository-relative paths."""
-    found = ["index.php", "404.html"]
+    """Every file that can carry a reference, as repository-relative paths.
+
+    lib/head.php is in here because it holds the five shared stylesheet URLs
+    and their version queries. It is not a page, but it is where a page's
+    markup now comes from, which is the same thing to this check.
+    """
+    found = ["index.php", "404.php", "lib/head.php"]
     found += [str(p.relative_to(ROOT)) for p in (ROOT / "pages").rglob("index.*")]
     return sorted(p for p in found if (ROOT / p).exists())
+
+
+def styles(text: str) -> set[str]:
+    """The stylesheet URLs a file assembles, rather than writes.
+
+    Two shapes:
+
+        const HEAD_STYLES = ['base.css', 'layout.css?v=4', ...];
+        seo_head('/pages/about/', $data['meta'], ['pages/about.css'], ...);
+
+    Read by taking the whole construct -- to the `;` for the constant, to the
+    closing `)` for the call -- and then the quoted names inside it that end in
+    .css. Scoping it to the construct is what keeps a comment mentioning
+    layout.css from counting as a reference; matching on .css rather than on
+    the first bracket is what keeps $data['meta'] from being read as the
+    stylesheet list, which is a mistake this function has already made.
+    """
+    found: set[str] = set()
+
+    at = text.find("const HEAD_STYLES = ")
+    if at != -1:
+        end = text.find(";", at)
+        for name in STYLE_ENTRY.findall(text[at:end if end != -1 else len(text)]):
+            found.add("/assets/css/" + name)
+
+    at = text.find("seo_head(")
+    while at != -1:
+        depth, i = 0, text.index("(", at)
+        for i in range(i, len(text)):
+            if text[i] == "(":
+                depth += 1
+            elif text[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+        for name in STYLE_ENTRY.findall(text[at:i]):
+            found.add("/assets/css/" + name)
+        at = text.find("seo_head(", i)
+
+    return found
 
 
 def references(revision: str | None, paths: list[str]) -> dict[str, set[str]]:
@@ -83,7 +141,7 @@ def references(revision: str | None, paths: list[str]) -> dict[str, set[str]]:
             if out.returncode != 0:      # the page did not exist yet
                 continue
             text = out.stdout
-        for url in REFERENCE.findall(text):
+        for url in set(REFERENCE.findall(text)) | styles(text):
             urls.setdefault(url.split("?", 1)[0].lstrip("/"), set()).add(url)
     return urls
 
@@ -139,9 +197,11 @@ def main() -> int:
         print(f"\n{len(problems)} changed asset(s) keep an unchanged URL.")
         print("Anyone who has visited before keeps the copy they already have,")
         print("for up to a year, and sees the new markup against the old file.")
-        print("\nBump the version query in tools/templates/ AND in every page —")
-        print("neither head.html nor scripts.html is propagated, so both have to")
-        print("be edited. docs/20-deployment/routine-deploys.md, 'Cache busting'.")
+        print("\nBump the version query where the URL is written: a shared")
+        print("stylesheet in lib/head.php's HEAD_STYLES, a page's own in its")
+        print("seo_head() call, a script in tools/templates/scripts.html AND in")
+        print("every page — scripts.html is not propagated, so both have to be")
+        print("edited. docs/20-deployment/routine-deploys.md, 'Cache busting'.")
         return 1
 
     print("\nEvery changed asset is served from a URL that changed with it.")
