@@ -109,6 +109,8 @@ REQUIRED = [
     "lib/certifications.php",
     "pages/branding-and-advertisement/index.php",
     "lib/branding.php",
+    "pages/privacy-policy/index.php",
+    "lib/privacy.php",
     # /sitemap.xml is a rewrite onto this file. Missing, the sitemap 404s and
     # Search Console reports the whole site's index as failing to refresh.
     "sitemap.php",

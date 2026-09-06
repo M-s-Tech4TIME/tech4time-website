@@ -48,6 +48,7 @@ require_once __DIR__ . '/../lib/home.php';
 require_once __DIR__ . '/../lib/services.php';
 require_once __DIR__ . '/../lib/certifications.php';
 require_once __DIR__ . '/../lib/branding.php';
+require_once __DIR__ . '/../lib/privacy.php';
 
 /**
  * Where each document lands, by name.
@@ -72,6 +73,7 @@ const PUBLISH_FILES = [
     'services' => SERVICES_FILE,
     'certifications' => CERTIFICATIONS_FILE,
     'branding'       => BRANDING_FILE,
+    'privacy'        => PRIVACY_FILE,
 ];
 
 header('Content-Type: application/json; charset=utf-8');

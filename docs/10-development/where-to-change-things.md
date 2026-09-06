@@ -123,6 +123,9 @@ off. [javascript.md](frontend/javascript.md) · [motion.md](frontend/motion.md)
 | The number in "54 certifications across the four specialist roles" | nowhere: the text holds `{certifications}` and `{groups-word}`, and the renderer fills them in |
 | A logo file people download, or the terms covering its use | **`https://admin.tech4time.bd/?s=branding`** — not a file, and not here |
 | How the branding page is drawn | `lib/branding.php` |
+| Anything the privacy policy says | **`https://admin.tech4time.bd/?s=privacy`** — not a file, and not here |
+| How the privacy policy is drawn | `lib/privacy.php` and `PRIVACY_BLOCK_KINDS` in `lib/contract.php` — a block's kind decides its markup |
+| The web address of a section of the policy | nowhere: it is minted from the heading once and then frozen, because somebody may have linked to it |
 | The size beside a download, or the words on its button | nowhere: both are read off the file itself by `branding_meta_line()` and `branding_download_label()` |
 | What a vector file is allowed to contain | `lib/svg.php` — **and the same file in the backend** |
 | What HTML is allowed in rich text | `lib/html.php` — the sanitiser |

@@ -71,21 +71,11 @@ stores share is `publish.key`, which is what the dotted arrow is signed with.
 
 ## Serving a page
 
-### A static page — fourteen of the sixteen
-
-```
-GET /pages/about/
-  → .htaccess adds security headers, resolves the extensionless URL
-  → pages/about/index.html is returned
-```
-
-No PHP runs. The page contains its own inlined icon symbols, links the CSS it needs, and defers all
-its JavaScript to the end of `<body>`. Nothing is fetched from another origin.
-
-### A dynamic page — careers and contact
+### A dynamic page — fifteen of the sixteen
 
 ```
 GET /pages/careers/
+  → .htaccess adds security headers, resolves the extensionless URL
   → pages/careers/index.php
       require lib/careers.php    the shape of the data, and its defaults
       require lib/store.php      read content/careers.json from disk
@@ -93,8 +83,25 @@ GET /pages/careers/
   → HTML, fully rendered, in one request
 ```
 
-Still one filesystem read and one page of output. The only difference from a static page is that
-the words came out of a JSON file instead of being typed into the HTML.
+One filesystem read and one page of output. The page contains its own inlined icon symbols, links
+the CSS it needs, and defers all its JavaScript to the end of `<body>`. Nothing is fetched from
+another origin, and nothing is fetched from the backend — the words came out of a JSON file on this
+disk instead of being typed into the HTML.
+
+Every page but one now works this way. `privacy-policy` was the last to convert, and with it there
+is no page left whose wording needs a developer and a deploy.
+
+### A static page — `404.html`, and only that
+
+```
+GET /pages/nothing-here/
+  → .htaccess: ErrorDocument
+  → 404.html is returned
+```
+
+No PHP runs. It stays static deliberately: it is the page served when something has already gone
+wrong, so it should depend on as little as possible — not on a document, not on `lib/`, not on PHP
+answering at all.
 
 **Why server-side and not `fetch()`:** a contact page whose addresses arrive by JavaScript is
 indexed unreliably, and it is the page most often searched for by name. See

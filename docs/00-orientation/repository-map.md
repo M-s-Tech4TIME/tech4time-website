@@ -56,7 +56,7 @@ because `.htaccess` resolves it. The homepage is the exception: it stays at the 
 | Contact | `pages/contact/index.php` | **dynamic** — renders `content/contact.json` |
 | Resource certifications | `pages/resource-certifications/index.php` | **dynamic** — renders `content/certifications.json` |
 | Branding & advertisement | `pages/branding-and-advertisement/index.php` | **dynamic** — renders `content/branding.json` |
-| Privacy policy | `pages/privacy-policy/index.html` | |
+| Privacy policy | `pages/privacy-policy/index.php` | **dynamic** — renders `content/privacy.json` |
 | Not found | `404.html` | at the repository root |
 
 Two static, fourteen dynamic. Adding one:

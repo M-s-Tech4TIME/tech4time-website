@@ -37,7 +37,7 @@ So adding a service needs no developer at all. What a directory still buys is th
 but `check_shared_markup.py` and `inject_icons.py` have nothing to look at. Promoting a service to
 its own directory is therefore optional tidying, not a prerequisite for it to work.
 
-The rest of this page covers a static page.
+The rest of this page covers a static page. Note that the site itself no longer contains one besides `404.html` — every page renders from a document now — so a genuinely static addition is the rarer case, and the section after it on making a page dynamic is usually the one you want.
 
 ---
 

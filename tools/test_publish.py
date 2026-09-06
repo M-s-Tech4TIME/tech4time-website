@@ -69,6 +69,7 @@ HOME = ROOT / "content" / "home.json"
 SERVICES = ROOT / "content" / "services.json"
 CERTIFICATIONS = ROOT / "content" / "certifications.json"
 BRANDING = ROOT / "content" / "branding.json"
+PRIVACY = ROOT / "content" / "privacy.json"
 
 MARK = "PUBLISHMARK"
 
@@ -363,6 +364,7 @@ def run(base: str, key: bytes, r: Results) -> None:
     services_seventh(base, key, r)
     certifications_round_trip(base, key, r)
     branding_round_trip(base, key, r)
+    privacy_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -1486,6 +1488,194 @@ def branding_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("but the page is still a page", f"{MARK}-hero" in page)
 
 
+
+def privacy_round_trip(base: str, key: bytes, r: Results) -> None:
+    """Every field the privacy model declares, set and read off the page.
+
+    THIS IS WHAT check_content_model.py POINTS AT, for the reason the branding
+    one is: both halves walk their lists in loops, so a regex over the renderer
+    finds $section and $block rather than a field name. Put a distinguishable
+    value in every field, publish it, and look for it in the HTML a visitor
+    would get.
+
+    THE SIX KINDS ARE THE POINT. A block declares what it is and the renderer
+    owns the markup for it, so what is checked is not that the words arrived —
+    it is that a subheading became an <h3>, a table became a <table> with
+    scoped headers, an address became an <address>, and a note became the
+    tinted paragraph and not an ordinary one. A renderer that drew all six the
+    same would pass a check that only looked for the text.
+
+    AND THE STRUCTURE IS CHECKED FOR STAYING FLAT. assets/css/pages/legal.css
+    zeroes the top margin of the first heading with a child combinator, so a
+    per-section wrapper would silently stop it matching. Nothing here may nest
+    the blocks inside anything.
+    """
+    print("\nthe privacy policy travels the same road")
+
+    page_url = "/pages/privacy-policy/"
+
+    data = json.loads(PRIVACY.read_text())
+    data["revision"] = 70
+
+    data["meta"]["title"] = f"{MARK}-tab"
+    data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["description"] = f"{MARK}-desc"
+    data["meta"]["breadcrumb"] = f"{MARK}-crumb"
+    data["hero"]["title"] = f"{MARK}-hero"
+    data["hero"]["subtitle"] = f"{MARK}-sub"
+    data["policy"]["label"] = f"{MARK}-label"
+    data["policy"]["effective"] = f"{MARK}-effective"
+    data["cta"]["title"] = f"{MARK}-ctatitle"
+    data["cta"]["text"] = f"{MARK}-ctatext"
+
+    data["policy"]["callout"] = {
+        "status": "shown",
+        "title": f"{MARK}-callouttitle",
+        "note": f"{MARK}-calloutnote",
+        "items": [
+            {"id": "c1", "text": f"{MARK}-point1 <strong>{MARK}-pointbold</strong>",
+             "status": "shown"},
+            {"id": "c2", "text": f"{MARK}-pointhidden", "status": "hidden"},
+        ],
+    }
+
+    data["policy"]["sections"] = [
+        {"id": "first-one", "heading": f"{MARK}-head1", "status": "shown", "blocks": [
+            {"id": "p1", "kind": "paragraph", "status": "shown",
+             "text": f'{MARK}-para1 <em>{MARK}-em</em> '
+                     f'<a href="#second-one">{MARK}-fraglink</a>'},
+            {"id": "s1", "kind": "subheading", "status": "shown",
+             "text": f"{MARK}-subhead"},
+            {"id": "n1", "kind": "note", "status": "shown",
+             "text": f"{MARK}-notetext"},
+            {"id": "a1", "kind": "address", "status": "shown",
+             "text": f"<strong>{MARK}-addrname</strong><br>{MARK}-addrline<br>"
+                     f'<a href="mailto:x@y.z">{MARK}-addrmail</a>'},
+            {"id": "l1", "kind": "list", "status": "shown", "rows": [
+                {"id": "i1", "text": f"{MARK}-bullet1", "status": "shown"},
+                {"id": "i2", "text": f"{MARK}-bullethidden", "status": "hidden"},
+            ]},
+            {"id": "t1", "kind": "table", "status": "shown",
+             "caption": f"{MARK}-caption", "columns": [f"{MARK}-col1", f"{MARK}-col2"],
+             "rows": [
+                 {"id": "r1", "label": f"{MARK}-rowlabel", "value": f"{MARK}-rowvalue",
+                  "status": "shown"},
+                 {"id": "r2", "label": f"{MARK}-rowhidden", "value": "x",
+                  "status": "hidden"},
+             ]},
+            {"id": "h1", "kind": "paragraph", "status": "hidden",
+             "text": f"{MARK}-blockhidden"},
+        ]},
+        {"id": "second-one", "heading": f"{MARK}-head2", "status": "shown",
+         "blocks": [{"id": "p2", "kind": "paragraph", "status": "shown",
+                     "text": f"{MARK}-para2"}]},
+        {"id": "gone", "heading": f"{MARK}-headhidden", "status": "hidden",
+         "blocks": [{"id": "p3", "kind": "paragraph", "status": "shown",
+                     "text": f"{MARK}-sectionhidden"}]},
+    ]
+
+    data["cta"]["items"] = [
+        {"id": "b1", "label": f"{MARK}-btn", "href": "/pages/contact/",
+         "style": "primary", "status": "shown"},
+        {"id": "b2", "label": f"{MARK}-btnhidden", "href": "/x/", "style": "ghost",
+         "status": "hidden"},
+    ]
+
+    status, answer = publish(base, key, "privacy", data)
+    r.check("a validly signed payload is accepted",
+            status == 200 and answer.get("ok") is True, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the page is served", status == 200, f"status {status}")
+
+    for field in ("tab", "share", "hero", "sub", "label", "effective",
+                  "callouttitle", "calloutnote", "point1", "pointbold",
+                  "head1", "para1", "em", "subhead", "notetext", "addrname",
+                  "addrline", "addrmail", "bullet1", "caption", "col1", "col2",
+                  "rowlabel", "rowvalue", "head2", "para2", "ctatitle",
+                  "ctatext", "btn"):
+        r.check(f"{field} reaches the visitor", f"{MARK}-{field}" in page)
+
+    r.check("the tab title is the tab title", f"<title>{MARK}-tab</title>" in page)
+    r.check("and the share title is separate",
+            f'property="og:title" content="{MARK}-share"' in page)
+    r.check("the breadcrumb carries its OWN name, not the hero's",
+            f'"name": "{MARK}-crumb"' in page and f'"name": "{MARK}-hero"' not in page,
+            "the breadcrumb followed the hero title instead of its own field")
+
+    print("\nwhat is hidden is not there at all")
+
+    for gone in ("pointhidden", "bullethidden", "rowhidden", "blockhidden",
+                 "headhidden", "sectionhidden", "btnhidden"):
+        r.check(f"{gone} is absent", f"{MARK}-{gone}" not in page)
+
+    print("\neach of the six kinds is drawn as the kind it is")
+
+    r.check("a paragraph is a bare <p>", f"<p>{MARK}-para1" in page)
+    r.check("and exactly one <p>, not a paragraph inside a paragraph",
+            f"<p>{MARK}-para1" in page and f"<p><p>{MARK}" not in page,
+            "the field carried its own <p> and the renderer added another")
+    r.check("a subheading is an h3 with the class the stylesheet knows",
+            f'<h3 class="legal__subheading">{MARK}-subhead</h3>' in page)
+    r.check("a note is the tinted paragraph and not an ordinary one",
+            f'<p class="legal__notice">{MARK}-notetext</p>' in page,
+            "the note lost its class, or gained a paragraph inside a paragraph")
+    r.check("an address is an <address>",
+            f'<address class="legal__address">' in page
+            and f"{MARK}-addrname" in page)
+    r.check("a list is a <ul> of <li>",
+            f'<ul class="legal__list">' in page and f"<li>{MARK}-bullet1</li>" in page)
+    r.check("a table is a table, in its scroller",
+            '<div class="legal__table-wrap"><table class="legal__table">' in page)
+    r.check("its caption is there for a screen reader and nobody else",
+            f'<caption class="visually-hidden">{MARK}-caption</caption>' in page)
+    r.check("its column headings are scoped to their column",
+            f'<th scope="col">{MARK}-col1</th>' in page)
+    r.check("and each row is headed by its own first cell",
+            f'<th scope="row">{MARK}-rowlabel</th><td>{MARK}-rowvalue</td>' in page)
+
+    print("\nthe things that make the stylesheet work")
+
+    r.check("the sections are FLAT children of the body, with no wrapper",
+            re.search(r'<div class="legal__body">\s*<p class="legal__updated">', page)
+            is not None,
+            "something was inserted between the body and its first child")
+    r.check("the first heading is a direct child, so :first-of-type still matches",
+            re.search(r'</div>\s*<h2 class="legal__heading" id="first-one">', page)
+            is not None,
+            "the callout no longer closes immediately before the first heading")
+    r.check("the callout's own heading stays INSIDE the callout, not beside it",
+            re.search(r'<div class="legal__callout">\s*'
+                      r'<h2 class="legal__callout-title">', page) is not None,
+            "a flattened callout would steal :first-of-type from the first section")
+
+    print("\nan anchor is a promise, and a fragment link is one kept")
+
+    r.check("each section carries its stored id as its anchor",
+            '<h2 class="legal__heading" id="second-one">' in page)
+    r.check("a link into the page KEEPS ITS HREF",
+            'href="#second-one"' in page,
+            "rt_safe_href() dropped the fragment — the link would still look "
+            "like a link and do nothing")
+
+    print("\nrich text is printed, and script is not")
+
+    data["policy"]["sections"][1]["blocks"][0]["text"] = (
+        f'{MARK}-clean<script>alert(1)</script>'
+        f'<h2>{MARK}-structure</h2><p>{MARK}-nested</p>')
+    data["revision"] = 71
+    publish(base, key, "privacy", data)
+    _status, page = get(base, page_url)
+
+    r.check("the words survive", f"{MARK}-clean" in page)
+    r.check("the script does not", "alert(1)" not in page and "<script>alert" not in page)
+    r.check("and a heading typed into a paragraph is stripped, "
+            "because structure is not the rich field's job",
+            f"<h2>{MARK}-structure</h2>" not in page)
+    r.check("nor can a paragraph be typed into a paragraph",
+            f"<p>{MARK}-nested</p>" not in page and f"{MARK}-nested" in page,
+            "the <p> survived into a field the renderer already wraps")
+
 def home_round_trip(base: str, key: bytes, r: Results) -> None:
     """Every field the home model declares, set and then read off the page.
 
@@ -1750,6 +1940,7 @@ def main() -> None:
         certifications_backup = (CERTIFICATIONS.read_text()
                                  if CERTIFICATIONS.is_file() else None)
         branding_backup = BRANDING.read_text() if BRANDING.is_file() else None
+        privacy_backup = PRIVACY.read_text() if PRIVACY.is_file() else None
 
         server = subprocess.Popen(
             ["php", "-S", f"127.0.0.1:{port}", "-t", str(ROOT),
@@ -1786,7 +1977,8 @@ def main() -> None:
                                  (COMPANY, company_backup), (ABOUT, about_backup),
                                  (HOME, home_backup), (SERVICES, services_backup),
                                  (CERTIFICATIONS, certifications_backup),
-                                 (BRANDING, branding_backup)):
+                                 (BRANDING, branding_backup),
+                                 (PRIVACY, privacy_backup)):
                 if backup is not None:
                     path.write_text(backup)
                 bak = path.with_suffix(".json.bak")

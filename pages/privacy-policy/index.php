@@ -1,11 +1,52 @@
+<?php
+/**
+ * Tech4TIME — the privacy policy.
+ *
+ * PHP, and not HTML, because its content is edited at admin.tech4time.bd and
+ * arrives here as content/privacy.json. Rendered on the server, on this
+ * request, from a file on this disk: no fetch, no framework, and the page works
+ * with JavaScript switched off. See ADR 0003 and ADR 0010.
+ *
+ * THE LAST PAGE ON THE SITE TO STOP BEING HAND-WRITTEN. It was also the one
+ * that most needed to: a privacy policy is the page most likely to need a
+ * correction at short notice, and every correction used to need a developer
+ * and a deploy.
+ *
+ * Everything editable goes through h() EXCEPT the rich blocks — a paragraph,
+ * a note, an address and a list row — which are printed bare, sanitised on the
+ * way in by contract_sanitise() and again on receipt, because a signature
+ * proves where a document came from and not what is inside it.
+ *
+ * The blocks are emitted as FLAT SIBLINGS of .legal__body, with no per-section
+ * wrapper. assets/css/pages/legal.css zeroes the top margin of the first
+ * heading with a child combinator, and a wrapper would silently stop it
+ * matching. See privacy_block().
+ *
+ * The header, footer, dock and hero circuit are shared markup and stay
+ * literal; tools/check_shared_markup.py holds them byte-identical to
+ * tools/templates/. The four scroll-reveal markers are hand-maintained and all
+ * four are in the closing band: tools/apply_reveals.py skips .legal__body
+ * outright — "a legal document, not a pitch" — and now also skips this page
+ * whole, because it builds part of itself with a loop.
+ *
+ * NO ICONS. The policy body carries no glyph, so tools/inject_icons.py needs
+ * nothing here and there is no second sprite.
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/../../lib/privacy.php';
+
+$data = privacy_load();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Privacy Policy | Tech4TIME</title>
-<meta name="description" content="What Tech4TIME collects when you use this website, why, and how to ask us to correct or delete it. No cookies, no analytics, no tracking.">
+<title><?= h($data['meta']['title']) ?></title>
+<meta name="description" content="<?= h($data['meta']['description']) ?>">
 <link rel="canonical" href="https://tech4time.bd/pages/privacy-policy/">
 
 <!-- Crawling. Large image previews and full snippets are allowed so rich
@@ -23,8 +64,8 @@
 <meta property="og:type" content="website">
 <meta property="og:locale" content="en_US">
 <meta property="og:site_name" content="Tech4TIME">
-<meta property="og:title" content="Privacy Policy | Tech4TIME">
-<meta property="og:description" content="What Tech4TIME collects when you use this website, why, and how to ask us to correct or delete it. No cookies, no analytics, no tracking.">
+<meta property="og:title" content="<?= h($data['meta']['share_title']) ?>">
+<meta property="og:description" content="<?= h($data['meta']['description']) ?>">
 <meta property="og:url" content="https://tech4time.bd/pages/privacy-policy/">
 <meta property="og:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
 <meta property="og:image:width" content="1200">
@@ -33,8 +74,8 @@
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Privacy Policy | Tech4TIME">
-<meta name="twitter:description" content="What Tech4TIME collects when you use this website, why, and how to ask us to correct or delete it. No cookies, no analytics, no tracking.">
+<meta name="twitter:title" content="<?= h($data['meta']['share_title']) ?>">
+<meta name="twitter:description" content="<?= h($data['meta']['description']) ?>">
 <meta name="twitter:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
 <meta name="twitter:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
 
@@ -254,7 +295,7 @@
     {
       "@type": "ListItem",
       "position": 2,
-      "name": "Privacy Policy",
+      "name": <?= json_encode($data['meta']['breadcrumb'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>,
       "item": "https://tech4time.bd/pages/privacy-policy/"
     }
   ]
@@ -598,441 +639,58 @@
 <!--hero-circuit:end-->
 
 <div class="container page-hero__inner">
-      <h1 class="page-hero__title">Privacy Policy</h1>
-      <p class="page-hero__subtitle">What We Collect, Why, and What You Can Ask Us to Do About It</p>
+      <h1 class="page-hero__title"><?= h($data['hero']['title']) ?></h1>
+      <p class="page-hero__subtitle"><?= h($data['hero']['subtitle']) ?></p>
     </div>
   </section>
 
   <!-- ============================ Policy ============================= -->
   <section class="section legal" aria-labelledby="policy-heading">
     <div class="container">
-      <h2 class="visually-hidden" id="policy-heading">Privacy policy</h2>
+      <h2 class="visually-hidden" id="policy-heading"><?= h($data['policy']['label']) ?></h2>
 
       <div class="legal__body">
 
-        <p class="legal__updated">Effective 21 August 2026</p>
+        <p class="legal__updated"><?= h($data['policy']['effective']) ?></p>
 
-        <!-- ----------------------- at a glance ----------------------- -->
+<?php $callout = $data['policy']['callout']; ?>
+<?php if (privacy_rows_shown([$callout])): ?>
         <div class="legal__callout">
-          <h2 class="legal__callout-title">The short version</h2>
+          <h2 class="legal__callout-title"><?= h($callout['title']) ?></h2>
           <ul class="legal__list">
-            <li>
-              This website sets <strong>no cookies</strong>, runs
-              <strong>no analytics</strong> and contains <strong>no tracking
-              of any kind</strong>. You can read every page without telling us
-              anything about yourself.
-            </li>
-            <li>
-              We only receive personal information if you <strong>send us an
-              enquiry</strong> or <strong>apply for a job</strong>.
-            </li>
-            <li>
-              Job applications are collected through an
-              <strong>external form service</strong>, so that provider holds
-              your CV as well as we do. You can see which one as soon as you
-              follow an application link.
-            </li>
-            <li>
-              If you apply for a role that involves being placed with one of
-              our clients, <strong>we share your application with that
-              client</strong> as part of their selection. This is how resource
-              placement works, and we would rather you knew before applying
-              than after.
-            </li>
-            <li>
-              We never sell your data, and we never send marketing to people
-              who did not ask for it.
-            </li>
-            <li>
-              You can ask us what we hold about you, correct it, or have it
-              deleted — free of charge, at
-              <a href="mailto:info@tech4time.bd">info@tech4time.bd</a>.
-            </li>
+<?php foreach (privacy_rows_shown($callout['items']) as $item): ?>
+            <li><?= $item['text'] ?></li>
+<?php endforeach; ?>
           </ul>
-          <p class="legal__callout-note">
-            The rest of this page says the same things in full.
-          </p>
+          <p class="legal__callout-note"><?= $callout['note'] ?></p>
         </div>
+<?php endif; ?>
 
-        <!-- --------------------------- who ---------------------------- -->
-        <h2 class="legal__heading" id="who-we-are">Who is responsible for your data</h2>
-        <p>
-          Tech4TIME decides why and how personal data is processed on this
-          website. In data protection law that makes us the
-          <em>data controller</em>. You can reach us at:
-        </p>
-        <address class="legal__address">
-          <strong>M/s. Tech4TIME</strong><br>
-          278/3, Manikdi<br>
-          Dhaka&nbsp;-&nbsp;1206, Bangladesh<br>
-          <br>
-          Email: <a href="mailto:info@tech4time.bd">info@tech4time.bd</a><br>
-          Telephone: <a href="tel:+8801320571562">+880&nbsp;1320&nbsp;571562</a>
-        </address>
-        <p>
-          We also operate from 68100 Batu Caves, Selangor, Malaysia and 367
-          Avenue Louise, Brussels, Belgium. Because we have a presence in the
-          European Union, we apply the standards of the EU General Data
-          Protection Regulation (GDPR) to everyone who contacts us, wherever
-          you happen to be.
-        </p>
+<?php foreach (privacy_rows_shown($data['policy']['sections']) as $section): ?>
+        <h2 class="legal__heading" id="<?= h($section['id']) ?>"><?= h($section['heading']) ?></h2>
+<?php   foreach (privacy_rows_shown($section['blocks']) as $block): ?>
+        <?= privacy_block($block) ?>
 
-        <!-- ------------------------- collect -------------------------- -->
-        <h2 class="legal__heading" id="what-we-collect">What we collect, and why</h2>
-        <p>
-          There are only two ways this website collects anything from you, and
-          both require you to act first.
-        </p>
-
-        <h3 class="legal__subheading">When you use the contact form</h3>
-        <p>We receive:</p>
-        <ul class="legal__list">
-          <li>Your name</li>
-          <li>Your email address</li>
-          <li>Your telephone number</li>
-          <li>The type of service you are asking about</li>
-          <li>Your message</li>
-          <li>
-            Your IP address and the time you submitted the form — recorded so
-            that abuse of the form can be traced, not to identify you
-          </li>
-        </ul>
-        <p>
-          We use this to answer your enquiry and any follow-up to it, and for
-          nothing else. The message is delivered by email to our own mail
-          server and is read by the people at Tech4TIME who deal with
-          enquiries.
-        </p>
-        <p>
-          <strong>Legal basis:</strong> your consent, which you give by ticking
-          the box on the form (GDPR Art. 6(1)(a)). You can withdraw it at any
-          time — see <a href="#your-rights">your rights</a> below.
-        </p>
-
-        <h3 class="legal__subheading">When you apply for a job</h3>
-        <p>
-          Applications and speculative CVs are collected through an external
-          online form service rather than on this website. When you follow an
-          "Apply" or "Share your CV" link you leave this site, and what you
-          submit — including your CV and everything in it — is collected and
-          stored by that provider on our behalf.
-        </p>
-        <p>
-          Which provider we use is visible the moment you follow the link, in
-          your browser's address bar, and that provider's own privacy policy
-          governs what it does with your data. We change these services from
-          time to time; if you would like to know which one we are using before
-          you apply, or how it handles your information, ask us at
-          <a href="mailto:career@tech4time.bd">career@tech4time.bd</a> and we
-          will tell you.
-        </p>
-        <p>
-          We use your application to assess you for the role you applied for,
-          and to consider you for roles that open later.
-        </p>
-        <p class="legal__notice">
-          <strong>Where your application may go.</strong> Some of the roles we
-          recruit for are placements with our client companies rather than
-          positions on our own staff. If you apply for one of those, or if we
-          think you suit one, <strong>we share your application — including
-          your CV — with that client</strong> as part of their selection
-          process. Our clients are in Bangladesh and abroad, so this may mean
-          your details travel outside your own country. If you would rather we
-          did not do this, tell us at
-          <a href="mailto:career@tech4time.bd">career@tech4time.bd</a> and we
-          will keep your application to ourselves.
-        </p>
-        <p>
-          <strong>Legal basis:</strong> steps taken at your request before
-          entering a contract of employment (GDPR Art. 6(1)(b)), and our
-          legitimate interest in matching candidates to roles
-          (Art. 6(1)(f)).
-        </p>
-
-        <h3 class="legal__subheading">When you simply read the site</h3>
-        <p>
-          Our hosting provider's web server keeps ordinary access logs, as
-          every web server does. These record:
-        </p>
-        <ul class="legal__list">
-          <li>Your IP address</li>
-          <li>Browser type and version</li>
-          <li>Operating system</li>
-          <li>The page you came from, if any</li>
-          <li>The date and time of the request</li>
-        </ul>
-        <p>
-          These are not combined with anything else and are not used to build a
-          picture of you. They exist so faults and attacks can be investigated.
-          Retention is set by our hosting provider rather than by us.
-        </p>
-        <p>
-          <strong>Legal basis:</strong> our legitimate interest in running a
-          secure and working website (GDPR Art. 6(1)(f)).
-        </p>
-
-        <h3 class="legal__subheading">Your light or dark mode choice</h3>
-        <p>
-          If you switch between light and dark appearance, your browser
-          remembers that choice in its own local storage. It is a single word,
-          it stays on your device, and it is <strong>never sent to us</strong>.
-          Clearing your browser's site data for this domain removes it.
-        </p>
-
-        <!-- ------------------------ we do not ------------------------- -->
-        <h2 class="legal__heading" id="what-we-do-not-do">What we do not do</h2>
-        <p>
-          This is worth stating plainly, because most websites cannot say it:
-        </p>
-        <ul class="legal__list">
-          <li><strong>No cookies.</strong> This site sets none at all.</li>
-          <li>
-            <strong>No analytics.</strong> No Google Analytics, no Matomo, no
-            tag manager, no counters. We do not measure your visit.
-          </li>
-          <li>
-            <strong>No tracking or advertising.</strong> No pixels, no
-            fingerprinting, no advertising networks, no profiling.
-          </li>
-          <li>
-            <strong>No third-party content.</strong> Every file this site loads
-            — every stylesheet, script, font and image — comes from our own
-            domain. Your browser is not asked to contact anyone else while you
-            read these pages. There are no embedded maps, videos or social
-            media plugins. Our links to LinkedIn and GitHub are ordinary links:
-            those networks learn nothing unless you click.
-          </li>
-          <li>
-            <strong>We never sell or rent your data</strong>, and we never pass
-            it to anyone for their own marketing.
-          </li>
-        </ul>
-
-        <!-- ------------------------ recipients ------------------------ -->
-        <h2 class="legal__heading" id="who-sees-it">Who else sees your data</h2>
-        <p>
-          We keep the list of people who touch your data as short as we can.
-          It is:
-        </p>
-        <ul class="legal__list">
-          <li>
-            <strong>Our hosting provider</strong>, whose servers run this
-            website and hold our email. They do not use your data for anything
-            of their own.
-          </li>
-          <li>
-            <strong>The provider of our application form service</strong>, for
-            job applications only. We will name the current one on request.
-          </li>
-          <li>
-            <strong>Client companies</strong>, for applications only, and only
-            where a role involves placement with that client, as described
-            above.
-          </li>
-        </ul>
-        <p>
-          Enquiries sent through the contact form are <strong>not</strong>
-          shared with any of these beyond our hosting provider — they stay on
-          our own mail server.
-        </p>
-        <p>
-          We may also disclose information where the law requires it, for
-          instance in response to a valid order from a court or regulator.
-        </p>
-
-        <!-- ------------------------ retention ------------------------- -->
-        <h2 class="legal__heading" id="how-long">How long we keep things</h2>
-        <div class="legal__table-wrap">
-          <table class="legal__table">
-            <caption class="visually-hidden">Retention periods by type of data</caption>
-            <thead>
-              <tr>
-                <th scope="col">What</th>
-                <th scope="col">How long</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">Contact enquiries</th>
-                <td>Until your question is resolved, and for up to 12 months
-                    afterwards in case you come back to us about it. Then deleted.</td>
-              </tr>
-              <tr>
-                <th scope="row">Job applications and CVs</th>
-                <td>12 months from when you send them, so we can consider you
-                    for roles that open in that time. Then deleted.</td>
-              </tr>
-              <tr>
-                <th scope="row">Server access logs</th>
-                <td>As long as our hosting provider retains them. We do not
-                    keep copies.</td>
-              </tr>
-              <tr>
-                <th scope="row">Light or dark mode choice</th>
-                <td>Until you clear your browser's data. We never receive it.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p>
-          If you become a client, information connected to that relationship is
-          kept for as long as the relationship lasts and for as long afterwards
-          as tax and company law require.
-        </p>
-        <p>
-          You do not have to wait for any of these periods to pass. Ask us to
-          delete something and we will, unless the law requires us to keep it.
-        </p>
-
-        <!-- --------------------------- where -------------------------- -->
-        <h2 class="legal__heading" id="where">Where your data is held</h2>
-        <p>
-          This website and our email run on servers located in
-          <strong>Singapore</strong>, operated by our hosting provider. That is
-          where your contact form message and our access logs physically sit.
-          Job applications are held by whichever form service we are using at
-          the time, and providers of that kind commonly store data across data
-          centres in several countries.
-        </p>
-        <p>
-          Singapore is outside the European Economic Area, and the European
-          Commission has not issued an adequacy decision for it. So if you
-          write to us from the EEA, your message is transferred out of it. We
-          rely on the contractual safeguards in our agreement with our hosting
-          provider for that transfer, and we will show you the detail if you
-          ask.
-        </p>
-        <p>
-          Where we share an application with a client company, that client may
-          be in a different country from you again. Where personal data leaves
-          the European Economic Area that way, we rely on the safeguards the
-          receiving organisation has in place, and we will tell you which on
-          request.
-        </p>
-
-        <!-- -------------------------- rights -------------------------- -->
-        <h2 class="legal__heading" id="your-rights">Your rights</h2>
-        <p>
-          Whatever country you are in, we will honour all of the following.
-          None of them costs you anything.
-        </p>
-        <ul class="legal__list">
-          <li>
-            <strong>Ask what we hold.</strong> We will tell you what data we
-            have about you, where it came from, who has received it and why we
-            have it.
-          </li>
-          <li><strong>Correct it</strong> if it is wrong or incomplete.</li>
-          <li>
-            <strong>Have it deleted.</strong> We will erase it unless the law
-            requires us to keep it, in which case we will say so.
-          </li>
-          <li>
-            <strong>Restrict or object to what we do with it</strong>,
-            including objecting to anything we do on the basis of legitimate
-            interest.
-          </li>
-          <li>
-            <strong>Take it with you.</strong> We will provide the data you
-            gave us in a common machine-readable format, or send it directly to
-            someone else where that is technically possible.
-          </li>
-          <li>
-            <strong>Withdraw consent</strong> at any time, where we relied on
-            it. This does not undo processing that already happened lawfully.
-          </li>
-          <li>
-            <strong>Complain to a regulator.</strong> You can complain to the
-            data protection authority in your country. If you are in the
-            European Union, that includes the authority where you live, work,
-            or where you believe the problem occurred.
-          </li>
-        </ul>
-        <p>
-          To exercise any of these, email
-          <a href="mailto:info@tech4time.bd">info@tech4time.bd</a> — or
-          <a href="mailto:career@tech4time.bd">career@tech4time.bd</a> if it
-          concerns a job application. An informal message is enough; you do not
-          need a particular form of words. We will respond within one month.
-        </p>
-
-        <!-- ------------------------- security ------------------------- -->
-        <h2 class="legal__heading" id="security">How we protect your data</h2>
-        <p>
-          The whole site is served over an encrypted HTTPS connection, so what
-          you send through the contact form cannot be read in transit. Access
-          to our mailbox and to job applications is limited to the people who
-          need it, and is protected by passwords and, where available,
-          two-factor authentication.
-        </p>
-        <p>
-          We should be honest about the limits of this. No transmission over
-          the internet is ever completely secure, and email in particular can
-          be intercepted between mail servers. Please do not send us anything
-          highly sensitive — identity documents, financial details, medical
-          information — through the contact form. If you need to share
-          something like that, write to us first and we will arrange a safer
-          route.
-        </p>
-
-        <!-- ------------------------ unsolicited ----------------------- -->
-        <h2 class="legal__heading" id="marketing">Marketing and unsolicited email</h2>
-        <p>
-          We do not run a mailing list and we do not send marketing to people
-          who have not asked for it. Answering your enquiry does not put you on
-          any list.
-        </p>
-        <p>
-          We also expressly refuse permission for the contact details published
-          on this website to be used to send us unsolicited advertising. We
-          reserve the right to take action if such material is sent to us.
-        </p>
-
-        <!-- ------------------------- children ------------------------- -->
-        <h2 class="legal__heading" id="children">Children</h2>
-        <p>
-          This website and our services are meant for businesses and for adults
-          seeking work. We do not knowingly collect information from children.
-          If you believe a child has sent us personal information, tell us and
-          we will delete it.
-        </p>
-
-        <!-- ------------------------- changes -------------------------- -->
-        <h2 class="legal__heading" id="changes">Changes to this policy</h2>
-        <p>
-          If what we do with your data changes, we will update this page and
-          change the date at the top. Where a change materially affects you, we
-          will do more than quietly edit the page.
-        </p>
-
-        <!-- -------------------------- contact ------------------------- -->
-        <h2 class="legal__heading" id="contact">Questions</h2>
-        <p>
-          If anything here is unclear, or you think we have got something
-          wrong, please write to
-          <a href="mailto:info@tech4time.bd">info@tech4time.bd</a>. We would
-          much rather hear from you than have you complain to a regulator, but
-          you are entitled to do both.
-        </p>
-
+<?php   endforeach; ?>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
 
   <!-- ============================== CTA ============================== -->
+<?php if (privacy_band_shown($data, 'cta')): ?>
   <section class="cta-band cta-band--base">
     <div class="container cta-band__inner">
-      <h2 data-reveal data-reveal-delay class="cta-band__title">Questions about your data?</h2>
-      <p data-reveal data-reveal-delay class="cta-band__text">
-        Ask us what we hold, or ask us to delete it. Both are free, and we
-        answer within a month.
-      </p>
+      <h2 data-reveal data-reveal-delay class="cta-band__title"><?= h($data['cta']['title']) ?></h2>
+      <p data-reveal data-reveal-delay class="cta-band__text"><?= h($data['cta']['text']) ?></p>
       <div class="cta-band__actions">
-        <a data-reveal data-reveal-delay class="btn btn--primary btn--lg" href="/pages/contact/">Contact Us</a>
-        <a data-reveal data-reveal-delay class="btn btn--ghost btn--lg" href="mailto:info@tech4time.bd">info@tech4time.bd</a>
+<?php foreach (privacy_rows_shown($data['cta']['items']) as $button): ?>
+        <a data-reveal data-reveal-delay class="btn btn--<?= h($button['style']) ?> btn--lg" href="<?= h($button['href']) ?>"><?= h($button['label']) ?></a>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
+<?php endif; ?>
 
 </main>
 

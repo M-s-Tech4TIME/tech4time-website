@@ -68,11 +68,16 @@ jobs:
       # in the pre-commit list and not here, which made it a rule kept by
       # remembering again for anything that arrived by pull request.
       - run: python3 tools/check_cache_bust.py
-      # The four files both repositories hold identically, compared against a
+      # The five files both repositories hold identically, compared against a
       # digest committed HERE. Hygiene, not a guarantee -- the guarantee is
       # CONTRACT_VERSION, checked at run time by api/publish.php against what
       # it was actually sent.
       - run: python3 tools/check_shared_lib.py
+      # A fact stated in two documents at once -- the offices, the email and the
+      # telephone are authored in BOTH the privacy policy and the contact page,
+      # on purpose. This asks whether they still agree. It can only see the
+      # committed seed: content edited in the admin never passes through git.
+      - run: python3 tools/check_shared_facts.py
 
       # And the thing the line above structurally cannot see: whether the OTHER
       # half still holds the same bytes. A per-repo digest passes happily while

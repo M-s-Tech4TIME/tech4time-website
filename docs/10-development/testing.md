@@ -23,6 +23,7 @@ python3 tools/check_docs.py            # the docs still describe the code
 python3 tools/audit_pages.py           # SEO, accessibility, structure, internal links
 python3 tools/build_deploy_set.py --check   # nothing secret or local is bound for the server
 python3 tools/check_shared_lib.py
+python3 tools/check_shared_facts.py    # the offices, email and phone the policy repeats from the contact page
 python3 tools/check_shared_repos.py      # the three files both halves hold identically
 ```
 
@@ -89,7 +90,7 @@ These start a real PHP server on a spare port and drive it over HTTP.
 
 | Script | Proves |
 |---|---|
-| `test_publish.py` | `api/publish.php` driven over real HTTP with real signatures: the happy path, then **every way past it that does not involve holding the key** — no signature, another key's signature, a tampered body, an old timestamp, a replay, a lower revision, a different `contract_version`, and a `<script>` from a sender that signed correctly. Also that **every field the model declares reaches the visitor**, by sending a marker through each one and reading it back off the public page. And that **a service added in the editor becomes a page**: an address with no file behind it, its own head, a line in the sitemap, a link from the index, and a 404 when it is hidden or removed |
+| `test_publish.py` | `api/publish.php` driven over real HTTP with real signatures: the happy path, then **every way past it that does not involve holding the key** — no signature, another key's signature, a tampered body, an old timestamp, a replay, a lower revision, a different `contract_version`, and a `<script>` from a sender that signed correctly. Also that **every field the model declares reaches the visitor**, by sending a marker through each one and reading it back off the public page. And that **a service added in the editor becomes a page**: an address with no file behind it, its own head, a line in the sitemap, a link from the index, and a 404 when it is hidden or removed. For the privacy policy it also checks that each of the **six block kinds** is drawn as the kind it is — a subheading as an `<h3>`, a table with scoped headers, a note as the tinted paragraph — that the blocks stay **flat** children of `.legal__body` so `:first-of-type` still matches, and that a fragment link into the page keeps its `href` |
 | `test_contact_handler.py` | method check, honeypot, every validation rule, CR/LF injection into each field, the assembled message, non-ASCII round trips, the rate limit, and the no-JavaScript HTML response |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
 
