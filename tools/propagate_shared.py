@@ -74,11 +74,12 @@ MARKED = re.compile(
 def pages() -> list[Path]:
     return sorted(
         list(ROOT.glob("*.html"))
-        # index.php is the home page. Named rather than globbed as "*.php":
-        # the root also holds contact-handler.php, a POST endpoint with no
-        # header, footer or <body> of its own, and a broad glob pastes a header
-        # and a footer straight into it. The root has exactly one page.
+        # index.php is the home page and 404.php the error page. Named rather
+        # than globbed as "*.php": the root also holds contact-handler.php and
+        # sitemap.php, endpoints with no header, footer or <body> of their own,
+        # and a broad glob pastes a header and a footer straight into them.
         + list(ROOT.glob("index.php"))
+        + list(ROOT.glob("404.php"))
         + list(ROOT.glob("pages/**/*.html"))
         + list(ROOT.glob("pages/**/*.php"))
     )

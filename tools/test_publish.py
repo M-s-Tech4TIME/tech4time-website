@@ -67,6 +67,10 @@ COMPANY = ROOT / "content" / "company.json"
 ABOUT = ROOT / "content" / "about.json"
 HOME = ROOT / "content" / "home.json"
 SERVICES = ROOT / "content" / "services.json"
+CERTIFICATIONS = ROOT / "content" / "certifications.json"
+BRANDING = ROOT / "content" / "branding.json"
+PRIVACY = ROOT / "content" / "privacy.json"
+SEO = ROOT / "content" / "seo.json"
 
 MARK = "PUBLISHMARK"
 
@@ -359,6 +363,10 @@ def run(base: str, key: bytes, r: Results) -> None:
     home_round_trip(base, key, r)
     services_round_trip(base, key, r)
     services_seventh(base, key, r)
+    certifications_round_trip(base, key, r)
+    branding_round_trip(base, key, r)
+    privacy_round_trip(base, key, r)
+    seo_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -458,6 +466,7 @@ def company_round_trip(base: str, key: bytes, r: Results) -> None:
     data["meta"]["title"] = f"{MARK}-tab"
     data["meta"]["description"] = f"{MARK}-desc"
     data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["keywords"] = f"{MARK}-kw"
     data["hero"]["title"] = f"{MARK}-hero"
     data["hero"]["subtitle"] = f"{MARK}-sub"
     data["milestones"]["eyebrow"] = f"{MARK}-m-eyebrow"
@@ -510,7 +519,7 @@ def company_round_trip(base: str, key: bytes, r: Results) -> None:
     _, page = get(base, "/pages/company-profile/")
 
     missing = [k for k in (
-        "tab", "desc", "share", "hero", "sub",
+        "tab", "desc", "share", "kw", "hero", "sub",
         "m-eyebrow", "m-title", "m-lead", "m-row", "m-text",
         "b-eyebrow", "b-title", "x-title", "x-label",
         "c-title", "c-name", "j-title", "j-lead", "j-alt",
@@ -520,6 +529,13 @@ def company_round_trip(base: str, key: bytes, r: Results) -> None:
     ) if f"{MARK}-{k}" not in page]
     r.check("every field the model declares reaches the page",
             not missing, "never rendered: " + ", ".join(missing))
+
+    # Not just present -- present as the tag it is meant to be. A keyword list
+    # that reached the page inside some other element would satisfy the marker
+    # walk above and tell a search engine nothing.
+    r.check("the keywords reach the page as a keywords tag",
+            f'<meta name="keywords" content="{MARK}-kw">' in page,
+            "the marker arrived, but not in the tag it is for")
 
     r.check("the figure keeps its count-up hook", 'data-count-up>42+<' in page)
     r.check("the slideshow carries the interval it was given",
@@ -1140,6 +1156,743 @@ def services_seventh(base: str, key: bytes, r: Results) -> None:
             f"status {status}")
 
 
+def certifications_round_trip(base: str, key: bytes, r: Results) -> None:
+    """Every field the certifications model declares, set and read off the page.
+
+    THIS IS WHAT check_content_model.py POINTS AT, for the reason
+    about_round_trip() is and one level deeper: a role group walks its roles
+    and its certifications, so a regex over the renderer finds $group and
+    $cert rather than a field name. Put a distinguishable value in every
+    field, publish it, and look for it in the HTML a visitor would get.
+
+    It also checks the things the renderer DRAWS rather than stores -- the
+    count on each group heading, the glyph beside every certification, and the
+    totals filled into the prose. Those cannot be proved by a marker, because
+    nothing types them: they are proved by being consistent with the rows they
+    come from, and by MOVING when those rows do.
+    """
+    print("\nthe certifications page travels the same road")
+
+    page_url = "/pages/resource-certifications/"
+
+    data = json.loads(CERTIFICATIONS.read_text())
+    data["revision"] = 50
+
+    data["meta"]["title"] = f"{MARK}-tab"
+    data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["description"] = f"{MARK}-desc {{certifications}} held"
+    data["hero"]["title"] = f"{MARK}-hero"
+    data["hero"]["subtitle"] = f"{MARK}-sub"
+    data["certs"]["eyebrow"] = f"{MARK}-eyebrow"
+    data["certs"]["title"] = f"{MARK}-bandtitle"
+    data["certs"]["lead"] = (f"{MARK}-lead {{certifications}} across {{groups}} "
+                             f"({{groups-word}}), {{roles}} roles")
+    data["cta"]["title"] = f"{MARK}-ctatitle"
+    data["cta"]["text"] = f"{MARK}-ctatext"
+
+    data["certs"]["items"] = [
+        {"id": "alpha", "slug": "alpha", "icon": "cogs", "blurb": f"{MARK}-blurb",
+         "status": "shown", "open": True,
+         "roles": [{"id": "r1", "name": f"{MARK}-role1", "status": "shown"},
+                   {"id": "r2", "name": f"{MARK}-role2", "status": "shown"},
+                   {"id": "r3", "name": f"{MARK}-rolehidden", "status": "hidden"}],
+         "items": [{"id": "c1", "name": f"{MARK}-cert1", "status": "shown"},
+                   {"id": "c2", "name": f"{MARK}-cert2", "status": "shown"},
+                   {"id": "c3", "name": f"{MARK}-certhidden", "status": "hidden"}]},
+        {"id": "beta", "slug": "beta", "icon": "first-aid", "blurb": "beta blurb",
+         "status": "shown", "open": False,
+         "roles": [{"id": "r4", "name": "Beta Role", "status": "shown"}],
+         "items": [{"id": "c4", "name": "Beta Cert", "status": "shown"}]},
+        {"id": "gamma", "slug": "gamma", "icon": "cogs", "blurb": f"{MARK}-neverseen",
+         "status": "hidden", "open": False,
+         "roles": [{"id": "r5", "name": f"{MARK}-hiddenrole", "status": "shown"}],
+         "items": [{"id": "c5", "name": f"{MARK}-hiddencert", "status": "shown"}]},
+    ]
+    data["cta"]["items"] = [
+        {"id": "b1", "label": f"{MARK}-btn", "href": "/pages/contact/", "icon": "",
+         "style": "primary", "status": "shown"},
+        {"id": "b2", "label": f"{MARK}-btnhidden", "href": "/x/", "icon": "",
+         "style": "ghost", "status": "hidden"},
+    ]
+
+    status, answer = publish(base, key, "certifications", data)
+    r.check("a validly signed payload is accepted",
+            status == 200 and answer.get("ok") is True, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the page is served", status == 200, f"status {status}")
+
+    for field in ("tab", "share", "hero", "sub", "eyebrow", "bandtitle",
+                  "blurb", "role1", "role2", "cert1", "cert2",
+                  "ctatitle", "ctatext", "btn"):
+        r.check(f"{field} reaches the visitor", f"{MARK}-{field}" in page)
+
+    r.check("the tab title is the tab title",
+            f"<title>{MARK}-tab</title>" in page)
+    r.check("and the share title is separate",
+            f'property="og:title" content="{MARK}-share"' in page)
+
+    print("\nwhat is hidden is not there at all")
+
+    for gone in ("rolehidden", "certhidden", "neverseen", "hiddenrole",
+                 "hiddencert", "btnhidden"):
+        r.check(f"{gone} is absent", f"{MARK}-{gone}" not in page)
+
+    r.check("a hidden group takes its whole panel with it",
+            'id="gamma"' not in page)
+
+    print("\nthe counts are drawn, not stored")
+
+    # Two shown certifications in the first group, one in the second.
+    r.check("each group heading counts the certifications shown inside it",
+            '<span class="cert-group__count">2 certifications</span>' in page
+            and '<span class="cert-group__count">1 certification</span>' in page,
+            "counts: " + str(re.findall(r'cert-group__count">([^<]*)<', page)))
+
+    r.check("one certification is not 'certifications'",
+            "1 certifications</span>" not in page)
+
+    r.check("nothing anywhere claims the hidden one",
+            "3 certifications" not in page)
+
+    print("\nthe totals in the prose are drawn too")
+
+    # Three shown certifications, two shown groups, three shown role names.
+    r.check("the lead resolves its digits",
+            f"{MARK}-lead 3 across 2" in page,
+            [line for line in page.splitlines() if f"{MARK}-lead" in line][:1])
+    r.check("and its spelled form", "(two), 3 roles" in page)
+    r.check("the meta description resolves too",
+            f'content="{MARK}-desc 3 held"' in page)
+    r.check("no token is left showing to a visitor",
+            "{certifications}" not in page and "{groups}" not in page
+            and "{roles}" not in page)
+
+    print("\nthe rest of what the renderer draws")
+
+    r.check("every certification carries the same glyph, and it is not stored",
+            page.count('<use href="#certificate"></use>') == 3,
+            str(page.count('<use href="#certificate"></use>')))
+    r.check("the group that says it is open is the one that is",
+            re.search(r'<details[^>]*id="alpha"[^>]*\sopen>', page) is not None
+            and re.search(r'<details[^>]*id="beta"[^>]*\sopen>', page) is None)
+    r.check("two role names are slashed apart",
+            page.count('class="cert-group__role-sep"') == 1,
+            "one separator between two roles, and none after the last")
+    r.check("a group's anchor is its slug",
+            'id="alpha"' in page and 'id="beta"' in page)
+
+    print("\nand a band can be switched off whole")
+
+    data["revision"] = 51
+    data["cta"]["status"] = "hidden"
+    status, answer = publish(base, key, "certifications", data)
+    r.check("hiding the closing band publishes", status == 200, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the whole band is gone", f"{MARK}-ctatitle" not in page)
+    r.check("but the page is still a page", f"{MARK}-hero" in page)
+
+
+def branding_round_trip(base: str, key: bytes, r: Results) -> None:
+    """Every field the branding model declares, set and read off the page.
+
+    THIS IS WHAT check_content_model.py POINTS AT, for the reason
+    certifications_round_trip() is: a logo card walks the files inside it, so a
+    regex over the renderer finds $asset and $file rather than a field name.
+    Put a distinguishable value in every field, publish it, and look for it in
+    the HTML a visitor would get.
+
+    It also checks the three things the renderer DRAWS rather than stores -- the
+    size in a meta line, the format on a download button, and the glyph beside
+    it. Those cannot be proved by a marker, because nothing types them: they are
+    proved by being consistent with the record they come from and by MOVING
+    when it does.
+
+    AND IT CHECKS THE TWO PICTURES STAY APART. A card holds a preview and a
+    download, and on the real page they are an 800px file and a 1600px one. A
+    renderer that confused them would look completely fine and hand out the
+    wrong file, so the sizes here are deliberately different and both are
+    asserted where they belong.
+    """
+    print("\nthe branding page travels the same road")
+
+    page_url = "/pages/branding-and-advertisement/"
+
+    data = json.loads(BRANDING.read_text())
+    data["revision"] = 60
+
+    data["meta"]["title"] = f"{MARK}-tab"
+    data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["description"] = f"{MARK}-desc"
+    data["meta"]["breadcrumb"] = f"{MARK}-crumb"
+    data["hero"]["title"] = f"{MARK}-hero"
+    data["hero"]["subtitle"] = f"{MARK}-sub"
+    data["assets"]["eyebrow"] = f"{MARK}-eyebrow"
+    data["assets"]["title"] = f"{MARK}-bandtitle"
+    data["assets"]["lead"] = f"{MARK}-lead"
+    data["legal"]["title"] = f"{MARK}-legaltitle"
+    data["cta"]["title"] = f"{MARK}-ctatitle"
+    data["cta"]["text"] = f"{MARK}-ctatext"
+
+    png = "/assets/images/branding/logo-light-transparent-full.png"
+    preview = "/assets/images/branding/logo-light-transparent.png"
+
+    data["assets"]["items"] = [
+        {"id": "alpha", "title": f"{MARK}-title1", "text": f"{MARK}-text1",
+         "alt": f"{MARK}-alt1", "plate": "light", "status": "shown",
+         "image": {"src": preview, "webp": preview.replace(".png", ".webp"),
+                   "width": 800, "height": 285},
+         "files": [
+             {"id": "f1", "label": f"{MARK}-label1",
+              "filename": f"{MARK}-saved1.png", "status": "shown",
+              "file": {"src": png, "webp": "", "width": 1600, "height": 570}},
+             # A second file on the same card: a vector, which the page LINKS
+             # to and must never draw.
+             {"id": "f2", "label": f"{MARK}-label2",
+              "filename": f"{MARK}-saved2.svg", "status": "shown",
+              "file": {"src": "/uploads/" + "b" * 16 + ".svg", "webp": "",
+                       "width": 512, "height": 182}},
+             {"id": "f3", "label": f"{MARK}-filehidden",
+              "filename": f"{MARK}-nope.png", "status": "hidden",
+              "file": {"src": png, "webp": "", "width": 10, "height": 10}},
+         ]},
+        {"id": "beta", "title": "Beta Logo", "text": "beta text",
+         "alt": "beta alt", "plate": "neutral", "status": "shown",
+         "image": {"src": preview, "webp": "", "width": 800, "height": 450},
+         "files": [{"id": "f4", "label": "Plated PNG", "filename": "beta.png",
+                    "status": "shown",
+                    "file": {"src": png, "webp": "", "width": 1600, "height": 900}}]},
+        {"id": "gamma", "title": f"{MARK}-neverseen", "text": f"{MARK}-hiddentext",
+         "alt": "x", "plate": "dark", "status": "hidden",
+         "image": {"src": preview, "webp": "", "width": 800, "height": 285},
+         "files": [{"id": "f5", "label": f"{MARK}-hiddenfile", "filename": "x.png",
+                    "status": "shown",
+                    "file": {"src": png, "webp": "", "width": 1, "height": 1}}]},
+    ]
+
+    data["legal"]["items"] = [
+        {"id": "n1", "text": f"<p>{MARK}-note1 <strong>{MARK}-bold</strong></p>",
+         "status": "shown"},
+        {"id": "n2", "text": f"<p>{MARK}-notehidden</p>", "status": "hidden"},
+    ]
+    data["cta"]["items"] = [
+        {"id": "b1", "label": f"{MARK}-btn", "href": "/pages/contact/",
+         "style": "primary", "status": "shown"},
+        {"id": "b2", "label": f"{MARK}-btnhidden", "href": "/x/", "style": "ghost",
+         "status": "hidden"},
+    ]
+
+    status, answer = publish(base, key, "branding", data)
+    r.check("a validly signed payload is accepted",
+            status == 200 and answer.get("ok") is True, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the page is served", status == 200, f"status {status}")
+
+    for field in ("tab", "share", "hero", "sub", "eyebrow", "bandtitle", "lead",
+                  "title1", "text1", "alt1", "legaltitle", "note1", "bold",
+                  "ctatitle", "ctatext", "btn"):
+        r.check(f"{field} reaches the visitor", f"{MARK}-{field}" in page)
+
+    r.check("the tab title is the tab title",
+            f"<title>{MARK}-tab</title>" in page)
+    r.check("and the share title is separate",
+            f'property="og:title" content="{MARK}-share"' in page)
+    r.check("the breadcrumb carries its OWN name, not the hero's",
+            f'"name": "{MARK}-crumb"' in page and f'"name": "{MARK}-hero"' not in page,
+            "the breadcrumb followed the hero title instead of its own field")
+
+    print("\nwhat is hidden is not there at all")
+
+    for gone in ("filehidden", "neverseen", "hiddentext", "hiddenfile",
+                 "notehidden", "btnhidden"):
+        r.check(f"{gone} is absent", f"{MARK}-{gone}" not in page)
+
+    print("\nthe preview and the download are different files")
+
+    r.check("the preview is drawn at the preview's size",
+            'width="800" height="285"' in page,
+            "the card is not using the preview's dimensions")
+    r.check("the download link points at the download",
+            f'href="{png}" download="{MARK}-saved1.png"' in page,
+            "the button does not point at the file it should")
+    r.check("the saved-as name is the authored one, not the file's own",
+            f'download="{MARK}-saved1.png"' in page
+            and 'download="logo-light-transparent-full.png"' not in page)
+    # Counted over the CARDS, not the page: the header and the footer carry
+    # <picture> elements of their own for the site logo, so a count of the
+    # whole document would be measuring the chrome.
+    wrapped = len(re.findall(
+        r'<picture><source srcset="[^"]*" type="image/webp"><img class="asset__image"', page))
+    total = page.count('<img class="asset__image"')
+    r.check("a preview with a WebP sibling gets a <picture>", wrapped == 1,
+            f"{wrapped} wrapped previews, wanted 1")
+    r.check("and one without gets a bare <img>", total == 2 and wrapped == 1,
+            f"{total} previews, {wrapped} of them wrapped")
+
+    print("\nthe meta line and the button are drawn, not stored")
+
+    r.check("the meta line quotes the DOWNLOAD's size",
+            f"{MARK}-label1 · 1600 × 570" in page,
+            [l.strip() for l in page.splitlines() if f"{MARK}-label1" in l][:1])
+    r.check("and not the preview's",
+            f"{MARK}-label1 · 800 × 285" not in page,
+            "the meta line is quoting the preview")
+    r.check("the vector's own size is its own",
+            f"{MARK}-label2 · 512 × 182" in page)
+    r.check("the button says what format the file is",
+            "Download PNG" in page and "Download SVG" in page,
+            "the derived button label is missing")
+    r.check("nothing published a button label",
+            "Download PNG" not in json.dumps(data))
+    r.check("every button carries the same glyph, and it is not stored",
+            page.count('<use href="#arrow-down"></use>') == 3,
+            str(page.count('<use href="#arrow-down"></use>')))
+
+    print("\na vector is linked and never drawn")
+
+    r.check("the SVG is a download target",
+            f'download="{MARK}-saved2.svg"' in page)
+    r.check("and nothing renders it",
+            '<img class="asset__image" src="/uploads/' not in page
+            and '<source srcset="/uploads/' not in page,
+            "an uploaded vector reached an <img> or a <source>")
+
+    print("\nthe plate is per card")
+
+    r.check("each card sits on the background it was given",
+            'asset__preview--light' in page and 'asset__preview--neutral' in page)
+    r.check("and the hidden card's plate went with it",
+            'asset__preview--dark' not in page)
+
+    print("\nthe disclaimer is the one place markup survives")
+
+    r.check("emphasis is printed rather than escaped",
+            f"<strong>{MARK}-bold</strong>" in page)
+
+    data["revision"] = 61
+    data["legal"]["items"][0]["text"] = (
+        f'<p>{MARK}-note1 <script>alert(1)</script></p>')
+    status, answer = publish(base, key, "branding", data)
+    r.check("a document with script in it still publishes",
+            status == 200, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("but the script does not reach the visitor",
+            "<script>alert(1)</script>" not in page and "alert(1)" not in page,
+            "the receiving side did not re-sanitise")
+    r.check("and the rest of the paragraph did", f"{MARK}-note1" in page)
+
+    print("\nand a band can be switched off whole")
+
+    data["revision"] = 62
+    data["cta"]["status"] = "hidden"
+    data["legal"]["status"] = "hidden"
+    status, answer = publish(base, key, "branding", data)
+    r.check("hiding two bands publishes", status == 200, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("both are gone",
+            f"{MARK}-ctatitle" not in page and f"{MARK}-legaltitle" not in page)
+    r.check("but the page is still a page", f"{MARK}-hero" in page)
+
+
+
+def privacy_round_trip(base: str, key: bytes, r: Results) -> None:
+    """Every field the privacy model declares, set and read off the page.
+
+    THIS IS WHAT check_content_model.py POINTS AT, for the reason the branding
+    one is: both halves walk their lists in loops, so a regex over the renderer
+    finds $section and $block rather than a field name. Put a distinguishable
+    value in every field, publish it, and look for it in the HTML a visitor
+    would get.
+
+    THE SIX KINDS ARE THE POINT. A block declares what it is and the renderer
+    owns the markup for it, so what is checked is not that the words arrived —
+    it is that a subheading became an <h3>, a table became a <table> with
+    scoped headers, an address became an <address>, and a note became the
+    tinted paragraph and not an ordinary one. A renderer that drew all six the
+    same would pass a check that only looked for the text.
+
+    AND THE STRUCTURE IS CHECKED FOR STAYING FLAT. assets/css/pages/legal.css
+    zeroes the top margin of the first heading with a child combinator, so a
+    per-section wrapper would silently stop it matching. Nothing here may nest
+    the blocks inside anything.
+    """
+    print("\nthe privacy policy travels the same road")
+
+    page_url = "/pages/privacy-policy/"
+
+    data = json.loads(PRIVACY.read_text())
+    data["revision"] = 70
+
+    data["meta"]["title"] = f"{MARK}-tab"
+    data["meta"]["share_title"] = f"{MARK}-share"
+    data["meta"]["description"] = f"{MARK}-desc"
+    data["meta"]["breadcrumb"] = f"{MARK}-crumb"
+    data["hero"]["title"] = f"{MARK}-hero"
+    data["hero"]["subtitle"] = f"{MARK}-sub"
+    data["policy"]["label"] = f"{MARK}-label"
+    data["policy"]["effective"] = f"{MARK}-effective"
+    data["cta"]["title"] = f"{MARK}-ctatitle"
+    data["cta"]["text"] = f"{MARK}-ctatext"
+
+    data["policy"]["callout"] = {
+        "status": "shown",
+        "title": f"{MARK}-callouttitle",
+        "note": f"{MARK}-calloutnote",
+        "items": [
+            {"id": "c1", "text": f"{MARK}-point1 <strong>{MARK}-pointbold</strong>",
+             "status": "shown"},
+            {"id": "c2", "text": f"{MARK}-pointhidden", "status": "hidden"},
+        ],
+    }
+
+    data["policy"]["sections"] = [
+        {"id": "first-one", "heading": f"{MARK}-head1", "status": "shown", "blocks": [
+            {"id": "p1", "kind": "paragraph", "status": "shown",
+             "text": f'{MARK}-para1 <em>{MARK}-em</em> '
+                     f'<a href="#second-one">{MARK}-fraglink</a>'},
+            {"id": "s1", "kind": "subheading", "status": "shown",
+             "text": f"{MARK}-subhead"},
+            {"id": "n1", "kind": "note", "status": "shown",
+             "text": f"{MARK}-notetext"},
+            {"id": "a1", "kind": "address", "status": "shown",
+             "text": f"<strong>{MARK}-addrname</strong><br>{MARK}-addrline<br>"
+                     f'<a href="mailto:x@y.z">{MARK}-addrmail</a>'},
+            {"id": "l1", "kind": "list", "status": "shown", "rows": [
+                {"id": "i1", "text": f"{MARK}-bullet1", "status": "shown"},
+                {"id": "i2", "text": f"{MARK}-bullethidden", "status": "hidden"},
+            ]},
+            {"id": "t1", "kind": "table", "status": "shown",
+             "caption": f"{MARK}-caption", "columns": [f"{MARK}-col1", f"{MARK}-col2"],
+             "rows": [
+                 {"id": "r1", "label": f"{MARK}-rowlabel", "value": f"{MARK}-rowvalue",
+                  "status": "shown"},
+                 {"id": "r2", "label": f"{MARK}-rowhidden", "value": "x",
+                  "status": "hidden"},
+             ]},
+            {"id": "h1", "kind": "paragraph", "status": "hidden",
+             "text": f"{MARK}-blockhidden"},
+        ]},
+        {"id": "second-one", "heading": f"{MARK}-head2", "status": "shown",
+         "blocks": [{"id": "p2", "kind": "paragraph", "status": "shown",
+                     "text": f"{MARK}-para2"}]},
+        {"id": "gone", "heading": f"{MARK}-headhidden", "status": "hidden",
+         "blocks": [{"id": "p3", "kind": "paragraph", "status": "shown",
+                     "text": f"{MARK}-sectionhidden"}]},
+    ]
+
+    data["cta"]["items"] = [
+        {"id": "b1", "label": f"{MARK}-btn", "href": "/pages/contact/",
+         "style": "primary", "status": "shown"},
+        {"id": "b2", "label": f"{MARK}-btnhidden", "href": "/x/", "style": "ghost",
+         "status": "hidden"},
+    ]
+
+    status, answer = publish(base, key, "privacy", data)
+    r.check("a validly signed payload is accepted",
+            status == 200 and answer.get("ok") is True, f"{status} {answer}")
+
+    status, page = get(base, page_url)
+    r.check("the page is served", status == 200, f"status {status}")
+
+    for field in ("tab", "share", "hero", "sub", "label", "effective",
+                  "callouttitle", "calloutnote", "point1", "pointbold",
+                  "head1", "para1", "em", "subhead", "notetext", "addrname",
+                  "addrline", "addrmail", "bullet1", "caption", "col1", "col2",
+                  "rowlabel", "rowvalue", "head2", "para2", "ctatitle",
+                  "ctatext", "btn"):
+        r.check(f"{field} reaches the visitor", f"{MARK}-{field}" in page)
+
+    r.check("the tab title is the tab title", f"<title>{MARK}-tab</title>" in page)
+    r.check("and the share title is separate",
+            f'property="og:title" content="{MARK}-share"' in page)
+    r.check("the breadcrumb carries its OWN name, not the hero's",
+            f'"name": "{MARK}-crumb"' in page and f'"name": "{MARK}-hero"' not in page,
+            "the breadcrumb followed the hero title instead of its own field")
+
+    print("\nwhat is hidden is not there at all")
+
+    for gone in ("pointhidden", "bullethidden", "rowhidden", "blockhidden",
+                 "headhidden", "sectionhidden", "btnhidden"):
+        r.check(f"{gone} is absent", f"{MARK}-{gone}" not in page)
+
+    print("\neach of the six kinds is drawn as the kind it is")
+
+    r.check("a paragraph is a bare <p>", f"<p>{MARK}-para1" in page)
+    r.check("and exactly one <p>, not a paragraph inside a paragraph",
+            f"<p>{MARK}-para1" in page and f"<p><p>{MARK}" not in page,
+            "the field carried its own <p> and the renderer added another")
+    r.check("a subheading is an h3 with the class the stylesheet knows",
+            f'<h3 class="legal__subheading">{MARK}-subhead</h3>' in page)
+    r.check("a note is the tinted paragraph and not an ordinary one",
+            f'<p class="legal__notice">{MARK}-notetext</p>' in page,
+            "the note lost its class, or gained a paragraph inside a paragraph")
+    r.check("an address is an <address>",
+            f'<address class="legal__address">' in page
+            and f"{MARK}-addrname" in page)
+    r.check("a list is a <ul> of <li>",
+            f'<ul class="legal__list">' in page and f"<li>{MARK}-bullet1</li>" in page)
+    r.check("a table is a table, in its scroller",
+            '<div class="legal__table-wrap"><table class="legal__table">' in page)
+    r.check("its caption is there for a screen reader and nobody else",
+            f'<caption class="visually-hidden">{MARK}-caption</caption>' in page)
+    r.check("its column headings are scoped to their column",
+            f'<th scope="col">{MARK}-col1</th>' in page)
+    r.check("and each row is headed by its own first cell",
+            f'<th scope="row">{MARK}-rowlabel</th><td>{MARK}-rowvalue</td>' in page)
+
+    print("\nthe things that make the stylesheet work")
+
+    r.check("the sections are FLAT children of the body, with no wrapper",
+            re.search(r'<div class="legal__body">\s*<p class="legal__updated">', page)
+            is not None,
+            "something was inserted between the body and its first child")
+    r.check("the first heading is a direct child, so :first-of-type still matches",
+            re.search(r'</div>\s*<h2 class="legal__heading" id="first-one">', page)
+            is not None,
+            "the callout no longer closes immediately before the first heading")
+    r.check("the callout's own heading stays INSIDE the callout, not beside it",
+            re.search(r'<div class="legal__callout">\s*'
+                      r'<h2 class="legal__callout-title">', page) is not None,
+            "a flattened callout would steal :first-of-type from the first section")
+
+    print("\nan anchor is a promise, and a fragment link is one kept")
+
+    r.check("each section carries its stored id as its anchor",
+            '<h2 class="legal__heading" id="second-one">' in page)
+    r.check("a link into the page KEEPS ITS HREF",
+            'href="#second-one"' in page,
+            "rt_safe_href() dropped the fragment — the link would still look "
+            "like a link and do nothing")
+
+    print("\nrich text is printed, and script is not")
+
+    data["policy"]["sections"][1]["blocks"][0]["text"] = (
+        f'{MARK}-clean<script>alert(1)</script>'
+        f'<h2>{MARK}-structure</h2><p>{MARK}-nested</p>')
+    data["revision"] = 71
+    publish(base, key, "privacy", data)
+    _status, page = get(base, page_url)
+
+    r.check("the words survive", f"{MARK}-clean" in page)
+    r.check("the script does not", "alert(1)" not in page and "<script>alert" not in page)
+    r.check("and a heading typed into a paragraph is stripped, "
+            "because structure is not the rich field's job",
+            f"<h2>{MARK}-structure</h2>" not in page)
+    r.check("nor can a paragraph be typed into a paragraph",
+            f"<p>{MARK}-nested</p>" not in page and f"{MARK}-nested" in page,
+            "the <p> survived into a field the renderer already wraps")
+
+
+def seo_round_trip(base: str, key: bytes, r: Results) -> None:
+    """The site-wide record, and the page fields that have never been tested.
+
+    THIS DOCUMENT IS NOT A PAGE, which is what makes it worth a round trip of
+    its own. Nothing renders content/seo.json on its own; it is read by every
+    page's <head>, by the Organization graph, by /robots.txt and by
+    /site.webmanifest. A field that stopped arriving would show up as a missing
+    line in seventeen heads at once and in nothing a person looks at.
+
+    THE PAGE FIELDS ARE HERE TOO. meta.breadcrumb, meta.robots, meta.changefreq
+    and meta.priority are new on every document, and check_content_model.py
+    cannot see them: they are read by lib/head.php in a loop over an array the
+    page hands it, not named in any page file. So they are proved by round trip,
+    which is what COVERED_ELSEWHERE points at.
+    """
+    print("\nthe site-wide SEO record travels the same road")
+
+    data = json.loads(SEO.read_text())
+    data["revision"] = 80
+
+    data["site"]["name"] = f"{MARK}-sitename"
+    data["site"]["lang"] = "en-GB"
+    data["site"]["locale"] = f"{MARK}_LOCALE"
+    data["site"]["twitter_card"] = "summary"
+    data["site"]["theme_light"] = "#fedcba"
+    data["site"]["theme_dark"] = "#123456"
+    data["site"]["share_alt"] = f"{MARK}-sharealt"
+    data["site"]["description"] = f"{MARK}-sitedescription"
+
+    data["identity"]["legal_name"] = f"{MARK}-legalname"
+    data["identity"]["alternate_name"] = f"{MARK}-alsoknown"
+    data["identity"]["slogan"] = f"{MARK}-slogan"
+    data["identity"]["description"] = f"{MARK}-orgdescription"
+    data["identity"]["founded"] = "2001-02-03"
+    data["identity"]["price_range"] = f"{MARK}-price"
+    data["identity"]["area_served"] = f"{MARK}-area"
+    data["identity"]["service_types"] = [f"{MARK}-servicetype"]
+    data["identity"]["knows_about"] = [f"{MARK}-knowsabout"]
+
+    data["sameas"]["items"] = [
+        {"id": "one", "label": "One", "url": f"https://example.com/{MARK}-profile",
+         "status": "shown"},
+        {"id": "two", "label": "Two", "url": "https://example.com/hidden",
+         "status": "hidden"},
+    ]
+    data["hours"]["items"] = [
+        {"id": "bd", "label": "Bangladesh office", "days": ["Monday"],
+         "opens": "07:00", "closes": "19:00", "status": "shown"},
+    ]
+
+    data["crawl"]["verify_google"] = f"{MARK}-googletoken"
+    data["crawl"]["verify_bing"] = f"{MARK}-bingtoken"
+    data["crawl"]["analytics_id"] = "G-PUBLISHED1"
+    data["crawl"]["robots_extra"] = ["/contact-handler.php", f"/{MARK}-disallowed"]
+
+    data["manifest"]["short_name"] = f"{MARK}-shortname"
+    data["manifest"]["display"] = "minimal-ui"
+    data["manifest"]["background"] = "#abcdef"
+    data["manifest"]["theme"] = "#fedcba"
+
+    data["notfound"]["title"] = f"{MARK}-notfoundtitle"
+    data["notfound"]["description"] = f"{MARK}-notfounddescription"
+
+    status, _ = publish(base, key, "seo", data)
+    r.check("the site-wide record is accepted", status == 200, f"status {status}")
+
+    _s, page = get(base, "/pages/about/")
+
+    print("  what every page's head now says")
+    for what, needle in [
+        ("the site name", f'property="og:site_name" content="{MARK}-sitename"'),
+        ("the language", 'lang="en-GB"'),
+        ("the sharing locale", f'property="og:locale" content="{MARK}_LOCALE"'),
+        ("the card shape", 'name="twitter:card" content="summary"'),
+        ("the light theme colour", 'content="#fedcba"'),
+        ("the dark theme colour", 'content="#123456"'),
+        ("the share picture's description", f"{MARK}-sharealt"),
+        ("the Google verification tag",
+         f'name="google-site-verification" content="{MARK}-googletoken"'),
+        ("the Bing verification tag",
+         f'name="msvalidate.01" content="{MARK}-bingtoken"'),
+
+        # THE ONE FIELD THAT REACHES ANOTHER COMPANY'S SERVERS. Both halves are
+        # named: the loader Google serves, and this site's own configuration
+        # file, which exists because their second <script> is inline and
+        # script-src 'self' refuses those without a word.
+        ("the analytics loader",
+         '<script async src="https://www.googletagmanager.com/gtag/js?id=G-PUBLISHED1">'),
+        ("and the configuration script, which is this site's own file",
+         '<script src="/assets/js/analytics.js?v=1" data-ga="G-PUBLISHED1" defer>'),
+        ("and the policy widened to let exactly that through",
+         "script-src 'self' https://www.googletagmanager.com"),
+    ]:
+        r.check(f"  {what}", needle in page, needle)
+
+    print("  and the Organization graph, on a page that is not the contact page")
+    graph = next((g for g in json_ld(page) if isinstance(g, dict) and "@graph" in g), None)
+    r.check("  the graph is there", graph is not None)
+    nodes = {n.get("@type"): n for n in (graph or {}).get("@graph", [])} if graph else {}
+
+    org = nodes.get("Organization", {})
+    r.check("  the legal name", org.get("name") == f"{MARK}-sitename", str(org.get("name")))
+    r.check("  the also-known-as", org.get("alternateName") == f"{MARK}-alsoknown")
+    r.check("  the slogan", org.get("slogan") == f"{MARK}-slogan")
+    r.check("  the description", org.get("description") == f"{MARK}-orgdescription")
+    r.check("  the founding date", org.get("foundingDate") == "2001-02-03")
+    r.check("  a shown profile is listed",
+            f"https://example.com/{MARK}-profile" in org.get("sameAs", []))
+    r.check("  A HIDDEN PROFILE IS NOT",
+            "https://example.com/hidden" not in org.get("sameAs", []),
+            "hiding a row has to mean it is not published")
+
+    r.check("  THE ADDRESSES STILL COME FROM THE CONTACT DOCUMENT",
+            len(org.get("address", [])) > 0 and MARK not in json.dumps(org.get("address")),
+            "the offices belong to content/contact.json and must not be in this one")
+
+    svc = nodes.get("ProfessionalService", {})
+    r.check("  the price range", svc.get("priceRange") == f"{MARK}-price")
+    r.check("  the services offered", svc.get("serviceType") == [f"{MARK}-servicetype"])
+    r.check("  the subjects known", svc.get("knowsAbout") == [f"{MARK}-knowsabout"])
+    hours = svc.get("openingHoursSpecification", [])
+    r.check("  the opening hours",
+            hours and hours[0].get("opens") == "07:00" and hours[0].get("dayOfWeek") == ["Monday"],
+            str(hours))
+
+    print("  one LocalBusiness per office, which the site has never had")
+    offices = [n for n in (graph or {}).get("@graph", [])
+               if isinstance(n, dict) and n.get("@type") == "LocalBusiness"]
+    r.check("  there is one per shown office", len(offices) == 3, str(len(offices)))
+    r.check("  each has an address of its own",
+            all(isinstance(o.get("address"), dict) for o in offices))
+    r.check("  each says which organisation it belongs to",
+            all(o.get("parentOrganization", {}).get("@id", "").endswith("#organization")
+                for o in offices))
+    bd = next((o for o in offices if "bangladesh" in o.get("@id", "")), {})
+    r.check("  and the hours row named after an office reaches that office",
+            bd.get("openingHoursSpecification", [{}])[0].get("opens") == "07:00",
+            str(bd.get("openingHoursSpecification")))
+
+    print("  the three generated files")
+    _s, robots = get(base, "/robots.txt")
+    r.check(f"  robots.txt carries the extra rule", f"/{MARK}-disallowed" in robots)
+    r.check("  and still allows the whole site", "Allow: /" in robots)
+
+    _s, manifest = get(base, "/site.webmanifest")
+    app = json.loads(manifest)
+    r.check("  the manifest takes its name from the site band",
+            app["name"] == f"{MARK}-sitename")
+    r.check("  its short name from its own", app["short_name"] == f"{MARK}-shortname")
+    r.check("  and its display mode", app["display"] == "minimal-ui")
+
+    print("  the error page, whose record is in this document")
+    _s, notfound = get(base, "/404.php")
+    r.check(f"  its title arrives", f"<title>{MARK}-notfoundtitle</title>" in notfound)
+    r.check("  it is noindex", 'name="robots" content="noindex, follow"' in notfound)
+    r.check("  AND IT HAS NO CANONICAL", "rel=\"canonical\"" not in notfound,
+            "a page served at every address that does not exist has no address "
+            "of its own to claim")
+
+    print("\nthe meta fields every document gained")
+
+    about = json.loads(ABOUT.read_text())
+    about["revision"] = 81
+    about["meta"]["breadcrumb"] = f"{MARK}-crumb"
+    about["meta"]["changefreq"] = "hourly"
+    about["meta"]["priority"] = "0.2"
+    about["updated"] = "2031-07-09T10:11:12+00:00"
+    status, _ = publish(base, key, "about", about)
+    r.check("a page document with the new fields is accepted", status == 200)
+
+    _s, page = get(base, "/pages/about/")
+    crumbs = next((b for b in json_ld(page)
+                   if isinstance(b, dict) and b.get("@type") == "BreadcrumbList"), None)
+    r.check("the breadcrumb reaches the trail",
+            crumbs and crumbs["itemListElement"][-1]["name"] == f"{MARK}-crumb",
+            str(crumbs))
+
+    webpage = next((b for b in json_ld(page)
+                    if isinstance(b, dict) and b.get("@type") == "WebPage"), None)
+    r.check("the page has a WebPage node, which it never had", webpage is not None)
+    r.check("it names this address", webpage and webpage["url"].endswith("/pages/about/"))
+    r.check("it says which site it is part of",
+            webpage and webpage["isPartOf"]["@id"].endswith("#website"))
+    r.check("AND IT CARRIES THE DAY THE PAGE CHANGED",
+            webpage and webpage.get("dateModified") == "2031-07-09",
+            "every document has carried an updated stamp and no page emitted it")
+    r.check("which is also an Open Graph tag",
+            'property="og:updated_time" content="2031-07-09"' in page)
+
+    _s, sitemap = get(base, "/sitemap.xml")
+    r.check("the sitemap takes its change frequency from the page",
+            "<changefreq>hourly</changefreq>" in sitemap)
+    r.check("and its priority", "<priority>0.2</priority>" in sitemap)
+    r.check("and its date", "<lastmod>2031-07-09</lastmod>" in sitemap)
+
+    about["revision"] = 82
+    about["meta"]["robots"] = "noindex"
+    publish(base, key, "about", about)
+    _s, sitemap = get(base, "/sitemap.xml")
+    r.check("A PAGE SET TO NOINDEX LEAVES THE SITEMAP",
+            "https://tech4time.bd/pages/about/" not in sitemap,
+            "membership is derived from robots, so the two cannot disagree")
+    _s, page = get(base, "/pages/about/")
+    r.check("and says so in its own head",
+            'name="robots" content="noindex, follow"' in page)
+
 def home_round_trip(base: str, key: bytes, r: Results) -> None:
     """Every field the home model declares, set and then read off the page.
 
@@ -1401,6 +2154,11 @@ def main() -> None:
         about_backup = ABOUT.read_text() if ABOUT.is_file() else None
         home_backup = HOME.read_text() if HOME.is_file() else None
         services_backup = SERVICES.read_text() if SERVICES.is_file() else None
+        certifications_backup = (CERTIFICATIONS.read_text()
+                                 if CERTIFICATIONS.is_file() else None)
+        branding_backup = BRANDING.read_text() if BRANDING.is_file() else None
+        privacy_backup = PRIVACY.read_text() if PRIVACY.is_file() else None
+        seo_backup = SEO.read_text() if SEO.is_file() else None
 
         server = subprocess.Popen(
             ["php", "-S", f"127.0.0.1:{port}", "-t", str(ROOT),
@@ -1435,7 +2193,11 @@ def main() -> None:
             # of, and is refused as not-newer. home.json was that one.
             for path, backup in ((CAREERS, careers_backup), (CONTACT, contact_backup),
                                  (COMPANY, company_backup), (ABOUT, about_backup),
-                                 (HOME, home_backup), (SERVICES, services_backup)):
+                                 (HOME, home_backup), (SERVICES, services_backup),
+                                 (CERTIFICATIONS, certifications_backup),
+                                 (BRANDING, branding_backup),
+                                 (PRIVACY, privacy_backup),
+                                 (SEO, seo_backup)):
                 if backup is not None:
                     path.write_text(backup)
                 bak = path.with_suffix(".json.bak")

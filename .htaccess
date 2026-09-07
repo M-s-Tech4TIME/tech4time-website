@@ -14,11 +14,21 @@
 # 1. Security headers
 # --------------------------------------------------------------------------
 <IfModule mod_headers.c>
-    # The site is fully self-hosted: no CDN, no third-party fonts, scripts,
-    # analytics or embeds. That lets the policy stay strict with no exceptions.
+    # The site is self-hosted: no CDN, no third-party fonts and no embeds.
     # 'unsafe-inline' is deliberately absent — there are no inline <script> or
     # <style> blocks anywhere in the site.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests"
+    #
+    # THE GOOGLE ORIGINS ARE THE ONE EXCEPTION, AND THIS IS NOT WHERE IT IS
+    # DECIDED. A header cannot read content/seo.json, so it cannot know whether
+    # anybody has asked for Google Analytics; naming the origins here is what
+    # makes it POSSIBLE to switch on from the editor. What decides is the
+    # <meta> policy lib/head.php sends with every page, which stays
+    # script-src 'self' until a measurement id is set — and a browser enforces
+    # every policy it is handed, so the stricter of the two is what applies.
+    #
+    # Clearing the id in the editor closes it again on the next request. There
+    # is no deploy in that loop, and there must not be. See ADR 0021.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self'; img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com; font-src 'self'; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests"
 
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "DENY"
@@ -122,6 +132,30 @@
 
     RewriteRule ^sitemap\.xml$ /sitemap.php [L]
 
+    # robots.txt and site.webmanifest, the same way and for the same reasons
+    # ----------------------------------------------------------------------
+    # Both stopped being static files when their contents came under the
+    # editor: the crawl rules and the app's name, description and colours are
+    # fields in content/seo.json now. Neither address changed, and neither may
+    # -- /robots.txt is where every crawler looks and nowhere else, and
+    # /site.webmanifest is named by a <link rel="manifest"> in every page that
+    # has already been cached by returning visitors.
+    #
+    # Same shape as the sitemap above: a 301 for anyone who asks for the .php
+    # file by name so neither is served at two URLs, guarded on THE_REQUEST so
+    # the internal rewrite below does not feed itself back into it; then the
+    # unconditional internal rewrite, so a stale robots.txt or site.webmanifest
+    # left on the host by an older deploy cannot shadow the generated one.
+    RewriteCond %{THE_REQUEST} \s/robots\.php[\s?] [NC]
+    RewriteRule ^robots\.php$ /robots.txt [R=301,L]
+
+    RewriteRule ^robots\.txt$ /robots.php [L]
+
+    RewriteCond %{THE_REQUEST} \s/manifest\.php[\s?] [NC]
+    RewriteRule ^manifest\.php$ /site.webmanifest [R=301,L]
+
+    RewriteRule ^site\.webmanifest$ /manifest.php [L]
+
     # Send /pages/about -> /pages/about/  (only where the directory exists)
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteCond %{REQUEST_URI} !/$
@@ -159,13 +193,13 @@
 </IfModule>
 
 <IfModule mod_dir.c>
-    DirectoryIndex index.html index.php
+    DirectoryIndex index.php index.html
 </IfModule>
 
 # --------------------------------------------------------------------------
 # 4. Error documents
 # --------------------------------------------------------------------------
-ErrorDocument 404 /404.html
+ErrorDocument 404 /404.php
 
 # Never expose directory listings for asset folders.
 Options -Indexes
@@ -278,10 +312,11 @@ Options -Indexes
     Require all denied
 </Files>
 
-# site.webmanifest is JSON but must stay public.
-<Files "site.webmanifest">
-    Require all granted
-</Files>
+# There is no site.webmanifest file any more, and so no exception for one.
+# /site.webmanifest is an internal rewrite onto manifest.php (section 3), and
+# the rewrite is unconditional, so a stale copy left by an older deploy is
+# never served either. The exception that stood here granted access to a file
+# that no longer ships; it is gone rather than left to be read as a rule.
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
@@ -314,19 +349,40 @@ Options -Indexes
 
     # uploads/ is the opposite case: it must be SERVED, and it holds files that
     # arrived over the network. So it gets an allow-list rather than a block —
-    # sixteen hex characters, a dot, and one of three raster extensions, which
-    # is exactly the shape api/publish-asset.php computes from the bytes. A
+    # sixteen hex characters, a dot, and one of four extensions, which is
+    # exactly the shape api/publish-asset.php computes from the bytes. A
     # request for anything else under uploads/ is refused before any handler
     # sees it, so a .php there could not be run even if one existed.
     #
-    # This is the THIRD of three independent layers, and the only one that
-    # holds if the other two are wrong. The first is that the bytes were
-    # re-encoded through gd on the admin host, so they are that library's
-    # output and not an uploader's file. The second is that the name is
-    # computed here from those bytes and never sent, so nothing an uploader
-    # chose reaches a filesystem call. See ADR 0019.
-    RewriteCond %{REQUEST_URI} !^/uploads/[0-9a-f]{16}\.(webp|jpe?g|png)$
+    # This is the FOURTH of five independent layers, and one of the two that
+    # hold if the others are wrong. The first is that the bytes are the
+    # sanitiser's own output — gd's, for a raster; lib/svg.php's, for a vector
+    # — and never an uploader's file. The second is that the receiving host
+    # proves that for itself rather than trusting the sender. The third is that
+    # the name is computed here from those bytes and never sent, so nothing an
+    # uploader chose reaches a filesystem call. See ADR 0019.
+    RewriteCond %{REQUEST_URI} !^/uploads/[0-9a-f]{16}\.(webp|jpe?g|png|svg)$
     RewriteRule ^uploads/. - [F,L]
+
+    # THE FIFTH LAYER, AND THE ONE THAT MAKES A VECTOR FILE SAFE TO SERVE AT
+    # ALL. Sanitising an SVG leaves a document, and a document in this origin
+    # is a document that could act in it. So an .svg under uploads/ is never
+    # served as one: Content-Disposition makes a browser save it rather than
+    # render it, and the CSP is a second answer in case something navigates to
+    # it anyway — no scripts, no fetches, no same-origin anything.
+    #
+    # Nothing on this site draws these files. The branding page LINKS to them;
+    # its previews are raster. The download="" attribute names the file for the
+    # visitor; this is what makes the address itself harmless.
+    #
+    # expr= rather than <FilesMatch> so the PATH is matched and not just the
+    # name — the rule must apply under uploads/ and nowhere else. Same form as
+    # the /admin and /api rules further down.
+    <IfModule mod_headers.c>
+        Header always set Content-Disposition "attachment" "expr=%{REQUEST_URI} =~ m#^/uploads/[0-9a-f]{16}\.svg$#"
+        Header always set Content-Security-Policy "default-src 'none'; sandbox" "expr=%{REQUEST_URI} =~ m#^/uploads/[0-9a-f]{16}\.svg$#"
+    </IfModule>
+
 
     # The private store — password hashes, the master key, sessions, the audit
     # log — belongs BESIDE the document root, at /home/USER/t4t-private, and

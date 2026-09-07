@@ -74,7 +74,24 @@ EXPECT = [
     ("/assets/css/base.css",      (200,),      "assets are served"),
     ("/robots.txt",               (200,),      "crawlers are told what to do"),
     ("/sitemap.xml",              (200,),      "and where to go"),
+    ("/site.webmanifest",         (200,),      "and the installed app has a name"),
     ("/no-such-page-here",        (404,),      "a miss is a miss"),
+
+    # The 404 page states its own status. It is PHP now, and
+    # http_response_code(404) is its first statement precisely so that this is
+    # true whether Apache reached it as an ErrorDocument or somebody asked for
+    # it by name. A 200 here is the failure that makes Google index the error
+    # page as a real one.
+    ("/404.php",                  (404,),      "the error page answers 404 on its own"),
+
+    # Every remaining route in SEO_ROUTES. They are listed one by one rather
+    # than derived, because this file runs against a HOST -- if it read the
+    # route list from the working tree it would prove the tree agrees with
+    # itself and nothing about what shipped.
+    ("/pages/company-profile/",   (200,),      "the company profile"),
+    ("/pages/resource-certifications/", (200,), "the certifications page"),
+    ("/pages/branding-and-advertisement/", (200,), "branding and advertisement"),
+    ("/pages/privacy-policy/",    (200,),      "the privacy policy"),
 
     # The services pages, and the rewrite that gives a service with no
     # directory an address. None of this can be tested against the dev server,
@@ -126,16 +143,29 @@ EXPECT = [
 
     # uploads/ is the one directory on this host that is BOTH written over the
     # network and served to the public, so it is the one worth asserting hardest
-    # about. .htaccess serves exactly sixteen hex characters and three raster
-    # extensions there and refuses everything else — the third of the three
-    # layers in ADR 0019, and the only one that still holds if the other two are
+    # about. .htaccess serves exactly sixteen hex characters and one of four
+    # extensions there and refuses everything else — the fourth of the five
+    # layers in ADR 0019, and one of the two that still hold if the others are
     # wrong. None of this is testable against the dev server, which does not
     # read .htaccess, so here is the only place it is ever checked.
     ("/uploads/",                 (403, 404),  "uploads/ does not list its contents"),
     ("/uploads/x.php",            (403, 404),  "and a .php there is refused before any handler sees it"),
     ("/uploads/../lib/contract.php", (400, 403, 404), "nor does a path climb out of it"),
     ("/uploads/notahexname.webp", (403, 404),  "a name this site did not mint is refused"),
-    ("/uploads/0123456789abcdef.svg", (403, 404), "and so is an extension it does not serve"),
+    ("/uploads/0123456789abcdef.gif", (403, 404), "and so is an extension it does not serve"),
+
+    # A vector file IS served now, so the assertion here is the opposite one and
+    # the status has to be exact: 404 means the rewrite let this shape through
+    # to the filesystem and there is simply no such file, which is what should
+    # happen. A 403 would mean the allow-list is still refusing .svg and every
+    # logo the branding page offers is a dead link.
+    #
+    # What makes serving one SAFE — Content-Disposition: attachment and a
+    # sandboxed CSP — cannot be asserted from here without a real published
+    # file to ask for. It is proved instead by tools/test_publish_asset.py at
+    # the endpoint, and by tools/dev-router.php locally, which carries the same
+    # two headers for the same paths.
+    ("/uploads/0123456789abcdef.svg", (404,), "but a vector file is allowed through to be served"),
 ]
 
 # (path, header, what must be in its value)
@@ -146,6 +176,21 @@ HEADERS = [
     ("/",        "strict-transport-security", "max-age="),
     ("/api/publish.php", "x-robots-tag",      "noindex"),
     ("/api/publish-asset.php", "x-robots-tag", "noindex"),
+
+    # All three are rendered by PHP at an address that looks like a file. The
+    # type is what tells the client which -- and this site sends
+    # X-Content-Type-Options: nosniff, so nothing will guess on its behalf. A
+    # sitemap served as text/html is a sitemap Google will not read.
+    # Proof that the CSP header on the host is the current one. The Google
+    # origins are what make the analytics switch a save rather than a deploy;
+    # a host still serving the older header would refuse the script and the
+    # editor's field would appear to do nothing. What actually decides whether
+    # anything loads is the page's own <meta> policy — see ADR 0021.
+    ("/", "content-security-policy", "googletagmanager.com"),
+
+    ("/robots.txt",       "content-type", "text/plain"),
+    ("/sitemap.xml",      "content-type", "application/xml"),
+    ("/site.webmanifest", "content-type", "application/manifest+json"),
 ]
 
 
@@ -160,6 +205,17 @@ BODIES = [
      "and it is generated by sitemap.php, not a file left from an older deploy"),
     ("/sitemap.xml", "/pages/services/cybersecurity/",
      "and the services are in it"),
+
+    # robots.txt is generated too, and its two load-bearing lines are the ones
+    # a well-meaning edit removes. Allow: / is the whole permission; the
+    # Sitemap: line is how a crawler that was never told finds the map.
+    ("/robots.txt", "Allow: /",
+     "the whole site is still crawlable"),
+    ("/robots.txt", "Sitemap: https://tech4time.bd/sitemap.xml",
+     "and the sitemap is announced where a crawler looks first"),
+
+    ("/site.webmanifest", '"start_url"',
+     "the manifest is a manifest, not an error page"),
 ]
 
 # (path, expected status, where it must point)
@@ -170,6 +226,24 @@ REDIRECTS = [
     ("/pages/services/detail.php?service=cybersecurity", 301,
      "/pages/services/cybersecurity/",
      "the renderer is not a second address for a page"),
+
+    # One page, one address. Every page emits a self-referencing canonical
+    # naming the directory, so the file behind it must not answer 200 as well
+    # -- that is two URLs for one page, and the canonical settles which of
+    # them is real only if the other one redirects.
+    ("/pages/about/index.php", 301, "/pages/about/",
+     "a page is served at its directory, not at the file inside it"),
+
+    # The three generated files, each reachable by its real filename as well as
+    # by the address it is meant to have. These twins exist only in .htaccess,
+    # which is never read locally, and tools/dev-router.php carries the internal
+    # rewrite without them -- so this is the only place they are ever checked.
+    ("/sitemap.php",  301, "/sitemap.xml",
+     "the sitemap has one address, and it is the one submitted to Search Console"),
+    ("/robots.php",   301, "/robots.txt",
+     "and so does the robots file"),
+    ("/manifest.php", 301, "/site.webmanifest",
+     "and the manifest"),
 ]
 
 

@@ -117,6 +117,7 @@ half that rots silently.
 | Change `api/publish.php` | [10-development/server-side/publish-api.md](10-development/server-side/publish-api.md) |
 | Add or remove a page under `pages/` | [00-orientation/repository-map.md](00-orientation/repository-map.md) |
 | Change a field in `content/*.json` | [40-reference/content-schemas.md](40-reference/content-schemas.md) |
+| Change anything a search engine reads | [40-reference/seo.md](40-reference/seo.md) |
 | Change a constant in `lib/throttle.php` | [40-reference/security-model.md](40-reference/security-model.md) |
 | Change `.htaccess` | [40-reference/security-model.md](40-reference/security-model.md) |
 | Change the deploy procedure | [20-deployment/](20-deployment/) |

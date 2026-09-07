@@ -38,6 +38,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # check_cache_bust.py compares this commit against origin/main, and a
+          # shallow clone has neither the ref nor the history to do it.
+          fetch-depth: 0
 
       # Printed, not asserted. The host runs PHP 8.2.33 and the runner will
       # drift ahead of it; that is worth seeing in the log rather than
@@ -56,11 +60,25 @@ jobs:
       - run: python3 tools/audit_pages.py
       - run: python3 tools/inject_icons.py --check
       - run: python3 tools/build_deploy_set.py --check
-      # The four files both repositories hold identically, compared against a
+
+      # Filenames here are not content-hashed and .htaccess caches CSS, JS and
+      # fonts for a year, so a changed asset behind an unchanged URL reaches
+      # new visitors only. The rule is a version query bumped by hand, this is
+      # the mechanism that checks it, and it has caught the miss twice. It was
+      # in the pre-commit list and not here, which made it a rule kept by
+      # remembering again for anything that arrived by pull request.
+      - run: python3 tools/check_cache_bust.py
+      # The five files both repositories hold identically, compared against a
       # digest committed HERE. Hygiene, not a guarantee -- the guarantee is
       # CONTRACT_VERSION, checked at run time by api/publish.php against what
       # it was actually sent.
       - run: python3 tools/check_shared_lib.py
+      # A fact stated in two documents at once -- the offices, the email and the
+      # telephone are authored in BOTH the privacy policy and the contact page,
+      # on purpose. This asks whether they still agree. It can only see the
+      # committed seed: content edited in the admin never passes through git.
+      - run: python3 tools/check_shared_facts.py
+      - run: python3 tools/check_form_dom.py
 
       # And the thing the line above structurally cannot see: whether the OTHER
       # half still holds the same bytes. A per-repo digest passes happily while
@@ -77,12 +95,34 @@ jobs:
       # These drive a real PHP server, and the private store lands beside the
       # checkout the same way it lands beside the document root on the host.
       - run: php -v | head -1
+
+      # The hosts have ext-dom; ubuntu-24.04's php-cli does not. lib/svg.php is
+      # the security boundary for every vector file this site publishes — it is
+      # what turns "an SVG is a document that can carry script" into something
+      # that can be served at all — and without a parser it refuses everything,
+      # which would make tools/test_svg.py pass for the wrong reason. Installed
+      # here rather than left to skip in the one place a regression would be
+      # caught. Same bargain as php-gd.
+      - name: php-xml, so the SVG sanitiser is actually tested
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq php-xml
+          php -r 'exit(class_exists("DOMDocument") ? 0 : 1);' \
+            || { echo "php-xml did not load"; exit 1; }
+
+      - run: python3 tools/test_svg.py
       - run: python3 tools/test_store.py
       - run: python3 tools/test_contact_handler.py
       # The one endpoint on this site that writes anything: the happy path,
       # and every way past it that does not involve holding the key.
       - run: python3 tools/test_publish.py
       - run: python3 tools/test_publish_asset.py
+      # The three files that are generated rather than stored: the sitemap, the
+      # robots file and the web manifest. Each is served at an address that
+      # looks like a static file and none of them is one any more, so a PHP
+      # error in any of the three ships as a 500 at a URL no page links to and
+      # nobody visits — /sitemap.xml is fetched by Google, not by people.
+      - run: python3 tools/test_sitemap.py
 
   browser:
     name: firefox

@@ -23,7 +23,9 @@ python3 tools/check_docs.py            # the docs still describe the code
 python3 tools/audit_pages.py           # SEO, accessibility, structure, internal links
 python3 tools/build_deploy_set.py --check   # nothing secret or local is bound for the server
 python3 tools/check_shared_lib.py
+python3 tools/check_shared_facts.py    # the offices, email and phone the policy repeats from the contact page
 python3 tools/check_shared_repos.py      # the three files both halves hold identically
+python3 tools/check_form_dom.py        # no script reads a property a form's own control hides
 ```
 
 > **Half the suite is in the other repository.** The editor's round trips, the sign-in and the
@@ -36,11 +38,13 @@ python3 tools/check_shared_repos.py      # the three files both halves hold iden
 ```bash
 python3 tools/test_publish.py          # the one endpoint that writes, over HTTP
 python3 tools/test_publish_asset.py    # the other one — pictures arrive there
+python3 tools/test_sitemap.py          # the three files that are generated, not stored
+python3 tools/test_svg.py              # the SVG sanitiser, which is a security boundary
 python3 tools/test_contact_handler.py  # the enquiry form's endpoint
 python3 tools/test_store.py            # the JSON store itself
 ```
 
-Touched `lib/contract.php`, `lib/publish.php` or `lib/html.php`? Then also:
+Touched `lib/contract.php`, `lib/publish.php`, `lib/html.php` or `lib/svg.php`? Then also:
 
 ```bash
 python3 tools/check_shared_lib.py --update    # re-record the digests
@@ -78,7 +82,7 @@ python3 tools/check_focus.py           # tab every page: the ring is visible and
 | `check_content_model.py` | the model, the editor form and the page renderer describe the same fields — **in both directions**, so a field dropped from the page but left in the form is caught; and that every editor in `ADMIN_PAGE_SECTIONS` is checked either here or by a named test that exists |
 | `check_secrets.py` | no secret is committed; the private store still refuses the web root; no auth bypass constant has returned; cookie flags intact; no password reachable by the audit log; every admin page shape noindexed |
 | `check_docs.py` | every tool, library and admin section is documented; no doc cites a path that does not exist; no internal link is broken; no doc quotes a constant that has changed |
-| `audit_pages.py` | per page: title and meta description, heading order, `alt` text, landmark roles, no repeated `id`, a label on every form control and an accessible name on every link and button, canonical URL, structured data, internal links resolve, the markup nests, and **nothing carries an inline `style=` or `on…=` attribute** — the CSP refuses those silently, so the page looks right and the behaviour is simply gone |
+| `audit_pages.py` | per page: title and meta description — **unique site-wide, and within the model's own `SEO_TITLE_MAX` / `SEO_DESC_MIN` / `SEO_DESC_MAX`, read from `lib/contract.php` rather than retyped here** — heading order, `alt` text, landmark roles, no repeated `id`, a label on every form control and an accessible name on every link and button, structured data, internal links resolve, the markup nests, and **nothing carries an inline `style=` or `on…=` attribute** — the CSP refuses those silently, so the page looks right and the behaviour is simply gone. Also that **each page's canonical is its own directory URL**: the head is emitted from one function now, and a copied `seo_head()` call with the wrong route is the single mistake that makes possible |
 | `build_deploy_set.py --check` | the upload set holds no `content/`, `tools/`, `docs/` or key, keeps the `.htaccess` that blocks them, and carries a seed for **every** document the contract defines, with no job posts in the careers one |
 | `verify_live.py <url>` | run **after** a deploy, against the real host: the pages answer 200, `lib/`, `content/`, `tools/` and `/.git/` answer 403, and the security headers are present. It also reads three **bodies** and one **redirect**, because a status alone cannot tell a generated sitemap from a stale file — and because `.htaccess` is the half of the services route that no local test can reach |
 
@@ -88,7 +92,8 @@ These start a real PHP server on a spare port and drive it over HTTP.
 
 | Script | Proves |
 |---|---|
-| `test_publish.py` | `api/publish.php` driven over real HTTP with real signatures: the happy path, then **every way past it that does not involve holding the key** — no signature, another key's signature, a tampered body, an old timestamp, a replay, a lower revision, a different `contract_version`, and a `<script>` from a sender that signed correctly. Also that **every field the model declares reaches the visitor**, by sending a marker through each one and reading it back off the public page. And that **a service added in the editor becomes a page**: an address with no file behind it, its own head, a line in the sitemap, a link from the index, and a 404 when it is hidden or removed |
+| `test_publish.py` | `api/publish.php` driven over real HTTP with real signatures: the happy path, then **every way past it that does not involve holding the key** — no signature, another key's signature, a tampered body, an old timestamp, a replay, a lower revision, a different `contract_version`, and a `<script>` from a sender that signed correctly. Also that **every field the model declares reaches the visitor**, by sending a marker through each one and reading it back off the public page. And that **a service added in the editor becomes a page**: an address with no file behind it, its own head, a line in the sitemap, a link from the index, and a 404 when it is hidden or removed. For the privacy policy it also checks that each of the **six block kinds** is drawn as the kind it is — a subheading as an `<h3>`, a table with scoped headers, a note as the tinted paragraph — that the blocks stay **flat** children of `.legal__body` so `:first-of-type` still matches, and that a fragment link into the page keeps its `href` |
+| `test_sitemap.py` | `sitemap.php`, `robots.php` and `manifest.php` — the three files served at an address that looks static and is not. That each answers with the right `Content-Type`; that the sitemap is well-formed XML listing **exactly** the indexable routes, so a page set to `noindex` and a hidden service both leave it; that `lastmod` is a real publish stamp or absent rather than today's date; that `robots.txt` cannot lose its `Allow: /` or its `Sitemap:` line, and never names the editor's address; and that the manifest is valid JSON |
 | `test_contact_handler.py` | method check, honeypot, every validation rule, CR/LF injection into each field, the assembled message, non-ASCII round trips, the rate limit, and the no-JavaScript HTML response |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
 

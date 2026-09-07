@@ -83,7 +83,7 @@ WIDTHS = [320, 360, 414, 640, 768, 1024, 1440]
 # two .php pages are exercised through PHP like everything else.
 PAGES = [
     "/",
-    "/404.html",
+    "/404.php",
     "/pages/about/",
     "/pages/branding-and-advertisement/",
     "/pages/careers/",
@@ -353,7 +353,7 @@ def run(b: Browser, origin: str, r: Results) -> None:
     # The frame needs a page around it, and the window has to stay wide enough
     # that the widest frame is not itself clamped.
     b.size(max(WIDTHS) + 120, 1000)
-    b.go(origin + "/404.html")
+    b.go(origin + "/404.php")
 
     for width in WIDTHS:
         print(f"\n{width}px")

@@ -56,7 +56,7 @@ PAGES = [
     "/pages/resource-certifications/",
     "/pages/privacy-policy/",
     "/pages/contact/",
-    "/404.html",
+    "/404.php",
 ]
 
 # Each pass is (label, width, height, scope, open_drawer). Below 64em the

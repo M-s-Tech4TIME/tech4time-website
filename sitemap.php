@@ -7,132 +7,35 @@
  * address did not change when this stopped being a static file, and it must
  * not: a sitemap is a URL a crawler remembers.
  *
- * WHY IT IS NO LONGER A STATIC FILE
- * A service added in the editor at admin.tech4time.bd has no file in this
- * repository — it is a row in content/services.json — so a hand-maintained
- * list could never contain it. It would be published, be reachable, be linked
- * from the services index, and be absent from the one file that tells a
- * crawler it exists. Every page that renders from a document is listed from
- * that document here instead.
+ * WHAT IS IN IT IS NOT DECIDED HERE ANY MORE. It was a table of ten routes
+ * with their changefreq and priority typed in beside them, plus the services
+ * read from their document. Every one of those values is a field on the page
+ * it describes now -- content/<page>.json, meta band -- and is edited at
+ * admin.tech4time.bd/?s=seo along with the page's title. seo_sitemap_entries()
+ * assembles them; adding a page is still a line in SEO_ROUTES, and nothing
+ * else.
  *
- * ADDING A PAGE STILL MEANS ADDING A LINE. The pages that are files in this
- * repository are listed in STATIC below, exactly as they were in sitemap.xml,
- * and docs/10-development/frontend/adding-a-page.md still says to add one.
- * What is generated is only what a developer cannot know: the services.
+ * MEMBERSHIP IS DERIVED FROM robots AND NOTHING ELSE. A page set to noindex is
+ * absent from this file, and a page in this file is indexable, because they
+ * are the same switch. Two controls could be set to contradict each other, and
+ * a noindex URL in a sitemap is a warning raised against the whole file.
  *
- * LASTMOD IS READ FROM THE DOCUMENT, NOT WRITTEN BY HAND
- * Five pages besides the services render from content/ and change without a
- * deploy, so a date typed into a file was wrong the moment the editor was next
- * used. Each of those takes its lastmod from its document's own `updated`
- * stamp, which api/publish.php sets when the content arrives. A page that is
- * genuinely a static file keeps a hand-set date, because nothing else knows.
+ * LASTMOD IS READ FROM THE DOCUMENT, NOT WRITTEN BY HAND. Every page renders
+ * from content/ and changes without a deploy, so a date typed into a file was
+ * wrong the moment the editor was next used. api/publish.php sets `updated`
+ * when the content arrives, and that is what is reported.
  *
- * IT MUST NOT BE ABLE TO FAIL
- * A crawler asking for the sitemap gets a sitemap. A document that is missing
- * or unreadable falls back to the date beside it rather than throwing, so the
- * worst case is a stale date on one line, not a 500 on the file that tells
- * search engines the site exists.
+ * IT MUST NOT BE ABLE TO FAIL. A crawler asking for the sitemap gets a
+ * sitemap. A document that is missing or unreadable contributes its defaults
+ * rather than throwing, so the worst case is a stale date on one line and not
+ * a 500 on the file that tells search engines the site exists.
  */
 
 declare(strict_types=1);
 
-require __DIR__ . '/lib/services.php';
+require __DIR__ . '/lib/seo.php';
 
-const SITEMAP_ORIGIN = 'https://tech4time.bd';
-
-/**
- * The day a document was last published, as YYYY-MM-DD.
- *
- * Falls back to $fallback for anything it cannot read or does not understand,
- * so a sitemap is still served when a document is missing.
- */
-function sitemap_updated(string $document, string $fallback): string
-{
-    $path = contract_path($document);
-    if (!is_file($path)) {
-        return $fallback;
-    }
-
-    $raw = @file_get_contents($path);
-    if ($raw === false) {
-        return $fallback;
-    }
-
-    $data = json_decode($raw, true);
-    if (!is_array($data) || !is_string($data['updated'] ?? null)) {
-        return $fallback;
-    }
-
-    $day = substr($data['updated'], 0, 10);
-    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) ? $day : $fallback;
-}
-
-/*
- * The pages that are files in this repository.
- *
- *   path, document (null when the page is static), fallback date,
- *   changefreq, priority
- *
- * The dates are the ones sitemap.xml carried, kept as the fallback so a page
- * whose document cannot be read still reports something true of the last
- * deploy. The services index is here because the page is a file; the six or
- * more service pages below it are not, because they are rows.
- */
-const SITEMAP_STATIC = [
-    ['/',                                  'home',     '2026-08-20', 'weekly',  '1.0'],
-    ['/pages/services/',                   'services', '2026-08-20', 'weekly',  '0.9'],
-    ['__services__',                       null,       '',           '',        ''],
-    ['/pages/about/',                      'about',    '2026-08-20', 'monthly', '0.8'],
-    ['/pages/company-profile/',            'company',  '2026-08-20', 'monthly', '0.7'],
-    ['/pages/careers/',                    'careers',  '2026-08-21', 'weekly',  '0.7'],
-    ['/pages/contact/',                    'contact',  '2026-08-20', 'yearly',  '0.7'],
-    ['/pages/resource-certifications/',    null,       '2026-08-21', 'monthly', '0.6'],
-    ['/pages/branding-and-advertisement/', null,       '2026-08-21', 'yearly',  '0.4'],
-    ['/pages/privacy-policy/',             null,       '2026-08-21', 'yearly',  '0.3'],
-];
-
-/* Every service page is the same kind of page, so all of them are described
-   the same way. priority is advisory and Google ignores it outright; making it
-   editable per page is plans/seo-management.md's job, not a table kept here
-   that a seventh service could not be added to. */
-const SITEMAP_SERVICE_CHANGEFREQ = 'monthly';
-const SITEMAP_SERVICE_PRIORITY   = '0.9';
-
-$data     = services_load();
-$services = sitemap_updated('services', '2026-08-20');
-
-$entries = [];
-foreach (SITEMAP_STATIC as [$path, $document, $fallback, $changefreq, $priority]) {
-    if ($path === '__services__') {
-        foreach (services_rows_shown(services_all($data)) as $service) {
-            /* The same shape pages/services/detail.php will accept. A service
-               row exists from the moment it is added in the editor, and a slug
-               it has not been given yet would otherwise be listed here as
-               /pages/services// — an address that answers 404. A sitemap
-               naming a URL that does not resolve is a crawl error reported
-               against the whole site, so it is left out until it is real. */
-            $slug = is_string($service['slug'] ?? null) ? $service['slug'] : '';
-            if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
-                continue;
-            }
-
-            $entries[] = [
-                '/pages/services/' . $slug . '/',
-                $services,
-                SITEMAP_SERVICE_CHANGEFREQ,
-                SITEMAP_SERVICE_PRIORITY,
-            ];
-        }
-        continue;
-    }
-
-    $entries[] = [
-        $path,
-        $document === null ? $fallback : sitemap_updated($document, $fallback),
-        $changefreq,
-        $priority,
-    ];
-}
+$entries = seo_sitemap_entries();
 
 /* Not text/html: a crawler is entitled to refuse a sitemap that arrives as one,
    and the site sends X-Content-Type-Options: nosniff, so nothing will guess. */
@@ -167,11 +70,17 @@ echo '<?xml-stylesheet type="text/xsl" href="/assets/xsl/sitemap.xsl"?>', "\n";
   what you are reading changes nothing: it is written out afresh every time
   this URL is asked for.
 
-  The pages that are files in this repository are listed there by hand, and
-  adding a page still means adding a line —
-  docs/10-development/frontend/adding-a-page.md says so. The service pages are
-  read from content/services.json, because a service added in the editor has
-  no file here to notice.
+  Which pages appear, how often each says it changes and what priority it
+  claims are fields on the pages themselves, set in the editor. A page marked
+  "not indexed" there is absent from this file. The service pages are read
+  from content/services.json, because a service added in the editor has no
+  file here to notice.
+
+  This file names no editor address, deliberately, and for the same reason
+  robots.txt names no editor path: both are world-readable and both are among
+  the first things anything scanning a site fetches. tools/audit_pages.py
+  fails the build if the word appears anywhere in what this renders — the
+  comments included, which is how this paragraph came to be worded around it.
 
   The xml-stylesheet line above is what a BROWSER uses to render this as a
   readable table — assets/xsl/sitemap.xsl. Crawlers ignore it and read the
@@ -181,8 +90,10 @@ echo '<?xml-stylesheet type="text/xsl" href="/assets/xsl/sitemap.xsl"?>', "\n";
 <?php foreach ($entries as [$path, $lastmod, $changefreq, $priority]): ?>
 
   <url>
-    <loc><?= x(SITEMAP_ORIGIN . $path) ?></loc>
+    <loc><?= x(SEO_ORIGIN . $path) ?></loc>
+<?php if ($lastmod !== ''): ?>
     <lastmod><?= x($lastmod) ?></lastmod>
+<?php endif; ?>
     <changefreq><?= x($changefreq) ?></changefreq>
     <priority><?= x($priority) ?></priority>
   </url>

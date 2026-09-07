@@ -1,265 +1,41 @@
+<?php
+/**
+ * Tech4TIME — the branding & advertisement page.
+ *
+ * PHP, and not HTML, because its content is edited at admin.tech4time.bd and
+ * arrives here as content/branding.json. Rendered on the server, on this
+ * request, from a file on this disk: no fetch, no framework, and the page works
+ * with JavaScript switched off. See ADR 0003 and ADR 0010.
+ *
+ * Everything editable goes through h() EXCEPT the disclaimer's paragraphs,
+ * which are rich text and are printed bare — sanitised on the way in by
+ * contract_sanitise(), and again on receipt, because a signature proves where
+ * a document came from and not what is inside it.
+ *
+ * The header, footer, dock and hero circuit are shared markup and stay
+ * literal; tools/check_shared_markup.py holds them byte-identical to
+ * tools/templates/. The scroll-reveal markers below are hand-maintained,
+ * because tools/apply_reveals.py reports and skips any page that builds part
+ * of itself with a loop, which this one now does.
+ *
+ * UNLIKE THE CERTIFICATIONS PAGE, THIS ONE NEEDS NO SECOND SPRITE. Nothing
+ * here picks an icon at run time: every download button carries #arrow-down,
+ * one constant, and it stays a literal href="#arrow-down" below where
+ * tools/inject_icons.py can see it. See BRANDING_DOWNLOAD_GLYPH.
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/../../lib/head.php';
+require __DIR__ . '/../../lib/branding.php';
+
+$data = branding_load();
+?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= h(seo_lang()) ?>">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>Branding Assets &amp; Guidelines | Tech4TIME</title>
-<meta name="description" content="Download the Tech4TIME logo in four variants for light and dark backgrounds, transparent or plated, with the terms covering their use.">
-<link rel="canonical" href="https://tech4time.bd/pages/branding-and-advertisement/">
-
-<!-- Crawling. Large image previews and full snippets are allowed so rich
-     results can use the branded share card. -->
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-
-<!-- Security. NOTE: X-Frame-Options and X-Content-Type-Options are ignored in
-     <meta> by every browser — they are set for real in .htaccess, which is the
-     authoritative source. Referrer-Policy and CSP genuinely do work here, and
-     are kept as defence in depth in case the host strips response headers. -->
-<meta name="referrer" content="strict-origin-when-cross-origin">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'">
-
-<!-- Open Graph -->
-<meta property="og:type" content="website">
-<meta property="og:locale" content="en_US">
-<meta property="og:site_name" content="Tech4TIME">
-<meta property="og:title" content="Branding Assets &amp; Guidelines | Tech4TIME">
-<meta property="og:description" content="Download the Tech4TIME logo in four variants for light and dark backgrounds, transparent or plated, with the terms covering their use.">
-<meta property="og:url" content="https://tech4time.bd/pages/branding-and-advertisement/">
-<meta property="og:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
-
-<!-- Twitter -->
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Branding Assets &amp; Guidelines | Tech4TIME">
-<meta name="twitter:description" content="Download the Tech4TIME logo in four variants for light and dark backgrounds, transparent or plated, with the terms covering their use.">
-<meta name="twitter:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
-<meta name="twitter:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
-
-<!-- Icons -->
-<link rel="icon" href="/assets/images/favicon/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="16x16" href="/assets/images/favicon/favicon-16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/images/favicon/favicon-32.png">
-<link rel="icon" type="image/png" sizes="48x48" href="/assets/images/favicon/favicon-48.png">
-<link rel="icon" type="image/png" sizes="96x96" href="/assets/images/favicon/favicon-96.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafafa">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0b0c">
-
-<!-- Fonts. Preloaded because the latin subset is on the critical render path;
-     the -ext subset is not preloaded since most pages never reference it. -->
-<link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-
-<!-- Styles, in cascade order.
-
-     THE VERSION QUERY IS THE CACHE BUST, AND IT IS NOT DECORATION
-     Filenames are not content-hashed — there is no build step to hash them —
-     and .htaccess caches CSS for a year. A changed stylesheet does not reach
-     anybody who has been here before unless this string changes with it, so
-     bump it in the same breath as the file. Forget, and the release is for
-     new visitors only, which looks like nothing at all from here.
-     docs/20-deployment/routine-deploys.md, "Cache busting" -->
-<link rel="stylesheet" href="/assets/css/base.css">
-<link rel="stylesheet" href="/assets/css/theme.css">
-<link rel="stylesheet" href="/assets/css/layout.css?v=4">
-<link rel="stylesheet" href="/assets/css/components.css">
-<link rel="stylesheet" href="/assets/css/animations.css">
-<link rel="stylesheet" href="/assets/css/pages/branding.css">
-
-<!-- Colour mode, applied before first paint to avoid a flash of the wrong
-     theme. Deliberately NOT deferred; see the comment in the file itself. -->
-<script src="/assets/js/theme-init.js"></script>
-
-<!-- Base structured data, identical on every page. Per-page BreadcrumbList and
-     any page-specific schema (Service, JobPosting, ContactPage…) go in their own
-     block after this one.
-
-     Contact details, addresses and social profiles are taken from the NextJS
-     Footer component, which carries the live values. The Organization schema in
-     the NextJS root layout lists placeholder social URLs (facebook.com/tech4time,
-     twitter.com/tech4time, linkedin.com/company/tech4time, github.com/tech4time)
-     that do not match the real profiles the footer links to; the real ones are
-     used here. -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://tech4time.bd/#organization",
-      "name": "Tech4TIME",
-      "alternateName": "M/s. Tech4TIME",
-      "url": "https://tech4time.bd/",
-      "logo": {
-        "@type": "ImageObject",
-        "url": "https://tech4time.bd/assets/images/logo/logo-light-540.png",
-        "width": 540,
-        "height": 192
-      },
-      "image": "https://tech4time.bd/assets/images/og/tech4time-og.png",
-      "description": "Open-Source and enterprise-grade cybersecurity, software development, cloud infrastructure and IT solutions. Orchestrate, build, maintain and protect your business.",
-      "slogan": "Orchestrating Technology with Time",
-      "foundingDate": "2018-05-15",
-      "email": "info@tech4time.bd",
-      "areaServed": "Worldwide",
-      "knowsLanguage": "en",
-      "address": [
-        {
-          "@type": "PostalAddress",
-          "streetAddress": "278/3, Manikdi",
-          "addressLocality": "Dhaka",
-          "postalCode": "1206",
-          "addressCountry": "BD"
-        },
-        {
-          "@type": "PostalAddress",
-          "streetAddress": "68100 Batu Caves",
-          "addressRegion": "Selangor",
-          "addressCountry": "MY"
-        },
-        {
-          "@type": "PostalAddress",
-          "streetAddress": "367, Avenue Louise",
-          "addressLocality": "Brussels",
-          "addressCountry": "BE"
-        }
-      ],
-      "contactPoint": [
-        {
-          "@type": "ContactPoint",
-          "telephone": "+8801320571562",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "BD",
-          "availableLanguage": [
-            "English",
-            "Bengali"
-          ]
-        },
-        {
-          "@type": "ContactPoint",
-          "telephone": "+8801881873463",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "BD",
-          "availableLanguage": [
-            "English",
-            "Bengali"
-          ]
-        },
-        {
-          "@type": "ContactPoint",
-          "telephone": "+8801847313835",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "BD",
-          "availableLanguage": [
-            "English",
-            "Bengali"
-          ]
-        },
-        {
-          "@type": "ContactPoint",
-          "telephone": "+60198527096",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "MY",
-          "availableLanguage": [
-            "English"
-          ]
-        }
-      ],
-      "sameAs": [
-        "https://www.linkedin.com/company/tech4time-bd/",
-        "https://github.com/M-s-Tech4TIME"
-      ]
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://tech4time.bd/#website",
-      "url": "https://tech4time.bd/",
-      "name": "Tech4TIME",
-      "description": "Cybersecurity, software development, cloud infrastructure and HR solutions.",
-      "publisher": { "@id": "https://tech4time.bd/#organization" },
-      "inLanguage": "en"
-    },
-    {
-      "@type": "ProfessionalService",
-      "@id": "https://tech4time.bd/#service",
-      "name": "Tech4TIME",
-      "url": "https://tech4time.bd/",
-      "image": "https://tech4time.bd/assets/images/og/tech4time-og.png",
-      "parentOrganization": { "@id": "https://tech4time.bd/#organization" },
-      "priceRange": "$$",
-      "areaServed": "Worldwide",
-      "openingHoursSpecification": [
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
-          "opens": "09:00",
-          "closes": "18:00",
-          "description": "Bangladesh office"
-        },
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-          "opens": "09:00",
-          "closes": "18:00",
-          "description": "Malaysia office"
-        }
-      ],
-      "serviceType": [
-        "Cybersecurity Services",
-        "Software Development",
-        "Cloud Infrastructure",
-        "IT Consulting",
-        "Managed Services",
-        "Human Resources as a Service",
-        "DevOps Services",
-        "Security Operations Center"
-      ],
-      "knowsAbout": [
-        "Cybersecurity",
-        "Penetration Testing",
-        "Security Operations Center",
-        "Incident Response",
-        "Digital Forensics",
-        "Software Development",
-        "DevSecOps",
-        "Cloud Computing",
-        "OpenStack",
-        "Kubernetes",
-        "IT Staffing",
-        "HR as a Service"
-      ]
-    }
-  ]
-}
-</script>
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    {
-      "@type": "ListItem",
-      "position": 1,
-      "name": "Home",
-      "item": "https://tech4time.bd/"
-    },
-    {
-      "@type": "ListItem",
-      "position": 2,
-      "name": "Branding & Advertisement",
-      "item": "https://tech4time.bd/pages/branding-and-advertisement/"
-    }
-  ]
-}
-</script>
+<?php seo_head('/pages/branding-and-advertisement/', $data['meta'], ['pages/branding.css?v=2'], $data['updated']); ?>
+<?php seo_jsonld('/pages/branding-and-advertisement/', $data['meta'], $data['updated']); ?>
 </head>
 
 <body class="page">
@@ -599,141 +375,89 @@
 <!--hero-circuit:end-->
 
 <div class="container page-hero__inner">
-      <h1 class="page-hero__title">Branding Assets &amp; Guidelines</h1>
-      <p class="page-hero__subtitle">Our Logo, and How to Use It</p>
+      <h1 class="page-hero__title"><?= h($data['hero']['title']) ?></h1>
+      <p class="page-hero__subtitle"><?= h($data['hero']['subtitle']) ?></p>
     </div>
   </section>
 
   <!-- ============================ Assets ============================= -->
+<?php if (branding_band_shown($data, 'assets')): ?>
   <section class="section assets" aria-labelledby="assets-heading">
     <div class="container">
       <div data-reveal data-reveal-delay class="section__header">
-        <span class="section__eyebrow">Downloads</span>
-        <h2 class="section__title" id="assets-heading">Tech4TIME Logos for Branding &amp; Advertisement</h2>
+        <span class="section__eyebrow"><?= h($data['assets']['eyebrow']) ?></span>
+        <h2 class="section__title" id="assets-heading"><?= h($data['assets']['title']) ?></h2>
         <p class="section__lead">
-          Four variants of the mark. Pick the one that matches the background it
-          will sit on — the light-theme logo is dark ink for pale backgrounds,
-          the dark-theme logo pale ink for dark ones.
+          <?= h($data['assets']['lead']) ?>
         </p>
       </div>
 
       <div class="assets__grid">
+<?php foreach (branding_rows_shown($data['assets']['items']) as $asset): ?>
         <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--light">
-            <picture>
-              <source srcset="/assets/images/branding/logo-light-transparent.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-light-transparent.png"
-                   alt="Tech4TIME logo in dark ink on a transparent background"
-                   width="800" height="285" loading="lazy" decoding="async">
-            </picture>
+          <div class="asset__preview asset__preview--<?= h($asset['plate']) ?>">
+            <?= branding_picture($asset['image'], 'asset__image', (string)$asset['alt']) ?>
           </div>
           <div class="asset__body">
-            <h3 class="asset__title">Light Theme Logo</h3>
-            <p class="asset__text">The primary mark, for placing on white or any pale background.</p>
-            <p class="asset__meta">Transparent PNG · 1600 × 570</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-light-transparent-full.png" download="tech4time-logo-light-theme.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
+            <h3 class="asset__title"><?= h($asset['title']) ?></h3>
+            <p class="asset__text"><?= h($asset['text']) ?></p>
+            <?php /* The wrapper is what pins the buttons to a common line
+                     across the row, and it exists because there can be more
+                     than one of them: two anchors each claiming
+                     margin-block-start:auto would split the free space between
+                     themselves instead. One file or five, the group moves as
+                     one. */ ?>
+            <div class="asset__files">
+<?php foreach (branding_rows_shown($asset['files']) as $file): ?>
+              <p class="asset__meta"><?= h(branding_meta_line($file)) ?></p>
+              <a class="btn btn--primary asset__download"
+                 href="<?= h($file['file']['src']) ?>" download="<?= h($file['filename']) ?>">
+                <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
+                <?= h(branding_download_label($file)) ?>
+              </a>
+<?php endforeach; ?>
+            </div>
           </div>
         </article>
-
-        <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--dark">
-            <picture>
-              <source srcset="/assets/images/branding/logo-dark-transparent.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-dark-transparent.png"
-                   alt="Tech4TIME logo in pale ink on a transparent background"
-                   width="800" height="285" loading="lazy" decoding="async">
-            </picture>
-          </div>
-          <div class="asset__body">
-            <h3 class="asset__title">Dark Theme Logo</h3>
-            <p class="asset__text">The same mark in pale ink, for placing on black or any dark background.</p>
-            <p class="asset__meta">Transparent PNG · 1600 × 570</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-dark-transparent-full.png" download="tech4time-logo-dark-theme.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
-          </div>
-        </article>
-
-        <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--neutral">
-            <picture>
-              <source srcset="/assets/images/branding/logo-light-background.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-light-background.jpg"
-                   alt="Tech4TIME logo in dark ink on a light background plate"
-                   width="800" height="450" loading="lazy" decoding="async">
-            </picture>
-          </div>
-          <div class="asset__body">
-            <h3 class="asset__title">Light Theme With Background</h3>
-            <p class="asset__text">The light mark supplied on its own pale plate, for use where a transparent file cannot be placed.</p>
-            <p class="asset__meta">PNG · 1600 × 900</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-light-background-full.png" download="tech4time-logo-light-theme-background.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
-          </div>
-        </article>
-
-        <article data-reveal data-reveal-delay class="asset">
-          <div class="asset__preview asset__preview--neutral">
-            <picture>
-              <source srcset="/assets/images/branding/logo-dark-background.webp" type="image/webp">
-              <img class="asset__image" src="/assets/images/branding/logo-dark-background.jpg"
-                   alt="Tech4TIME logo in pale ink on a dark background plate"
-                   width="800" height="450" loading="lazy" decoding="async">
-            </picture>
-          </div>
-          <div class="asset__body">
-            <h3 class="asset__title">Dark Theme With Background</h3>
-            <p class="asset__text">The dark mark supplied on its own dark plate, for use where a transparent file cannot be placed.</p>
-            <p class="asset__meta">PNG · 1600 × 900</p>
-            <a class="btn btn--primary asset__download"
-               href="/assets/images/branding/logo-dark-background-full.png" download="tech4time-logo-dark-theme-background.png">
-              <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#arrow-down"></use></svg>
-              Download PNG
-            </a>
-          </div>
-        </article>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
+<?php endif; ?>
 
   <!-- ========================== Disclaimer =========================== -->
+<?php if (branding_band_shown($data, 'legal')): ?>
   <section class="section section--surface disclaimer" aria-labelledby="disclaimer-heading">
     <div class="container">
       <div data-reveal data-reveal-delay class="section__header">
-        <h2 class="section__title" id="disclaimer-heading">Disclaimer</h2>
+        <h2 class="section__title" id="disclaimer-heading"><?= h($data['legal']['title']) ?></h2>
       </div>
 
       <div class="disclaimer__body">
-        <p data-reveal data-reveal-delay class="disclaimer__text">All logos, trademarks, service marks, trade names, designs, and other proprietary assets displayed on this website or in any associated materials of M/s. Tech4TIME are the exclusive property of their respective owners and are protected under applicable intellectual property laws of Bangladesh, including but not limited to the Copyright Act, 2000 and the Trademarks Act, 2009, as well as relevant international conventions.</p>
-        <p data-reveal data-reveal-delay class="disclaimer__text">Any third-party logos or assets used herein are presented strictly for identification, informational, or reference purposes only. Their inclusion does not constitute or imply any form of affiliation, partnership, endorsement, or sponsorship by the respective owners, unless expressly stated in writing.</p>
-        <p data-reveal data-reveal-delay class="disclaimer__text">Unauthorized use, reproduction, modification, distribution, or exploitation of any logos or proprietary assets, in whole or in part, without prior written consent from the rightful owner is strictly prohibited and may result in legal action under applicable laws and regulations.</p>
-        <p data-reveal data-reveal-delay class="disclaimer__text">M/s. Tech4TIME respects the intellectual property rights of all entities. If you are the owner of any logo or asset featured and believe it has been used in a manner that constitutes infringement or is otherwise inappropriate, you are requested to contact us immediately for prompt review and necessary corrective action.</p>
+<?php foreach (branding_rows_shown($data['legal']['items']) as $note): ?>
+        <p data-reveal data-reveal-delay class="disclaimer__text"><?= $note['text'] ?></p>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
+<?php endif; ?>
 
   <!-- ============================== CTA ============================== -->
+<?php if (branding_band_shown($data, 'cta')): ?>
   <section class="cta-band cta-band--base">
     <div class="container cta-band__inner">
-      <h2 data-reveal data-reveal-delay class="cta-band__title">Need something not listed here?</h2>
+      <h2 data-reveal data-reveal-delay class="cta-band__title"><?= h($data['cta']['title']) ?></h2>
       <p data-reveal data-reveal-delay class="cta-band__text">
-        For permission to use these marks outside the terms above, or for a
-        format we have not published, write to us.
+        <?= h($data['cta']['text']) ?>
       </p>
       <div data-reveal data-reveal-delay class="cta-band__actions">
-        <a class="btn btn--primary btn--lg" href="/pages/contact/">Contact Us</a>
+<?php foreach (branding_rows_shown($data['cta']['items']) as $button): ?>
+        <a class="btn btn--<?= h($button['style']) ?> btn--lg" href="<?= h($button['href']) ?>"><?= h($button['label']) ?></a>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
+<?php endif; ?>
 
 </main>
 
@@ -820,6 +544,10 @@
               <span class="contact-item__label">Malaysia</span>
               <a href="tel:+60198527096">+60 198527096</a>
               <span class="contact-item__note">Monday – Friday</span>
+
+              <span class="contact-item__label">Belgium</span>
+              <a href="tel:+3225557525">+32 2 555 75 25</a><br>
+              <a href="tel:+3229995575">+32 2 999 55 75</a>
             </div>
           </div>
 
@@ -1068,7 +796,7 @@
 <script src="/assets/js/theme-toggle.js" defer></script>
 <script src="/assets/js/nav.js" defer></script>
 <script src="/assets/js/animations.js" defer></script>
-<script src="/assets/js/forms.js" defer></script>
+<script src="/assets/js/forms.js?v=2" defer></script>
 <script src="/assets/js/dashboard.js" defer></script>
 <script src="/assets/js/tech-sphere.js" defer></script>
 <!-- Versioned for the same reason the stylesheets are, and with a sharper

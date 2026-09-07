@@ -58,7 +58,7 @@ PAGES = [
     "/pages/resource-certifications/",
     "/pages/privacy-policy/",
     "/pages/contact/",
-    "/404.html",
+    "/404.php",
 ]
 
 # Things that are interactive but have nothing to say on hover, with the reason

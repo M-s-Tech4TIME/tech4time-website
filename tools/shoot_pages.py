@@ -53,7 +53,7 @@ PAGES = [
     ("certifications", "/pages/resource-certifications/"),
     ("privacy-policy", "/pages/privacy-policy/"),
     ("contact", "/pages/contact/"),
-    ("404", "/404.html"),
+    ("404", "/404.php"),
 ]
 
 SETTLE = """

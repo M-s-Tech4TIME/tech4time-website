@@ -11,17 +11,18 @@ Every directory: what it holds, who owns it, and what must never happen to it.
 ```
 tech4time-website/
 ├── index.php               the homepage — stays at the root, not in pages/
-├── 404.html                the custom error page
+├── 404.php                 the custom error page
 ├── contact-handler.php     where the enquiry form posts
 ├── .htaccess               security headers, caching, clean URLs, blocking
-├── robots.txt              crawl rules
+│                           — and the internal rewrites for the three below
 ├── sitemap.php             generated; served at /sitemap.xml, which is what
 │                           Search Console was given and must not change
-├── site.webmanifest        PWA manifest (the one .json that stays public)
+├── robots.php              generated; served at /robots.txt
+├── manifest.php            generated; served at /site.webmanifest
 ├── .gitattributes          line endings and diff behaviour
 ├── .gitignore              includes the private store, as a backstop
 │
-├── pages/                  the other fourteen pages; eleven are .php
+├── pages/                  the other fourteen pages, all of them .php
 │   └── services/detail.php a renderer, not a page: it serves any service
 │                           that has no directory of its own
 ├── assets/                 css, js, fonts, icons, images — all self-hosted
@@ -54,12 +55,12 @@ because `.htaccess` resolves it. The homepage is the exception: it stays at the 
 | Company profile | `pages/company-profile/index.php` | **dynamic** — renders `content/company.json` |
 | Careers | `pages/careers/index.php` | **dynamic** — renders `content/careers.json` |
 | Contact | `pages/contact/index.php` | **dynamic** — renders `content/contact.json` |
-| Resource certifications | `pages/resource-certifications/index.html` | |
-| Branding & advertisement | `pages/branding-and-advertisement/index.html` | |
-| Privacy policy | `pages/privacy-policy/index.html` | |
-| Not found | `404.html` | at the repository root |
+| Resource certifications | `pages/resource-certifications/index.php` | **dynamic** — renders `content/certifications.json` |
+| Branding & advertisement | `pages/branding-and-advertisement/index.php` | **dynamic** — renders `content/branding.json` |
+| Privacy policy | `pages/privacy-policy/index.php` | **dynamic** — renders `content/privacy.json` |
+| Not found | `404.php` | at the repository root; its record is `notfound` in `content/seo.json` |
 
-Four static, twelve dynamic. Adding one:
+**All sixteen are dynamic.** The site has no static page. Adding one:
 [adding-a-page.md](../10-development/frontend/adding-a-page.md).
 
 **The seven services pages are one document, not seven.** `content/services.json` holds the index

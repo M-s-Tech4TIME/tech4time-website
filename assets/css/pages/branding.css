@@ -96,11 +96,29 @@
 }
 
 /* margin-block-start:auto rather than a fixed gap, so the buttons sit on one
-   line across the row however long the descriptions run. */
+   line across the row however long the descriptions run.
+
+   IT IS ON THE GROUP, NOT ON THE BUTTON, because a card can offer more than
+   one file — a raster and a vector of the same mark. Two buttons each claiming
+   auto here would share the free space between them and open a gap in the
+   middle of the card; one wrapper claiming it moves the whole group down
+   together, whether it holds one file or five. */
+.asset__files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin-block-start: auto;
+}
+
 .asset__download {
   align-self: start;
-  margin-block-start: auto;
   padding-block-start: var(--space-2xs);
+}
+
+/* A second file starts a new pair, so it needs more air above it than the gap
+   between a line and the button it belongs to. */
+.asset__download + .asset__meta {
+  margin-block-start: var(--space-sm);
 }
 
 /* ------------------------------------------------------------ disclaimer */

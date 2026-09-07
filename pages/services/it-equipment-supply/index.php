@@ -25,6 +25,7 @@
 
 declare(strict_types=1);
 
+require __DIR__ . '/../../../lib/head.php';
 require __DIR__ . '/../../../lib/services.php';
 
 $data    = services_load();
@@ -32,255 +33,15 @@ $service = services_by_slug($data, 'it-equipment-supply');
 
 if ($service === null || $service['status'] === 'hidden') {
     http_response_code(404);
-    require __DIR__ . '/../../../404.html';
+    require __DIR__ . '/../../../404.php';
     exit;
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= h(seo_lang()) ?>">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title><?= h($service['meta']['title']) ?></title>
-<meta name="description" content="<?= h($service['meta']['description']) ?>">
-<link rel="canonical" href="https://tech4time.bd/pages/services/it-equipment-supply/">
-
-<!-- Crawling. Large image previews and full snippets are allowed so rich
-     results can use the branded share card. -->
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-
-<!-- Security. NOTE: X-Frame-Options and X-Content-Type-Options are ignored in
-     <meta> by every browser — they are set for real in .htaccess, which is the
-     authoritative source. Referrer-Policy and CSP genuinely do work here, and
-     are kept as defence in depth in case the host strips response headers. -->
-<meta name="referrer" content="strict-origin-when-cross-origin">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'">
-
-<!-- Open Graph -->
-<meta property="og:type" content="website">
-<meta property="og:locale" content="en_US">
-<meta property="og:site_name" content="Tech4TIME">
-<meta property="og:title" content="<?= h($service['meta']['share_title']) ?>">
-<meta property="og:description" content="<?= h($service['meta']['description']) ?>">
-<meta property="og:url" content="https://tech4time.bd/pages/services/it-equipment-supply/">
-<meta property="og:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
-
-<!-- Twitter -->
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="<?= h($service['meta']['share_title']) ?>">
-<meta name="twitter:description" content="<?= h($service['meta']['description']) ?>">
-<meta name="twitter:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
-<meta name="twitter:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
-
-<!-- Icons -->
-<link rel="icon" href="/assets/images/favicon/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="16x16" href="/assets/images/favicon/favicon-16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/images/favicon/favicon-32.png">
-<link rel="icon" type="image/png" sizes="48x48" href="/assets/images/favicon/favicon-48.png">
-<link rel="icon" type="image/png" sizes="96x96" href="/assets/images/favicon/favicon-96.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafafa">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0b0c">
-
-<!-- Fonts. Preloaded because the latin subset is on the critical render path;
-     the -ext subset is not preloaded since most pages never reference it. -->
-<link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-
-<!-- Styles, in cascade order.
-
-     THE VERSION QUERY IS THE CACHE BUST, AND IT IS NOT DECORATION
-     Filenames are not content-hashed — there is no build step to hash them —
-     and .htaccess caches CSS for a year. A changed stylesheet does not reach
-     anybody who has been here before unless this string changes with it, so
-     bump it in the same breath as the file. Forget, and the release is for
-     new visitors only, which looks like nothing at all from here.
-     docs/20-deployment/routine-deploys.md, "Cache busting" -->
-<link rel="stylesheet" href="/assets/css/base.css">
-<link rel="stylesheet" href="/assets/css/theme.css">
-<link rel="stylesheet" href="/assets/css/layout.css?v=4">
-<link rel="stylesheet" href="/assets/css/components.css">
-<link rel="stylesheet" href="/assets/css/animations.css">
-<link rel="stylesheet" href="/assets/css/pages/service-detail.css">
-
-<!-- Colour mode, applied before first paint to avoid a flash of the wrong
-     theme. Deliberately NOT deferred; see the comment in the file itself. -->
-<script src="/assets/js/theme-init.js"></script>
-
-<!-- Base structured data, identical on every page. Per-page BreadcrumbList and
-     any page-specific schema (Service, JobPosting, ContactPage…) go in their own
-     block after this one.
-
-     Contact details, addresses and social profiles are taken from the NextJS
-     Footer component, which carries the live values. The Organization schema in
-     the NextJS root layout lists placeholder social URLs (facebook.com/tech4time,
-     twitter.com/tech4time, linkedin.com/company/tech4time, github.com/tech4time)
-     that do not match the real profiles the footer links to; the real ones are
-     used here. -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://tech4time.bd/#organization",
-      "name": "Tech4TIME",
-      "alternateName": "M/s. Tech4TIME",
-      "url": "https://tech4time.bd/",
-      "logo": {
-        "@type": "ImageObject",
-        "url": "https://tech4time.bd/assets/images/logo/logo-light-540.png",
-        "width": 540,
-        "height": 192
-      },
-      "image": "https://tech4time.bd/assets/images/og/tech4time-og.png",
-      "description": "Open-Source and enterprise-grade cybersecurity, software development, cloud infrastructure and IT solutions. Orchestrate, build, maintain and protect your business.",
-      "slogan": "Orchestrating Technology with Time",
-      "foundingDate": "2018-05-15",
-      "email": "info@tech4time.bd",
-      "areaServed": "Worldwide",
-      "knowsLanguage": "en",
-      "address": [
-        {
-          "@type": "PostalAddress",
-          "streetAddress": "278/3, Manikdi",
-          "addressLocality": "Dhaka",
-          "postalCode": "1206",
-          "addressCountry": "BD"
-        },
-        {
-          "@type": "PostalAddress",
-          "streetAddress": "68100 Batu Caves",
-          "addressRegion": "Selangor",
-          "addressCountry": "MY"
-        },
-        {
-          "@type": "PostalAddress",
-          "streetAddress": "367, Avenue Louise",
-          "addressLocality": "Brussels",
-          "addressCountry": "BE"
-        }
-      ],
-      "contactPoint": [
-        {
-          "@type": "ContactPoint",
-          "telephone": "+8801320571562",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "BD",
-          "availableLanguage": [
-            "English",
-            "Bengali"
-          ]
-        },
-        {
-          "@type": "ContactPoint",
-          "telephone": "+8801881873463",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "BD",
-          "availableLanguage": [
-            "English",
-            "Bengali"
-          ]
-        },
-        {
-          "@type": "ContactPoint",
-          "telephone": "+8801847313835",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "BD",
-          "availableLanguage": [
-            "English",
-            "Bengali"
-          ]
-        },
-        {
-          "@type": "ContactPoint",
-          "telephone": "+60198527096",
-          "email": "info@tech4time.bd",
-          "contactType": "customer service",
-          "areaServed": "MY",
-          "availableLanguage": [
-            "English"
-          ]
-        }
-      ],
-      "sameAs": [
-        "https://www.linkedin.com/company/tech4time-bd/",
-        "https://github.com/M-s-Tech4TIME"
-      ]
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://tech4time.bd/#website",
-      "url": "https://tech4time.bd/",
-      "name": "Tech4TIME",
-      "description": "Cybersecurity, software development, cloud infrastructure and HR solutions.",
-      "publisher": { "@id": "https://tech4time.bd/#organization" },
-      "inLanguage": "en"
-    },
-    {
-      "@type": "ProfessionalService",
-      "@id": "https://tech4time.bd/#service",
-      "name": "Tech4TIME",
-      "url": "https://tech4time.bd/",
-      "image": "https://tech4time.bd/assets/images/og/tech4time-og.png",
-      "parentOrganization": { "@id": "https://tech4time.bd/#organization" },
-      "priceRange": "$$",
-      "areaServed": "Worldwide",
-      "openingHoursSpecification": [
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
-          "opens": "09:00",
-          "closes": "18:00",
-          "description": "Bangladesh office"
-        },
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-          "opens": "09:00",
-          "closes": "18:00",
-          "description": "Malaysia office"
-        }
-      ],
-      "serviceType": [
-        "Cybersecurity Services",
-        "Software Development",
-        "Cloud Infrastructure",
-        "IT Consulting",
-        "Managed Services",
-        "Human Resources as a Service",
-        "DevOps Services",
-        "Security Operations Center"
-      ],
-      "knowsAbout": [
-        "Cybersecurity",
-        "Penetration Testing",
-        "Security Operations Center",
-        "Incident Response",
-        "Digital Forensics",
-        "Software Development",
-        "DevSecOps",
-        "Cloud Computing",
-        "OpenStack",
-        "Kubernetes",
-        "IT Staffing",
-        "HR as a Service"
-      ]
-    }
-  ]
-}
-</script>
-
-<script type="application/ld+json">
-<?= services_json_ld(services_breadcrumbs($service, 'https://tech4time.bd')) ?>
-</script>
+<?php seo_head('/pages/services/it-equipment-supply/', $service['meta'], ['pages/service-detail.css'], $data['updated']); ?>
+<?php seo_jsonld('/pages/services/it-equipment-supply/', $service['meta'], $data['updated']); ?>
 
 <script type="application/ld+json">
 <?= services_json_ld(services_schema($service, 'https://tech4time.bd')) ?>
@@ -718,6 +479,10 @@ if ($service === null || $service['status'] === 'hidden') {
               <span class="contact-item__label">Malaysia</span>
               <a href="tel:+60198527096">+60 198527096</a>
               <span class="contact-item__note">Monday – Friday</span>
+
+              <span class="contact-item__label">Belgium</span>
+              <a href="tel:+3225557525">+32 2 555 75 25</a><br>
+              <a href="tel:+3229995575">+32 2 999 55 75</a>
             </div>
           </div>
 
@@ -966,7 +731,7 @@ if ($service === null || $service['status'] === 'hidden') {
 <script src="/assets/js/theme-toggle.js" defer></script>
 <script src="/assets/js/nav.js" defer></script>
 <script src="/assets/js/animations.js" defer></script>
-<script src="/assets/js/forms.js" defer></script>
+<script src="/assets/js/forms.js?v=2" defer></script>
 <script src="/assets/js/dashboard.js" defer></script>
 <script src="/assets/js/tech-sphere.js" defer></script>
 <!-- Versioned for the same reason the stylesheets are, and with a sharper

@@ -31,6 +31,11 @@ that name the admin name the other repository too.
 | The technology list, or the principles | `https://admin.tech4time.bd/?s=company` |
 | The company profile's headings and copy | `https://admin.tech4time.bd/?s=company` |
 | The about page's sections, specialities and why-us cards | `https://admin.tech4time.bd/?s=about` |
+| **Any page's browser-tab title, search description or share card** | `https://admin.tech4time.bd/?s=seo` |
+| Whether a page appears in search at all, and where it sits in the sitemap | `https://admin.tech4time.bd/?s=seo` |
+| The Organization details a search engine reads — legal name, slogan, opening hours, social profiles | `https://admin.tech4time.bd/?s=seo&site=identity` |
+| Crawl rules, the web manifest, Search Console and Bing verification | `https://admin.tech4time.bd/?s=seo&site=crawl` |
+| The 404 page's title and description | `https://admin.tech4time.bd/?s=seo&page=notfound` |
 
 Saving there writes the backend's own record, then pushes a signed copy to `api/publish.php` here,
 which verifies it, re-sanitises it and writes `content/home.json`, `content/careers.json`,
@@ -80,6 +85,7 @@ publish overwrites it. [publish-api.md](server-side/publish-api.md)
 | The technology sphere | `assets/js/tech-sphere.js` |
 | Counting figures, client logos | `assets/js/animations.js` |
 | Contact form validation (convenience only) | `assets/js/forms.js` |
+| **Where** the contact form posts, and how it clears | its `action` attribute. Never `form.action`, `form.method` or `form.reset()` in script — a control of that name replaces each. [ADR 0022](../90-decisions/0022-form-properties-are-read-off-the-prototype.md) |
 | Module wiring | `assets/js/main.js` |
 
 Every module registers on `window.Tech4Time` and must degrade — the page has to work with scripting
@@ -92,9 +98,10 @@ off. [javascript.md](frontend/javascript.md) · [motion.md](frontend/motion.md)
 | I want to change | Where |
 |---|---|
 | **The header or footer** | `tools/templates/`, then `python3 tools/propagate_shared.py` — **never one page** |
-| A page's content | `pages/<name>/index.html` |
-| The homepage | `index.php`, at the repository root — its **words** are in the admin, above |
-| The 404 page | `404.html` |
+| A page's content | `pages/<name>/index.php` — its **words** are in the admin, above |
+| The homepage | `index.php`, at the repository root — likewise |
+| The 404 page | `404.php` — its markup here, its title and description in the admin |
+| Anything inside a page's `<head>` | `lib/head.php` if it is code; the admin if it is words. Never a page file |
 | Add a whole new page | [adding-a-page.md](frontend/adding-a-page.md) |
 | An icon on a page | edit the markup, then `python3 tools/inject_icons.py` |
 | Add a new icon to the set | `assets/icons/sprite.svg` via `tools/build_icon_sprite.py`, then inject |
@@ -118,6 +125,16 @@ off. [javascript.md](frontend/javascript.md) · [motion.md](frontend/motion.md)
 | A service, its solutions, or the services page | **`https://admin.tech4time.bd/?s=services`** — not a file, and not here |
 | How a services page is drawn | `lib/services.php` — one renderer behind all seven pages |
 | Adding a whole new service | **the editor** — it needs no file here. `pages/services/detail.php` serves any slug the document has |
+| A certification, a role, or a whole role group | **`https://admin.tech4time.bd/?s=certifications`** — not a file, and not here |
+| How the certifications page is drawn | `lib/certifications.php` |
+| The number in "54 certifications across the four specialist roles" | nowhere: the text holds `{certifications}` and `{groups-word}`, and the renderer fills them in |
+| A logo file people download, or the terms covering its use | **`https://admin.tech4time.bd/?s=branding`** — not a file, and not here |
+| How the branding page is drawn | `lib/branding.php` |
+| Anything the privacy policy says | **`https://admin.tech4time.bd/?s=privacy`** — not a file, and not here |
+| How the privacy policy is drawn | `lib/privacy.php` and `PRIVACY_BLOCK_KINDS` in `lib/contract.php` — a block's kind decides its markup |
+| The web address of a section of the policy | nowhere: it is minted from the heading once and then frozen, because somebody may have linked to it |
+| The size beside a download, or the words on its button | nowhere: both are read off the file itself by `branding_meta_line()` and `branding_download_label()` |
+| What a vector file is allowed to contain | `lib/svg.php` — **and the same file in the backend** |
 | What HTML is allowed in rich text | `lib/html.php` — the sanitiser |
 | How JSON is read and written | `lib/store.php` |
 
@@ -162,9 +179,11 @@ What is still here, because the public site uses it for the contact form:
 | What is blocked over HTTP | `.htaccess` section 8 |
 | Keeping `/api/` out of search results | `.htaccess` section 9 |
 | Enabling HSTS | `.htaccess` — uncomment, **after** the site is live on HTTPS |
-| Crawl rules | `robots.txt` |
-| The sitemap's fixed pages | `SITEMAP_STATIC` in `sitemap.php` — served at `/sitemap.xml` |
+| Crawl rules | `https://admin.tech4time.bd/?s=seo&site=crawl` — `robots.php` renders them at `/robots.txt` |
+| The sitemap's pages | nowhere: `sitemap.php` walks `SEO_ROUTES` and omits anything set to noindex |
 | The sitemap's service pages | nowhere: they are read from `content/services.json` |
+| The address a page is a page **at** | `SEO_ROUTES` in `lib/contract.php`, and `.htaccess` — a route is code |
+| The web manifest | `https://admin.tech4time.bd/?s=seo&site=crawl` — `manifest.php` renders it |
 
 > `.htaccess` is not read by the local dev server. Changes there can only be verified on the host.
 > [security-model.md](../40-reference/security-model.md)

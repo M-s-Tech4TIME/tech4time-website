@@ -191,6 +191,13 @@ The only thing the frontend tells the backend. The site-wide footers repeat the 
 literal markup in all sixteen pages, so they go stale the moment an address is edited and stay stale
 until the pages are rebuilt and deployed.
 
+**The `<head>` used to have the same problem and no longer does.** The Organization graph carried
+the same addresses and telephone numbers, pasted into fifteen of the sixteen pages, and
+`sync_site_contact.py` pasted the new ones back before a deploy. `seo_graph()` builds that graph
+from `content/contact.json` on the request now, so the structured data needs no fingerprint, no
+rebuild and no deploy — it is right the moment the publish lands. The footer is still markup, so it
+still does. [ADR 0020](../../90-decisions/0020-page-metadata-is-content.md)
+
 `tools/sync_site_contact.py` rebuilds them and records the fingerprint in
 `lib/footer-fingerprint.php`; `api/publish.php` returns it in every response; `contact_save()`
 records what it was told; the editor compares. **The side that knows what its own footers say is the

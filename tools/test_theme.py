@@ -37,7 +37,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-HEAD = ROOT / "tools" / "templates" / "head.html"
+# The shared head is emitted by lib/head.php, not spliced from a template. The
+# script tag is a literal line in seo_head(), so this check reads the same way
+# it always did -- it just reads the one file every page renders through
+# instead of the one every page was born from.
+HEAD = ROOT / "lib" / "head.php"
 PAGE = "/pages/about/"
 
 

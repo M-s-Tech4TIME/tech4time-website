@@ -95,6 +95,7 @@ Everything else is deferred, at the end of `<body>`.
 | `circuit.js` | the charges running through the title band's circuitry, on the fourteen pages that have one. Reads its geometry out of the SVG already in the page and paints on one canvas, because the same thing in CSS cost a CPU core — [motion.md](motion.md#the-mistake-this-band-is-shaped-around) |
 | `forms.js` | contact form convenience validation |
 | `dashboard.js` | the tabbed panels on the service detail pages |
+| `analytics.js` | configures Google Analytics from the `data-ga` attribute on its own tag. Loaded **only** while a measurement id is set on the SEO screen — with the field empty the tag is not emitted and no external origin is reached. It is a separate file rather than an inline block because the second half of Google's own snippet is inline and `script-src 'self'` refuses those silently — [ADR 0021](../../90-decisions/0021-analytics-is-off-until-somebody-turns-it-on.md) |
 | `main.js` | bootstrap; runs each module's `init()` |
 
 **None of the admin's scripts are here.** They moved with the editor:

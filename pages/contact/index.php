@@ -18,227 +18,22 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../../lib/contact.php';
+require __DIR__ . '/../../lib/head.php';
+/* require_once, not require: lib/head.php pulls lib/contact.php in for the
+   Organization graph's addresses and telephone numbers, so by the time this
+   line is reached the file is already loaded and a plain require would
+   redeclare every function in it. */
+require_once __DIR__ . '/../../lib/contact.php';
 
 $data    = contact_load();
 $offices = contact_shown_offices($data);
 $reach   = contact_shown_reach($data);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= h(seo_lang()) ?>">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title><?= h($data['meta']['title']) ?></title>
-<meta name="description" content="<?= h($data['meta']['description']) ?>">
-<link rel="canonical" href="https://tech4time.bd/pages/contact/">
-
-<!-- Crawling. Large image previews and full snippets are allowed so rich
-     results can use the branded share card. -->
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-
-<!-- Security. NOTE: X-Frame-Options and X-Content-Type-Options are ignored in
-     <meta> by every browser — they are set for real in .htaccess, which is the
-     authoritative source. Referrer-Policy and CSP genuinely do work here, and
-     are kept as defence in depth in case the host strips response headers. -->
-<meta name="referrer" content="strict-origin-when-cross-origin">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'">
-
-<!-- Open Graph -->
-<meta property="og:type" content="website">
-<meta property="og:locale" content="en_US">
-<meta property="og:site_name" content="Tech4TIME">
-<meta property="og:title" content="<?= h($data['meta']['share_title']) ?>">
-<meta property="og:description" content="<?= h($data['meta']['description']) ?>">
-<meta property="og:url" content="https://tech4time.bd/pages/contact/">
-<meta property="og:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
-
-<!-- Twitter -->
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="<?= h($data['meta']['share_title']) ?>">
-<meta name="twitter:description" content="<?= h($data['meta']['description']) ?>">
-<meta name="twitter:image" content="https://tech4time.bd/assets/images/og/tech4time-og.png">
-<meta name="twitter:image:alt" content="Tech4TIME — Orchestrating Technology with Time">
-
-<!-- Icons -->
-<link rel="icon" href="/assets/images/favicon/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="16x16" href="/assets/images/favicon/favicon-16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/images/favicon/favicon-32.png">
-<link rel="icon" type="image/png" sizes="48x48" href="/assets/images/favicon/favicon-48.png">
-<link rel="icon" type="image/png" sizes="96x96" href="/assets/images/favicon/favicon-96.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafafa">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0b0c">
-
-<!-- Fonts. Preloaded because the latin subset is on the critical render path;
-     the -ext subset is not preloaded since most pages never reference it. -->
-<link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-
-<!-- Styles, in cascade order.
-
-     THE VERSION QUERY IS THE CACHE BUST, AND IT IS NOT DECORATION
-     Filenames are not content-hashed — there is no build step to hash them —
-     and .htaccess caches CSS for a year. A changed stylesheet does not reach
-     anybody who has been here before unless this string changes with it, so
-     bump it in the same breath as the file. Forget, and the release is for
-     new visitors only, which looks like nothing at all from here.
-     docs/20-deployment/routine-deploys.md, "Cache busting" -->
-<link rel="stylesheet" href="/assets/css/base.css">
-<link rel="stylesheet" href="/assets/css/theme.css">
-<link rel="stylesheet" href="/assets/css/layout.css?v=4">
-<link rel="stylesheet" href="/assets/css/components.css">
-<link rel="stylesheet" href="/assets/css/animations.css">
-<link rel="stylesheet" href="/assets/css/pages/contact.css">
-
-<!-- Colour mode, applied before first paint to avoid a flash of the wrong
-     theme. Deliberately NOT deferred; see the comment in the file itself. -->
-<script src="/assets/js/theme-init.js"></script>
-
-<!-- Base structured data, identical on every page. Per-page BreadcrumbList and
-     any page-specific schema (Service, JobPosting, ContactPage…) go in their own
-     block after this one.
-
-     Contact details, addresses and social profiles are taken from the NextJS
-     Footer component, which carries the live values. The Organization schema in
-     the NextJS root layout lists placeholder social URLs (facebook.com/tech4time,
-     twitter.com/tech4time, linkedin.com/company/tech4time, github.com/tech4time)
-     that do not match the real profiles the footer links to; the real ones are
-     used here. -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://tech4time.bd/#organization",
-      "name": "Tech4TIME",
-      "alternateName": "M/s. Tech4TIME",
-      "url": "https://tech4time.bd/",
-      "logo": {
-        "@type": "ImageObject",
-        "url": "https://tech4time.bd/assets/images/logo/logo-light-540.png",
-        "width": 540,
-        "height": 192
-      },
-      "image": "https://tech4time.bd/assets/images/og/tech4time-og.png",
-      "description": "Open-Source and enterprise-grade cybersecurity, software development, cloud infrastructure and IT solutions. Orchestrate, build, maintain and protect your business.",
-      "slogan": "Orchestrating Technology with Time",
-      "foundingDate": "2018-05-15",
-      "email": "info@tech4time.bd",
-      "areaServed": "Worldwide",
-      "knowsLanguage": "en",
-<?php /* THE OFFICES, FROM THE RECORD RATHER THAN FROM THIS FILE.
-
-         These two arrays were written out by hand, which meant the contact
-         page carried the addresses twice: once in the cards a visitor reads,
-         which the editor writes, and once here, which nothing did. Hiding an
-         office in the admin took its card off the page and left its address
-         being advertised to Google — and adding an office never reached this
-         block at all. A wrong address in structured data is wrong in a
-         knowledge panel, where nobody on this end ever sees it.
-
-         contact_addresses() and contact_points() answer for the band's switch
-         as well as each office's, so a hidden band is absent from both.
-
-         json_encode with the same flags as the graph below, and indented to
-         sit inside this object — it is being spliced into hand-written JSON,
-         so the comma placement is the caller's problem and is why each line
-         ends the way it does. */ ?>
-      "address": <?= contact_ld_indent(contact_addresses($data), 6) ?>,
-      "contactPoint": <?= contact_ld_indent(contact_points($data), 6) ?>,
-      "sameAs": [
-        "https://www.linkedin.com/company/tech4time-bd/",
-        "https://github.com/M-s-Tech4TIME"
-      ]
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://tech4time.bd/#website",
-      "url": "https://tech4time.bd/",
-      "name": "Tech4TIME",
-      "description": "Cybersecurity, software development, cloud infrastructure and HR solutions.",
-      "publisher": { "@id": "https://tech4time.bd/#organization" },
-      "inLanguage": "en"
-    },
-    {
-      "@type": "ProfessionalService",
-      "@id": "https://tech4time.bd/#service",
-      "name": "Tech4TIME",
-      "url": "https://tech4time.bd/",
-      "image": "https://tech4time.bd/assets/images/og/tech4time-og.png",
-      "parentOrganization": { "@id": "https://tech4time.bd/#organization" },
-      "priceRange": "$$",
-      "areaServed": "Worldwide",
-      "openingHoursSpecification": [
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
-          "opens": "09:00",
-          "closes": "18:00",
-          "description": "Bangladesh office"
-        },
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-          "opens": "09:00",
-          "closes": "18:00",
-          "description": "Malaysia office"
-        }
-      ],
-      "serviceType": [
-        "Cybersecurity Services",
-        "Software Development",
-        "Cloud Infrastructure",
-        "IT Consulting",
-        "Managed Services",
-        "Human Resources as a Service",
-        "DevOps Services",
-        "Security Operations Center"
-      ],
-      "knowsAbout": [
-        "Cybersecurity",
-        "Penetration Testing",
-        "Security Operations Center",
-        "Incident Response",
-        "Digital Forensics",
-        "Software Development",
-        "DevSecOps",
-        "Cloud Computing",
-        "OpenStack",
-        "Kubernetes",
-        "IT Staffing",
-        "HR as a Service"
-      ]
-    }
-  ]
-}
-</script>
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    {
-      "@type": "ListItem",
-      "position": 1,
-      "name": "Home",
-      "item": "https://tech4time.bd/"
-    },
-    {
-      "@type": "ListItem",
-      "position": 2,
-      "name": "Contact Us",
-      "item": "https://tech4time.bd/pages/contact/"
-    }
-  ]
-}
-</script>
+<?php seo_head('/pages/contact/', $data['meta'], ['pages/contact.css'], $data['updated']); ?>
+<?php seo_jsonld('/pages/contact/', $data['meta'], $data['updated']); ?>
 
 <?php /* The ContactPage graph, built from the same records the page below
          renders. Generated rather than written out so it cannot drift from
@@ -966,6 +761,10 @@ $reach   = contact_shown_reach($data);
               <span class="contact-item__label">Malaysia</span>
               <a href="tel:+60198527096">+60 198527096</a>
               <span class="contact-item__note">Monday – Friday</span>
+
+              <span class="contact-item__label">Belgium</span>
+              <a href="tel:+3225557525">+32 2 555 75 25</a><br>
+              <a href="tel:+3229995575">+32 2 999 55 75</a>
             </div>
           </div>
 
@@ -1214,7 +1013,7 @@ $reach   = contact_shown_reach($data);
 <script src="/assets/js/theme-toggle.js" defer></script>
 <script src="/assets/js/nav.js" defer></script>
 <script src="/assets/js/animations.js" defer></script>
-<script src="/assets/js/forms.js" defer></script>
+<script src="/assets/js/forms.js?v=2" defer></script>
 <script src="/assets/js/dashboard.js" defer></script>
 <script src="/assets/js/tech-sphere.js" defer></script>
 <!-- Versioned for the same reason the stylesheets are, and with a sharper

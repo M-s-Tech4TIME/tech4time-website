@@ -20,14 +20,14 @@ working, showing older content, until somebody notices their job post is gone.
 
 ```
 UPLOAD                            NEVER UPLOAD
-  index.php    404.html             content/          ← live data
+  index.php    404.php              content/          ← live data
   pages/                            tools/            ← scripts, incl. password reset
   assets/                           docs/
   lib/                              references/
   contact-handler.php               *.md   *.py
   .htaccess                         admin/            ← nothing, ever
-  robots.txt   sitemap.php
-  site.webmanifest
+  sitemap.php  robots.php
+  manifest.php
 ```
 
 ### With rsync
@@ -102,15 +102,22 @@ the tag, and bump it in the same breath as the file:
 served from the URL it had on `main`. Run it before every deploy — this rule was kept by memory
 until it was missed twice, and both misses were invisible from a clean cache.
 
-### Both places, by hand
+### A stylesheet is one edit; a script is still seventeen
 
-The stylesheet links live in `tools/templates/head.html` and the script tags in
-`tools/templates/scripts.html` — and **`propagate_shared.py` does not carry either of them out to
-the pages.** It handles the header, footer, dock and hero circuit only; `head.html` and
-`scripts.html` are read by `assemble_page.py` when a page is *created*, and after that each page
-holds its own copy. So a bump means editing the template **and** all sixteen pages, and
+**Stylesheets.** The five every page loads are named in `HEAD_STYLES`, in `lib/head.php`, and a
+page's own is the third argument of its `seo_head()` call. Both are read on the request, so a bump
+is one edit in one file — the page it appears on is wherever that file is used. This used to be a
+template pasted into every page at birth and sixteen copies to keep in step; it is not any more.
+
+**Scripts.** The tags live in `tools/templates/scripts.html`, and **`propagate_shared.py` does not
+carry it out to the pages.** It handles the header, footer, dock and hero circuit only;
+`scripts.html` is read by `assemble_page.py` when a page is *created*, and after that each page
+holds its own copy. So a script bump still means editing the template **and** every page, and
 `check_shared_markup.py` pins the expected `main.js` URL so a page left behind fails rather than
 merely behaving oddly for people who have been here before.
+
+`check_cache_bust.py` reads all three places — `HEAD_STYLES`, each `seo_head()` call, and the
+pages' own script tags — so neither kind can change behind an unchanged URL without it saying so.
 
 ### What being wrong looks like
 

@@ -23,6 +23,7 @@ Changing a shape means changing three things together — the model, the form an
 {
   "cv_form_url": "https://forms.gle/…",
   "updated": "2026-08-23T02:10:00+00:00",
+  "meta": { … },
   "jobs": [ { … } ]
 }
 ```
@@ -31,6 +32,7 @@ Changing a shape means changing three things together — the model, the form an
 |---|---|---|
 | `cv_form_url` | string | one link for the whole page, for speculative applications |
 | `updated` | string | ISO 8601, written on save. Bookkeeping — nothing renders it |
+| `meta` | object | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document). This document **gained** one: the careers page's title and description were literal strings in the page file, and the only two on the site nobody could change |
 | `jobs` | array | job posts, **in display order** |
 
 ### A job
@@ -65,7 +67,7 @@ structured data from these.
 {
   "updated": "…",
   "footer_synced": "…",
-  "meta":    { "title": "…", "description": "…", "share_title": "…" },
+  "meta":    { … },
   "hero":    { "title": "…", "subtitle": "…" },
   "form":    { "title": "…", "lead": "…", "subject_hint": "…", "note": "…",
                "service_types": [] },
@@ -79,7 +81,7 @@ structured data from these.
 |---|---|
 | `updated` | ISO 8601, written on save. Bookkeeping |
 | `footer_synced` | the fingerprint of the contact details as last pushed into the pages' footers. Drives the drift banner — [shared-markup.md](../10-development/frontend/shared-markup.md) |
-| `meta` | `<title>`, meta description, Open Graph title |
+| `meta` | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document) |
 | `hero` | the page's heading and subheading |
 | `form` | the enquiry form's copy, and `service_types` — the subject options offered |
 | `reach` | direct contact methods. `status` switches the whole band off |
@@ -132,7 +134,7 @@ numbers had two of them reachable on the page and invisible to a search engine.
 {
   "updated":  "…",
   "revision": 0,
-  "meta":        { "title": "…", "description": "…", "share_title": "…" },
+  "meta":        { … },
   "hero":        { "title": "…", "subtitle": "…" },
   "story":       { "status": "shown", "items": [] },
   "specialties": { "status": "shown", "title": "…", "interval": 10000, "items": [] },
@@ -144,7 +146,7 @@ numbers had two of them reachable on the page and invisible to a search engine.
 | Field | |
 |---|---|
 | `updated` · `revision` | bookkeeping — see *Rules that apply to both* |
-| `meta` | `<title>`, meta description, Open Graph title |
+| `meta` | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document) |
 | `hero` | the page's heading and subheading. No `status`: a page with no title is not a page with a section switched off |
 | `story` | the image-and-prose sections. `status` switches the whole run of them off |
 | `specialties` | the slideshow. `interval` is milliseconds, clamped 2000–60000 |
@@ -229,7 +231,7 @@ worth a look at the other.
 {
   "updated":  "…",
   "revision": 0,
-  "meta":         { "title": "…", "description": "…", "share_title": "…" },
+  "meta":         { … },
   "hero":         { "title": "…", "accent": "…", "cta_label": "…", "cta_href": "…" },
   "badges":       { "status": "shown", "items": [] },
   "tags":         { "status": "shown", "items": [] },
@@ -246,7 +248,7 @@ worth a look at the other.
 | Field | |
 |---|---|
 | `updated` · `revision` | bookkeeping — see *Rules that apply to both* |
-| `meta` | `<title>`, meta description, Open Graph and Twitter titles |
+| `meta` | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document) |
 | `hero` | the page's only `<h1>`, the phrase drawn in the accent colour, and one button. No `status`: a front page with no heading is not a page with a section switched off |
 | `badges` · `tags` | `{ id, icon, label, status }` — the pills under the heading |
 | `terminal` | the decorative SOC console. `summary` is the one line a screen reader is given instead of it |
@@ -288,7 +290,7 @@ a constant in code — so a service cannot be its own document and has to be a r
 {
   "updated":  "…",
   "revision": 0,
-  "meta":     { "title": "…", "description": "…", "share_title": "…" },
+  "meta":     { … },
   "hero":     { "title": "…", "subtitle": "…" },
   "nav":      { "status": "shown", "eyebrow": "…", "title": "…", "lead": "…", "items": [] },
   "blocks":   { "status": "shown", "items": [] },
@@ -316,7 +318,7 @@ A `services` row is **one whole page**:
 {
   "id": "…", "slug": "…", "name": "…", "status": "shown",
   "schema_type": "…", "schema_description": "…",
-  "meta":   { "title": "…", "description": "…", "share_title": "…" },
+  "meta":   { … },
   "hero":   { "title": "…", "subtitle": "…" },
   "core":   { "status": "shown", "eyebrow": "…", "title": "…", "lead": "…",
               "note": { "text": "…", "link_label": "…", "link_href": "…" },
@@ -371,6 +373,219 @@ is switched off.
 
 **There are no pictures on any of these pages, and no rich text anywhere in the document.**
 
+## `content/certifications.json`
+
+The resource certifications page: role groups, the roles each covers, and the certifications the
+people in those roles hold. **A list inside a list** — the only document shaped that way.
+
+```json
+{
+  "updated":  "…",
+  "revision": 0,
+  "meta":     { … },
+  "hero":     { "title": "…", "subtitle": "…" },
+  "certs":    { "status": "shown", "eyebrow": "…", "title": "…", "lead": "…", "items": [] },
+  "cta":      { "status": "shown", "title": "…", "text": "…", "items": [] }
+}
+```
+
+### A role group
+
+```json
+{
+  "id":     "security-analyst",
+  "slug":   "security-analyst",
+  "icon":   "shield-halved",
+  "blurb":  "…",
+  "status": "shown",
+  "open":   true,
+  "roles":  [ { "id": "…", "name": "Security Analyst", "status": "shown" } ],
+  "items":  [ { "id": "…", "name": "CompTIA Security+",  "status": "shown" } ]
+}
+```
+
+`slug` is the anchor the group's `<details>` carries, so `#security-analyst` links to it. It is
+minted from the **first role name** — a group has no title of its own, it *is* its roles — and then
+frozen, because a link into the page is a promise. A group still carrying the placeholder id it was
+created with is the one exception: that was never a real address.
+
+`open` is the group that starts expanded. More than one may be, and none has to be.
+
+### Three things are NOT in the file
+
+- **the count on a group heading** — *"27 certifications"* is however many are **shown** in it;
+- **a certification's icon** — all of them carry `certificate`, so it is a constant in the renderer;
+- **the `/` between role names** — markup, emitted between them, and hidden from a screen reader so
+  two roles are not read as a fraction.
+
+### The totals in the prose are not in the file either
+
+The lead and the search description may hold `{certifications}`, `{groups}` and `{roles}`, and the
+renderer replaces each with the live figure as it draws. Every one has a `-word` form as well —
+`{groups-word}` is *"four"* — because the page writes one of its numbers as a numeral and the other
+as a word, and a token that could only produce digits would have reworded the page the first time
+it rendered.
+
+A typed number is wrong the moment somebody adds a certification, and nothing on the page or in any
+check would notice: it is a true sentence that has quietly stopped being true. Counting and
+substitution live in `lib/contract.php` rather than in either renderer, so the editor's preview and
+the published page cannot disagree about what a token means.
+
+## `content/branding.json`
+
+The branding & advertisement page: the logo files people download, and the terms covering their
+use. Edited at `/?s=branding`.
+
+```
+meta    { … }
+hero    { title, subtitle }
+assets  { status, eyebrow, title, lead, items[] }
+legal   { status, title, items[] }
+cta     { status, title, text, items[] }
+```
+
+One `assets.items[]` row is a logo variant:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | minted from the title |
+| `title` `text` | string | the card's heading and its one line of description |
+| `alt` | string | read instead of the preview picture |
+| `plate` | string | `light`, `dark` or `neutral` — the background behind the preview |
+| `status` | string | `shown` or hidden |
+| `image` | picture | the preview drawn on the card |
+| `files[]` | list | what a visitor can download |
+
+And one `files[]` row:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | minted from the label, or the format when there is none |
+| `label` | string | the adjective in the meta line — *"Transparent PNG"* |
+| `filename` | string | the `download=` attribute: what the visitor's computer calls it. No separators; `branding_safe_filename()` empties anything with one |
+| `status` | string | `shown` or hidden |
+| `file` | picture | the file itself, which may be a vector |
+
+`legal.items[]` rows are `{ id, text, status }` and `text` is **rich text** — the only rich text on
+the page, because it is a legal notice and the sentence asking a rights holder to get in touch is a
+link waiting to happen. It goes through `rt_sanitise_html()` on save and again on receipt.
+
+### The preview and the download are two different pictures
+
+`image` is the small thing on the card; `files[].file` is what somebody came for. On the page as it
+ships those are an 800px preview and a 1600px download of the same mark. Collapsing them would
+either serve the big file to everyone who merely looks at the page, or hand out the small one to
+everyone who came for the logo.
+
+A download may be an **SVG**; a preview may not. The page *links* to a vector file and never draws
+one — see [0019](../90-decisions/0019-uploaded-images-travel-their-own-channel.md) and `lib/svg.php`.
+A download is also allowed up to `UPLOAD_MAX_DOWNLOAD_DIMENSION` (3000px) rather than the 1600px
+every displayed picture is reduced to, because it is the deliverable rather than decoration.
+
+### Three things are not in the file
+
+- **the size in a meta line** — *"1600 × 570"* is read off the file's own record, so it cannot claim
+  a size the file no longer has. Only the adjective beside it is stored, because *"Transparent"* is
+  editorial;
+- **the words on a download button** — *"Download PNG"* states the file's own format;
+- **the glyph on it** — every button carries `arrow-down`, so it is a constant in the renderer.
+
+### The breadcrumb is its own field
+
+The page is titled *"Branding Assets & Guidelines"* and called *"Branding & Advertisement"*
+everywhere it is linked from. The about, company and certifications pages let their breadcrumb
+follow `hero.title` because on those three the two strings are the same; here they differ, so a
+breadcrumb that followed the hero would quietly rename the page in every search result that shows a
+trail.
+
+## `content/privacy.json`
+
+The privacy policy: twelve headed sections, a summary callout, a retention table and an address
+block. The last page on the site to stop being hand-written. Edited at `/?s=privacy`.
+
+```
+meta    { … }
+hero    { title, subtitle }
+policy  { label, effective, callout{…}, sections[] }
+cta     { status, title, text, items[] }
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `policy.label` | string | the visually-hidden `<h2>` that names the region for a screen reader, bound to it by `aria-labelledby` |
+| `policy.effective` | string | the whole line at the top — *"Effective 21 August 2026"*. The wording is authored: *"Effective"* and *"Last updated"* do not mean the same thing |
+
+One `policy.sections[]` row is a headed part of the policy:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | **the anchor**, minted from the heading and then frozen for good |
+| `heading` | string | the `<h2>` |
+| `status` | `shown` \| `hidden` | |
+| `blocks[]` | list | in the order they render |
+
+One `blocks[]` row is one shape, and `kind` decides which:
+
+| `kind` | Carries | Renders |
+|---|---|---|
+| `paragraph` | `text` | `<p>` |
+| `note` | `text` | `<p class="legal__notice">` |
+| `address` | `text` | `<address class="legal__address">` |
+| `subheading` | `text` *(plain)* | `<h3 class="legal__subheading">` |
+| `list` | `rows[]` of `{ id, text, status }` | `<ul class="legal__list">` |
+| `table` | `caption`, `columns[2]`, `rows[]` of `{ id, label, value, status }` | `.legal__table-wrap > table` |
+
+`policy.callout` is `{ status, title, items[], note }` — the *"short version"* box, whose `items[]`
+are `{ id, text, status }`.
+
+### Structure is a kind, not markup
+
+`rt_sanitise_html()` allows nine tags — `p br strong em u ul ol li a` — and no heading, no
+`<address>` and no `<table>` among them. A person typing `<h3>` into a rich field would watch it
+disappear on save with no way to tell that from a bug. So every block declares what it **is**, and
+the renderer owns the markup for that kind. A seventh shape costs a row in `PRIVACY_BLOCK_KINDS`
+and an arm in `privacy_block_defaults()`.
+
+A block is also **narrowed** to the fields its kind uses. A block that was a `list` and is now a
+`paragraph` does not keep its `rows[]` — invisible on the page, carried in the document and
+published every time.
+
+### Every rich field here is inline-only
+
+`paragraph`, `note`, `address`, a list row and a callout point all go through
+`rt_sanitise_inline()`, not `rt_sanitise_html()`. Each renders *inside* an element the renderer
+supplies, so a `<p>` arriving from the editor is not emphasis somebody added — it is a paragraph
+inside a paragraph, and pressing Enter in a textarea is how it would arrive.
+
+### An anchor is a promise
+
+A section's `id` is the fragment somebody links to. Ids are assigned by `contract_identify_rows()`,
+which claims every id already chosen **before** minting anything new — because the obvious one-pass
+version lets a section added above an existing one with the same heading take that section's
+fragment and silently rename the incumbent. Nine of the twelve shipped ids are hand-authored
+(`who-we-are`, not `who-is-responsible-for-your-data`) and there is nothing to recover them from.
+
+### The effective date is never stamped
+
+`updated` records when the document was last published. `policy.effective` is a claim about when the
+**policy** changed, and fixing a typo is not a new policy — so nothing writes it but a person.
+
+### The policy band cannot be hidden
+
+`PRIVACY_BANDS` holds only `cta`. Hiding the policy would leave a page headed *"Privacy Policy"*
+with no policy on it, still linked from the footer of all sixteen pages and still in the sitemap.
+The callout, any section, any block and any row can each be hidden.
+
+### What it repeats from the contact page is compared, never enforced
+
+The policy states the offices, the email and the telephone; so does `content/contact.json`. They are
+kept separately on purpose — a controller's details are a legal statement, and one that changed
+because somebody edited another page would be a statement nobody made. `privacy_shared_facts()`
+asks by containment whether the policy still states the current values, on a form with `&nbsp;` and
+whitespace collapsed, commas dropped and case folded, so it reports a different street and stays
+quiet about a different comma. The editor draws it as a standing notice and **never refuses a
+save**.
+
 ## Which pictures get a light/dark pair, and which do not
 
 Asked and settled on 2026-08-31. Every managed picture on the site, and why it is or is not a pair:
@@ -403,6 +618,105 @@ picture. Full-bleed is also simply how they look best.
 The rule, stated once: **a picture gets a second slot when the page has to supply its background.
 It does not when the picture is its own background, or when a fixed plate is a guarantee rather
 than a default.**
+
+## The `meta` band, on every document
+
+Every document has one, including `content/careers.json`, which never used to — its title and
+description were literal strings in the page file and were the only two on the site nobody could
+change.
+
+```json
+"meta": {
+  "title":       "About Tech4TIME | Trusted IT & Cybersecurity Solutions",
+  "description": "Founded in 2018, Tech4TIME delivers …",
+  "share_title": "About Tech4TIME",
+  "keywords":    "about Tech4TIME, IT company Bangladesh, cybersecurity company Dhaka",
+  "breadcrumb":  "About Us",
+  "robots":      "index",
+  "changefreq":  "monthly",
+  "priority":    "0.8",
+  "share":       { "src": "", "webp": "", "width": 0, "height": 0 },
+  "share_alt":   ""
+}
+```
+
+| Field | |
+|---|---|
+| `title` | the browser tab and the search result's heading. At most `SEO_TITLE_MAX` (65) characters |
+| `description` | the search result's paragraph. `SEO_DESC_MIN`–`SEO_DESC_MAX` (50–165); 150–160 is the ideal the editor hints at and nothing refuses |
+| `keywords` | a comma-separated list, tidied on save: empties and case-insensitive repeats dropped, one space after each comma. **Omitted from the page entirely when empty.** Google has ignored the tag since 2009 and Bing treats a stuffed one as spam — a handful of true words is worth more than a long list |
+| `share_title` | the heading on a shared link. Usually the title without the brand suffix |
+| `breadcrumb` | the page's name in the BreadcrumbList. **Pure SEO** — there is no visible breadcrumb anywhere on the site |
+| `robots` | `index` or `noindex`. **Also decides the sitemap**: one control, not two, so the two cannot contradict each other |
+| `changefreq`, `priority` | the sitemap's hints for this page |
+| `share` | a per-page share card. Empty means the site-wide one in `content/seo.json`, which is what every page uses today |
+| `share_alt` | its alt text |
+
+**A service row carries the same band**, so a seventh service arrives with sensible defaults and a
+sitemap entry without anyone opening a second screen.
+
+**Only `title`, `description`, `share_title` and `breadcrumb` are in `*_TEXT_FIELDS`.** The rest are
+enumerated or structured, and are validated against their allowed values rather than trimmed as
+free text.
+
+### The band is edited on one screen, and by nothing else
+
+`?s=seo&page=<key>` writes it. The nine page editors do not: they render a link to that screen where
+the fieldset used to be, and their `*_from_post()` loops iterate `contract_page_bands()`, which is
+`*_TEXT_FIELDS` **minus** `meta`.
+
+That subtraction is load-bearing. A form that stops *rendering* a field while its band is still
+named in the loop reads `$_POST['meta']['title']` as absent, `?? ''` supplies an empty string, and
+the page's title is blanked on every save — silently, because empty is a valid title.
+`tech4time-website-backend/tools/test_seo_admin.py` saves each page editor untouched and requires
+every meta value to survive. [ADR 0020](../90-decisions/0020-page-metadata-is-content.md)
+
+---
+
+## `content/seo.json`
+
+The site-wide half: what is true of the whole site rather than of one page, plus the 404's own
+record, because that page renders no content document and never will.
+
+```json
+{
+  "updated":  "…",
+  "revision": 0,
+  "site":     { "name": "…", "lang": "en", "locale": "en_US", "og_type": "website",
+                "twitter_card": "summary_large_image", "theme_light": "#…",
+                "theme_dark": "#…", "share": {}, "share_alt": "…" },
+  "identity": { "legal_name": "…", "alternate_name": "…", "slogan": "…",
+                "description": "…", "founded": "…", "price_range": "…",
+                "area_served": "…", "logo": {}, "service_types": [],
+                "knows_about": [] },
+  "sameas":   { "items": [] },
+  "hours":    { "items": [] },
+  "crawl":    { "robots_extra": [], "verify_google": "", "verify_bing": "" },
+  "manifest": { "name": "…", "short_name": "…", "description": "…",
+                "background": "#…", "theme": "#…", "display": "standalone" },
+  "notfound": { "title": "…", "description": "…", "robots": "noindex" }
+}
+```
+
+| Band | | Edited at |
+|---|---|---|
+| `site` | the defaults every page inherits: `<html lang>`, `og:locale`, `og:type`, the card shape, the theme colours, the share card | `?s=seo&site=identity` |
+| `identity` | the Organization node — legal name, slogan, founding year, the services it offers, what it knows about | `?s=seo&site=identity` |
+| `sameas` | the profiles that are this company elsewhere. Rows, so they add, reorder and **hide** | `?s=seo&site=identity` |
+| `hours` | opening hours as machine-readable rows — `days[]`, `opens`, `closes`. The office rows in `content/contact.json` carry hours as prose, which a search engine cannot read | `?s=seo&site=identity` |
+| `crawl` | extra `Disallow` paths, the Search Console and Bing verification tokens, and **`analytics_id`** — a Google measurement id. Empty means no analytics and no external origin; anything that is not the shape Google issues is refused rather than escaped, because it lands inside a `<script src>`. [ADR 0021](../90-decisions/0021-analytics-is-off-until-somebody-turns-it-on.md) | `?s=seo&site=crawl` |
+| `manifest` | what `manifest.php` renders at `/site.webmanifest`. The **icon list is not here** — it names files that must exist | `?s=seo&site=crawl` |
+| `notfound` | the 404's title, description and crawl directive. It has no canonical and no `og:url`, by design | `?s=seo&page=notfound` |
+
+**The offices are not here.** The addresses and telephone numbers in the Organization graph come
+from `content/contact.json`, through `contact_addresses()` and `contact_points()` — the same
+functions the contact page renders from, so the graph and the visible page cannot disagree.
+
+**`seo_defaults()` carries the real values, not placeholders.** A host with no `content/seo.json`
+still emits the correct graph and share card, exactly as `contact_defaults()` already does for its
+page.
+
+---
 
 ## Rules that apply to both
 

@@ -80,7 +80,7 @@ PAGES = [
     "/pages/resource-certifications/",
     "/pages/privacy-policy/",
     "/pages/contact/",
-    "/404.html",
+    "/404.php",
 ]
 
 MEASURE = r"""
@@ -239,7 +239,7 @@ class Browser:
 
 
 def prove_reduced_motion(b: Browser, origin: str) -> None:
-    b.go(origin + "/404.html")
+    b.go(origin + "/404.php")
     state = b.js(REDUCED_MOTION)
     if not state["media"] or state["scroll"] != "auto":
         raise SystemExit(
