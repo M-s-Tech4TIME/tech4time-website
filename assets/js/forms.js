@@ -180,6 +180,63 @@
      Submission
      ---------------------------------------------------------------------- */
 
+  /* WHERE THE FORM POSTS, AND HOW IT IS EMPTIED AFTERWARDS — read off the
+     prototype, never off the form.
+
+     HTMLFormElement is declared [LegacyOverrideBuiltIns] in the HTML
+     specification, so a control's name wins over the interface's own property
+     of that name. A form holding <input name="action"> answers form.action
+     with that input rather than a URL, and fetch() then posts to
+     /[object%20HTMLInputElement]; one named "method" breaks the verb; one
+     named "reset" makes form.reset() a TypeError and the form is never
+     cleared. This form already shadows form.name with its own name field, and
+     the three properties below are three field names away from the same fate.
+
+     It is not hypothetical: it is what took every button on the admin's
+     careers screen down, silently, for ten days — the comment above the same
+     fix in the backend's admin-forms.js tells that half of the story.
+     tools/check_form_dom.py holds the rule in both repositories, and
+     docs/90-decisions/0022-form-properties-are-read-off-the-prototype.md
+     records why.
+
+     Each getter carries the whole of the specification's behaviour already —
+     the action attribute resolved against the document's base URL, the
+     document's own URL when there is no attribute, and "get" or "post"
+     normalised — so there is nothing here to reimplement or to keep in step. */
+  var FORM = global.HTMLFormElement ? global.HTMLFormElement.prototype : null;
+
+  function own(name) {
+    var d = FORM && Object.getOwnPropertyDescriptor
+      ? Object.getOwnPropertyDescriptor(FORM, name)
+      : null;
+    return d && typeof d.get === "function" ? d.get : null;
+  }
+
+  var FORM_ACTION = own("action");
+  var FORM_METHOD = own("method");
+
+  function postUrl(form) {
+    if (FORM_ACTION) {
+      return FORM_ACTION.call(form) || global.location.href;
+    }
+
+    var attr = form.getAttribute("action");
+    return attr && typeof global.URL === "function"
+      ? new global.URL(attr, document.baseURI).href
+      : global.location.href;
+  }
+
+  function postVerb(form) {
+    var verb = FORM_METHOD ? FORM_METHOD.call(form) : form.getAttribute("method");
+    return verb ? String(verb).toUpperCase() : "POST";
+  }
+
+  function empty(form) {
+    if (FORM && typeof FORM.reset === "function") {
+      FORM.reset.call(form);
+    }
+  }
+
   function submit(form) {
     var button = form.querySelector('[type="submit"]');
     var original = button ? button.innerHTML : "";
@@ -190,8 +247,8 @@
     }
     setStatus(form, "", false);
 
-    fetch(form.action, {
-      method: form.method || "POST",
+    fetch(postUrl(form), {
+      method: postVerb(form),
       body: new FormData(form),
       headers: { Accept: "application/json" },
     })
@@ -210,7 +267,7 @@
           });
       })
       .then(function (data) {
-        form.reset();
+        empty(form);
         setStatus(
           form,
           data.message || "Thank you — your message has been sent.",

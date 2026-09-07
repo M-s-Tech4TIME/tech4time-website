@@ -985,7 +985,7 @@ $data = company_load();
 <script src="/assets/js/theme-toggle.js" defer></script>
 <script src="/assets/js/nav.js" defer></script>
 <script src="/assets/js/animations.js" defer></script>
-<script src="/assets/js/forms.js" defer></script>
+<script src="/assets/js/forms.js?v=2" defer></script>
 <script src="/assets/js/dashboard.js" defer></script>
 <script src="/assets/js/tech-sphere.js" defer></script>
 <script src="/assets/js/slider.js" defer></script>

@@ -25,6 +25,7 @@ python3 tools/build_deploy_set.py --check   # nothing secret or local is bound f
 python3 tools/check_shared_lib.py
 python3 tools/check_shared_facts.py    # the offices, email and phone the policy repeats from the contact page
 python3 tools/check_shared_repos.py      # the three files both halves hold identically
+python3 tools/check_form_dom.py        # no script reads a property a form's own control hides
 ```
 
 > **Half the suite is in the other repository.** The editor's round trips, the sign-in and the

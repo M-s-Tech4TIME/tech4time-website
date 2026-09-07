@@ -52,6 +52,14 @@ OPTIONAL_BLOCKS = {"hero-circuit"}
 # Feature modules a page may legitimately omit: forms.js when it carries no
 # form, dashboard.js when it has no tabbed panels, tech-sphere.js when it has no
 # logo sphere. Their absence is not drift.
+#
+# PATHS, WITHOUT THE VERSION QUERY. circuit.js was listed here as
+# "/assets/js/circuit.js?v=2" and had to be re-edited every time the file
+# changed -- a tool that has to be maintained in step with a cache bust is a
+# tool that will one day be forgotten, and its only symptom would be sixteen
+# pages accused of carrying a shared script they do not have. The comparison
+# strips the query instead, and the agreement BETWEEN pages is asserted
+# separately, further down, where it belongs.
 OPTIONAL_SCRIPTS = {
     "/assets/js/forms.js",
     "/assets/js/dashboard.js",
@@ -62,7 +70,7 @@ OPTIONAL_SCRIPTS = {
     # The hero mesh is the home page's alone.
     "/assets/js/neural.js",
     # The charges in the title band; the two pages without a band omit it.
-    "/assets/js/circuit.js?v=2",
+    "/assets/js/circuit.js",
 }
 
 ARIA_CURRENT = re.compile(r'\s*aria-current="page"')
@@ -121,6 +129,8 @@ def main() -> None:
         canonical[name] = normalise(path.read_text())
 
     problems = []
+    # Which URL each optional script is served from, and on which pages.
+    optional_versions: dict[str, dict[str, list[str]]] = {}
     print(f"Checking shared markup across {len(files)} page(s)\n")
 
     for path in files:
@@ -139,8 +149,22 @@ def main() -> None:
                 issues.append(f"{name} differs from template" + first_difference(found, canonical[name]))
 
         # Scripts: check the set and order of the non-optional ones.
+        #
+        # An optional script is recognised by its PATH, not by its whole URL. It
+        # carries a version query the moment its file changes -- forms.js became
+        # forms.js?v=2 the day the contact form stopped reading form.action -- and
+        # matching the literal would then treat it as a missing shared script on
+        # every page that has one. The bump is the correct action; a check that
+        # punishes it is the one that is wrong. What the version has to agree
+        # with is the OTHER pages, and that is asserted below.
         srcs = re.findall(r'<script src="(/assets/js/[^"]+)"[^>]*></script>', html)
-        required = [s for s in srcs if s not in OPTIONAL_SCRIPTS]
+        required = [s for s in srcs if s.split("?")[0] not in OPTIONAL_SCRIPTS]
+
+        for src in srcs:
+            stem = src.split("?")[0]
+            if stem in OPTIONAL_SCRIPTS:
+                optional_versions.setdefault(stem, {}).setdefault(src, []).append(str(rel))
+
         expected = [
             # theme-init.js is NOT here any more. It moved into lib/head.php
             # with the rest of the <head>, so it is no longer a literal in any
@@ -165,6 +189,22 @@ def main() -> None:
         print(f"  {rel}  — {'OK' if not issues else str(len(issues)) + ' issue(s)'}")
         for issue in issues:
             problems.append(f"{rel}: {issue}")
+
+    # AND THEY AGREE WITH EACH OTHER. An optional script is edited in one file
+    # and pointed at from up to sixteen, so a sed that missed one leaves those
+    # visitors on last year's copy with this year's markup -- the same failure
+    # check_cache_bust.py catches for a script nobody bumped at all, in the one
+    # shape it cannot see, because the URL did change on the pages it looked at.
+    for stem, seen in sorted(optional_versions.items()):
+        if len(seen) > 1:
+            detail = "; ".join(
+                f"{url} on {len(pages)} page(s), e.g. {sorted(pages)[0]}"
+                for url, pages in sorted(seen.items())
+            )
+            problems.append(
+                f"{stem}: served from {len(seen)} different URLs — {detail}. "
+                f"One file, one version query, every page that carries it."
+            )
 
     # The head is emitted rather than pasted now, so the one script that lives
     # in it is checked in the file that emits it. This is the whole of what

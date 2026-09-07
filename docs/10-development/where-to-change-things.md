@@ -85,6 +85,7 @@ publish overwrites it. [publish-api.md](server-side/publish-api.md)
 | The technology sphere | `assets/js/tech-sphere.js` |
 | Counting figures, client logos | `assets/js/animations.js` |
 | Contact form validation (convenience only) | `assets/js/forms.js` |
+| **Where** the contact form posts, and how it clears | its `action` attribute. Never `form.action`, `form.method` or `form.reset()` in script — a control of that name replaces each. [ADR 0022](../90-decisions/0022-form-properties-are-read-off-the-prototype.md) |
 | Module wiring | `assets/js/main.js` |
 
 Every module registers on `window.Tech4Time` and must degrade — the page has to work with scripting

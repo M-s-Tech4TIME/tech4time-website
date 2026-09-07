@@ -770,7 +770,7 @@ if (str_contains($_SERVER['REQUEST_URI'] ?? '', 'detail.php')) {
 <script src="/assets/js/theme-toggle.js" defer></script>
 <script src="/assets/js/nav.js" defer></script>
 <script src="/assets/js/animations.js" defer></script>
-<script src="/assets/js/forms.js" defer></script>
+<script src="/assets/js/forms.js?v=2" defer></script>
 <script src="/assets/js/dashboard.js" defer></script>
 <script src="/assets/js/tech-sphere.js" defer></script>
 <!-- Versioned for the same reason the stylesheets are, and with a sharper
