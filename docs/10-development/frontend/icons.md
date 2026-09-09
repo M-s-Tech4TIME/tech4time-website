@@ -75,6 +75,41 @@ dead weight.
 
 ---
 
+## Icons chosen at run time
+
+`inject_icons.py` can only see a name written into a page as a literal `<use href="#…">`. An icon
+that comes out of a content document is chosen after the page was written, so the scan never finds
+it and the symbol is never inlined — the page draws an empty square.
+
+Two libraries answer this by building a **second sprite** as they render, holding exactly the
+symbols that page will actually draw: `services_sprite()` in `lib/services.php` and
+`certifications_sprite()` in `lib/certifications.php`. Its markers are `content-sprite:start` /
+`content-sprite:end` and **not** `icon-sprite:…`, deliberately — a second pair of those would make
+`inject_icons.py`'s non-greedy match end in the wrong place.
+
+Two `<symbol>` elements may share an id, and several do. The first definition wins, the markup is
+identical either way, and `tools/audit_pages.py` exempts symbol ids from its duplicate-id check for
+exactly this reason. It also audits **rendered** output, so "every `<use>` resolves to an inlined
+`<symbol>`" is proved on the text a visitor actually receives, whichever sprite supplied it.
+
+The alternative — naming every icon the model offers in a comment the scan can see — is what the
+about, contact and company pages do, and it is right where the list is short. It was measured
+against seventy-six for the services model and cost **+7 to +10 KB gzipped per page**, so the rule
+of thumb is: a handful, name them; a model's worth, build the sprite.
+
+### The allow-lists
+
+Which icons a document may offer is part of the model, in `lib/contract.php`:
+`CONTACT_ICONS`, `COMPANY_ICONS`, `ABOUT_ICONS`, `HOME_ICONS`, `SERVICES_ICONS`, and
+`CHROME_BAR_ICONS` with the fixed marks beside it (`CHROME_CONTACT_ICONS`, `CHROME_SOCIAL_ICONS`).
+They are in the shared contract because the backend offers the choice and the frontend has to be
+able to draw whatever was chosen.
+
+`python3 tools/check_content_model.py` asserts every name in all of them is in the master sprite,
+and — run in the backend, where the editor lives — that it is in `ADMIN_ICONS` too.
+
+---
+
 ## Icons in the admin
 
 The admin's pages are PHP, so their icon block is generated at request time by `admin_icons()` in
