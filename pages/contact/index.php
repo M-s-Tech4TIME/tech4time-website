@@ -2,10 +2,11 @@
 /**
  * Tech4TIME — contact page.
  *
- * PHP rather than a static file for the same reason the careers page is: what
- * it says changes without a redeploy. Addresses, phone numbers, opening hours
- * and the copy around them live in content/contact.json and are edited through
- * /admin/; this renders them.
+ * Renders from a document, as every page here does. It was among the first to,
+ * for the reason that later applied to all of them: what it says changes
+ * without a redeploy. Addresses, phone numbers, opening hours and the copy
+ * around them live in content/contact.json and are edited at
+ * admin.tech4time.bd; this renders them.
  *
  * Rendered on the SERVER, not fetched in the browser. A contact page whose
  * addresses arrive by JavaScript is one a search engine indexes unreliably,

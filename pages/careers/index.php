@@ -2,9 +2,11 @@
 /**
  * Tech4TIME — careers page.
  *
- * The one page on this site that is not a static file, because it is the one
- * page whose content changes on its own schedule. Job posts live in
- * content/careers.json and are edited through /admin/; this renders them.
+ * The first page here to stop being a static file, because it was the first
+ * whose content changed on its own schedule. Every page renders from a
+ * document now -- 404.php was the last to convert -- so this is ordinary
+ * rather than the exception it was. Job posts live in content/careers.json and
+ * are edited at admin.tech4time.bd; this renders them.
  *
  * Rendered on the SERVER, not fetched in the browser. A careers page whose
  * listings arrive by JavaScript is one that search engines index unreliably,

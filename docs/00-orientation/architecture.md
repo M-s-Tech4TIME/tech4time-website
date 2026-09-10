@@ -71,22 +71,32 @@ stores share is `publish.key`, which is what the dotted arrow is signed with.
 
 ## Serving a page
 
-### A dynamic page — fifteen of the sixteen
+### A page — and all sixteen are this
 
 ```
 GET /pages/careers/
   → .htaccess adds security headers, resolves the extensionless URL
   → pages/careers/index.php
+      require lib/head.php       the <head>, from content/seo.json
+      require lib/body.php       the header, footer and dock, from content/chrome.json
       require lib/careers.php    the shape of the data, and its defaults
       require lib/store.php      read content/careers.json from disk
       require lib/html.php       escape everything on the way out
   → HTML, fully rendered, in one request
 ```
 
-One filesystem read and one page of output. The page contains its own inlined icon symbols, links
-the CSS it needs, and defers all its JavaScript to the end of `<body>`. Nothing is fetched from
-another origin, and nothing is fetched from the backend — the words came out of a JSON file on this
-disk instead of being typed into the HTML.
+**Eleven documents are read, not one.** The page's own, `content/seo.json` for the head, and
+`content/chrome.json` for the header, footer and dock — then every other route's document, because
+a chrome link with no label of its own draws *whatever that page calls itself*, and what a page
+calls itself is its own `meta.breadcrumb`. `content/services.json` is read for the footer's
+services column on top of that. It is the price of a nav that cannot go stale, and it is small:
+a whole cold render is **about 10 ms including PHP's own startup**, of which the chrome is a
+fraction of a millisecond once its documents are in the page cache.
+
+One page of output, either way. The page contains its own inlined icon symbols, links the CSS it
+needs, and defers all its JavaScript to the end of `<body>`. Nothing is fetched from another
+origin, and nothing is fetched from the backend — the words came out of JSON files on this disk
+instead of being typed into the HTML.
 
 **Every page works this way.** `privacy-policy` was the last body to convert; `404.html` was the
 last file, and became `404.php` when the `<head>` stopped being pasted into each page. There is no

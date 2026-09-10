@@ -2,8 +2,8 @@
 /**
  * Tech4TIME — company profile page.
  *
- * PHP rather than a static file for the same reason the careers and contact
- * pages are: what it says changes without a redeploy. The milestones, the
+ * Renders from a document, as every page here does: what it says changes
+ * without a redeploy. The milestones, the
  * client roster, the technology list, the principles and the copy around them
  * live in content/company.json and are edited through the admin at
  * admin.tech4time.bd; this renders them.

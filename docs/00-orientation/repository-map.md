@@ -108,18 +108,25 @@ Never reachable over HTTP: `.htaccess` has `RewriteRule ^lib/ - [F,L]`.
 
 | File | Owns |
 |---|---|
-| `html.php` | escaping, and the rich-text sanitiser |
-| `store.php` | reading and writing a JSON file atomically, with a lock |
+| `html.php` | **shared** — escaping, and the rich-text sanitiser |
 | `contract.php` | **shared** — the shape of every editable document, and `CONTRACT_VERSION` |
 | `publish.php` | **shared** — how a document is signed, and how a signature is checked |
-| `careers.php` | what this side does with a job post: the JobPosting schema |
-| `contact.php` | what this side does with the contact page: the ContactPage schema |
+| `svg.php` | **shared** — the SVG sanitiser, which is a security boundary |
+| `store.php` | reading and writing a JSON file atomically, with a lock |
+| `head.php` | every page's `<head>`, from `content/seo.json` |
+| `body.php` | every page's header, footer and dock, from `content/chrome.json` |
+| `chrome.php` | what those three are made of: destinations, derived columns, the current page |
+| `seo.php` | titles, descriptions, the structured data, the sitemap's membership |
+| `sprite.php` | the run-time icon sprite, for symbols chosen by a document rather than typed |
+| `services.php` | the index and all seven detail pages, from one document |
+| `about.php` `home.php` `company.php` `careers.php` `contact.php` | one page's shape and its schema, one file each |
+| `certifications.php` `branding.php` `privacy.php` | likewise |
 | `private.php` | where the secrets are, and the keys derived from them |
 | `throttle.php` | counting attempts, so guessing costs something |
 
-**Shared** means byte-identical with `tech4time-website-backend`. `tools/check_shared_lib.py` compares all
-three against a committed digest; the real guarantee is `CONTRACT_VERSION`, checked at run time by
-`api/publish.php` against what it was actually sent.
+**Shared** means byte-identical with `tech4time-website-backend`. `tools/check_shared_lib.py`
+compares those four and `assets/icons/sprite.svg` against a committed digest; the real guarantee is
+`CONTRACT_VERSION`, checked at run time by `api/publish.php` against what it was actually sent.
 
 There is no `auth.php`, `admin.php`, `totp.php`, `reset.php` or `mailer.php` here. They went with
 the editor. [0017](../90-decisions/0017-two-private-stores.md)
@@ -132,12 +139,21 @@ Detail on each: [libraries.md](../10-development/server-side/libraries.md).
 
 ```
 content/
-├── careers.json     job posts and the CV form link
-└── contact.json     offices, phone numbers, the enquiry form's copy
+├── about.json           the about page
+├── branding.json        the branding & advertisement page
+├── careers.json         job posts and the CV form link
+├── certifications.json  the resource certifications page
+├── chrome.json          the header, footer and dock every page carries
+├── company.json         the company profile page
+├── contact.json         offices, phone numbers, the enquiry form's copy
+├── home.json            the home page
+├── privacy.json         the privacy policy
+├── seo.json             every page's <head>, the sitemap, robots and the manifest
+└── services.json        the services index and all seven detail pages
 ```
 
 **This is a replica, and `api/publish.php` is the only thing that writes it.** The system of record
-is the backend's copy of these two files; this one is what it was last sent.
+is the backend's copy of these eleven files; this one is what it was last sent.
 
 So a deploy that overwrote it would destroy live job posts, and so would editing it by hand — the
 difference being that the hand edit survives until the next save in the admin and then vanishes,

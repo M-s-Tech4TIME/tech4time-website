@@ -100,8 +100,8 @@ damage is recovered from. `tools/test_store.py` covers both.
 **Shared — byte-identical in `tech4time-website-frontend` and `tech4time-website-backend`.**
 
 `CONTRACT_VERSION` · `CONTRACT_DOCUMENTS` · `CONTRACT_BOOKKEEPING` · `contract_path()` ·
-`careers_normalise()` · `contact_normalise()` · `contact_defaults()` · `contact_fingerprint()` ·
-`contract_sanitise()` · `contract_next_revision()` · …
+`careers_normalise()` · `contact_normalise()` · `contact_defaults()` · `chrome_defaults()` ·
+`chrome_normalise()` · `chrome_targets()` · `contract_sanitise()` · `contract_next_revision()` · …
 
 `contract_path()` gives a document's record path — `content/<name>.json`, the same rule on both
 hosts. It exists for the things that have to work over *all* the documents without knowing their

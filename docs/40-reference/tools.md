@@ -129,7 +129,7 @@ The two halves and the one route between them — [the publish API](../10-develo
 | Script | Does |
 |---|---|
 | `make_publish_key.py` | Create the key both halves sign content with. Run **once**, then copy the printed value into the other half's private store by hand |
-| `check_shared_lib.py` | Assert the three shared files against a committed digest. `--update` re-records after a deliberate change |
+| `check_shared_lib.py` | Assert the four shared PHP files and the icon sprite against a committed digest. `--update` re-records after a deliberate change |
 
 `make_publish_key.py` is deliberately not automatic. Every other secret here creates itself on first
 use; this one must not, because a key that appears by itself appears **differently** on each host and

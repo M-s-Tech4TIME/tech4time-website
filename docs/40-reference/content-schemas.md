@@ -2,13 +2,16 @@
 
 **Applies to:** both
 
-The **six** JSON files the dynamic pages render from, field by field. Twelve of the sixteen pages,
-because `content/services.json` carries seven of them.
+The **eleven** JSON files the dynamic pages render from, field by field — `CONTRACT_DOCUMENTS` is
+the list. Nine of them are a page or a set of pages, and `content/services.json` carries seven on
+its own; the last two are on **every** page, `seo` for the `<head>` and `chrome` for the header,
+footer and dock.
 
 **The defaults functions are the definition of the shape**, not these files — `careers_defaults()`,
-`contact_defaults()`, `company_defaults()`, `about_defaults()`, `home_defaults()` and
-`services_defaults()`, all in **`lib/contract.php`**, which the two repositories hold
-byte-identical. (They lived in `lib/careers.php` and `lib/contact.php` until the repository split;
+`contact_defaults()`, `company_defaults()`, `about_defaults()`, `home_defaults()`,
+`services_defaults()`, `certifications_defaults()`, `branding_defaults()`, `privacy_defaults()`,
+`seo_defaults()` and `chrome_defaults()`, all in **`lib/contract.php`**, which the two repositories
+hold byte-identical. (They lived in `lib/careers.php` and `lib/contact.php` until the repository split;
 the prose here said so for some time after it stopped being true.) A JSON file is one instance of a
 shape, and an optional field that happens to be absent from it is still a field.
 
