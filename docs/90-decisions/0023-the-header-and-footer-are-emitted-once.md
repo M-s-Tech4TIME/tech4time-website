@@ -87,7 +87,10 @@ the symbol sets compared as sets. Seventeen pages differed by exactly four thing
    row's own lines by `<br>`, one rule for all four kinds. The old markup put a `<br>` between
    address rows and none between hours rows, an artefact of `sync_site_contact.py` having been
    written a section at a time; `.contact-item__label` is `display:block` and carries
-   `margin-block-start` for exactly this, which `assets/css/layout.css` says beside the rule;
+   `margin-block-start` for exactly this, which `assets/css/layout.css` says beside the rule.
+   **Put to the owner and kept** — the alternative was a per-kind separator in the emitter, which
+   is what let the four blocks drift apart in the first place. Should the gap ever read too tight,
+   the token in `layout.css` is the place, not a `<br>` for one kind;
 4. the `<!--dock:start-->` and `<!--dock:end-->` marker comments are gone, with the tool that read
    them.
 
