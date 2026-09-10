@@ -178,11 +178,18 @@ now how any change to either is verified:
 
 ```bash
 rsync -a --delete --itemize-changes --dry-run SRC/ DST/ > plan.txt   # no filters
-grep -E '^\*deleting[[:space:]]+(content/|\.well-known/|cgi-bin/|error_log)' plan.txt
+grep -E '^\*deleting[[:space:]]+(content/|\.well-known/|cgi-bin/|([^[:space:]]*/)?error_log)' plan.txt
 ```
 
 If that prints nothing, the gate is broken. A gate that has never been seen to fail has not been
 tested.
+
+**`error_log` matches at any depth on purpose.** PHP writes its log beside the script that raised
+the error, so a rule anchored to the root protected one file and let every other one be deleted.
+Both halves were wrong until 2026-09-10; the backend's log lives at `public/error_log` and was
+being removed by every deploy. The fix was proved the way this section asks for — the pattern run
+against a plan carrying `error_log` at three depths, and the filter against a real
+`rsync --delete` into a tree holding them.
 
 ### Secrets
 

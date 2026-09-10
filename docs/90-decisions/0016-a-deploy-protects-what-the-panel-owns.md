@@ -9,14 +9,22 @@ gate reads the dry run and fails the job if it proposes deleting anything on tha
 
 ```
 P /content/            live job posts and contact details
+P /uploads/            pictures the editor sent, which are not in the repository
 P /admin/.htaccess     cPanel writes it; ours must never replace it
 P /.well-known/        AutoSSL's ACME challenges
 P /cgi-bin/            created by cPanel
-P /error_log           written by the server
+P error_log            written by the server -- AT ANY DEPTH, see below
 P /.user.ini           MultiPHP INI Editor
 P /php.ini             MultiPHP INI Editor
 P /.htpasswd           Directory Privacy
 ```
+
+**`error_log` is the one rule with no leading slash, and that is deliberate.** A pattern
+containing no `/` is matched by rsync against the final component of a name at any depth, and PHP
+writes its log beside whichever script raised the error -- so the logs appear anywhere, not only at
+the root. Written `P /error_log` it protected exactly one of them and every deploy silently removed
+the rest, which is a diagnostic history destroyed at the very moment somebody would want to read
+it. Found in the 2026-09-10 deploy log.
 
 The filters prevent the deletions. **The gate is a separate check that they did**, and it is not
 redundant.
