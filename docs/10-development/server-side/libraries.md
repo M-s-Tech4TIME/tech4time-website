@@ -26,6 +26,7 @@ store they read from is outside the document root entirely.
 | [`branding.php`](#brandingphp) | the branding & advertisement page | `contract`, `store`, `html` |
 | [`privacy.php`](#privacyphp) | the privacy policy | `contract`, `store`, `html` |
 | [`seo.php`](#seophp) | the site-wide SEO record, and what is derived from it | `contract`, `store`, `html`, `contact` |
+| [`chrome.php`](#chromephp) | the header, footer and dock every page carries | `contract`, `store`, `html`, `services` |
 | [`head.php`](#headphp) *(frontend)* | the `<head>` every page emits, and its structured data | `seo` |
 | [`svg.php`](#svgphp) **shared** | what a publishable vector file is |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
@@ -511,6 +512,42 @@ The backend copy adds the two saves. `seo_edit()` writes `content/seo.json`; `se
 `seo_service_meta_edit()` write **one band of another document** under `store_edit()`'s lock,
 because the screen holds one band of a document whose other twenty were never in the form. A
 whole-document rebuild there would empty the page.
+
+### `chrome.php`
+
+`chrome_load()` · `chrome_header()` · `chrome_footer()` · `chrome_dock()`
+
+One document, `content/chrome.json`, holding the furniture around every page: the header's logo
+and nav, the footer's four columns, and the small-screen dock. It was literal markup in seventeen
+page files — about 6,800 lines of duplication kept in step by a propagation script — and the
+duplication had already produced three live defects: a footer service list that disagreed with
+`content/services.json`, a service that could never appear in the footer at all, and phone numbers
+that went stale because a script had to be run by hand before a deploy.
+
+**A link points at a route, never at a URL.** Every destination is a key of `chrome_targets()` in
+`contract.php` — `about`, `service:cybersecurity` — built from `SEO_ROUTES` and
+`content/services.json`. There is no way to type an address into a nav link, so a nav link cannot
+404, in the one component that appears on every page. An empty label means *whatever that page
+calls itself*, which is how renaming a page in `?s=seo` renames it in the header, the footer and
+the dock at once.
+
+**Two columns of the footer store nothing.** The services list is read from
+`content/services.json`, so a seventh service appears by itself and a hidden one goes; the social
+links are read from the SEO document's `sameas` rows, so a profile URL is changed in one place and
+the footer cannot disagree with the Organization graph.
+
+**The footer's contact rows deliberately are not.** They are the footer's own — added, worded,
+ordered, shown and hidden on the footer screen — and owe nothing to `content/contact.json`. The
+contact page holds every detail in full; a footer holds the part worth putting in a footer. What
+keeps the two honest is a notice the editor draws, never a refusal, for the reason the privacy
+policy's duplicated facts are reported rather than forbidden: requiring the two to agree before
+either could be saved means that after an office move, whichever page you edited first could not
+be saved.
+
+**A missing file is not an error.** `chrome_load()` fills from `chrome_defaults()`, which is the
+site's own header, footer and dock as they shipped, extracted from the markup rather than typed.
+A host that has never received a publish still renders a correct page — the failure that avoids is
+the whole site losing its navigation because one file did not arrive.
 
 ### `head.php`
 
