@@ -5,19 +5,20 @@
  * WHY THIS FILE EXISTS
  * Every page carried its own head: between 222 and 308 lines each, about 4,250
  * lines in all, and no propagation tool and no drift check over any of it.
- * tools/check_shared_markup.py holds the header, footer, dock and hero-circuit
+ * tools/check_shared_markup.py held the header, footer and dock
  * byte-identical; the head was never in that set, and the template it came
  * from -- tools/templates/head.html, deleted with this file's arrival -- was
- * read exactly once per page, at birth, by tools/assemble_page.py.
+ * read exactly once per page, at birth, by tools/assemble_page.py. (The other
+ * three went the same way afterwards, into lib/body.php. ADR 0023.)
  *
  * It drifted, exactly as that arrangement guarantees. The Organization graph
  * carried three office addresses and four telephone numbers as literal JSON in
  * sixteen of the seventeen heads -- the contact page alone rendered them from
  * content/contact.json -- so editing an office in the admin left sixteen pages
- * advertising the old one, and tools/sync_site_contact.py was written to paste
- * the new values back in before a deploy. That whole mechanism is gone from
- * the head now: the graph is built here, on the request, from the document
- * that owns the facts.
+ * advertising the old one, and a build script -- tools/sync_site_contact.py,
+ * since deleted -- was written to paste the new values back in before a
+ * deploy. That whole mechanism is gone: the graph is built here, on the
+ * request, from the document that owns the facts.
  *
  * WHAT A PAGE PASSES, AND WHY IT IS NOT A KEY
  * A page hands its OWN ADDRESS and its OWN meta band:

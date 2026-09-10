@@ -1,18 +1,30 @@
 #!/usr/bin/env python3
 """
-Verify the shared header/footer/scripts markup has not drifted between pages.
+Verify the markup still pasted into every page has not drifted between them.
 
 Build/audit tool. NOT deployed to the web server (see tools/README.md).
 Run from the repo root:  python3 tools/check_shared_markup.py
 
-The project forbids runtime fetch()-based partials, so the header, footer and
-script tags are pasted into all sixteen pages. That is the right call for
-reliability, but it means the same markup exists in sixteen places and is free
-to drift. This script is the safeguard: it asserts every page still matches the
-canonical copies in tools/templates/.
+MOST OF WHAT THIS FILE USED TO CHECK NO LONGER EXISTS TO CHECK. The header,
+footer and dock were literal markup in seventeen pages -- about 6,800 lines of
+duplication -- and this compared every copy against tools/templates/. They are
+lib/body.php now, rendering from content/chrome.json, and there is one copy.
+Nothing can drift from itself, so those three blocks and their templates are
+gone from here and from the repository. ADR 0023.
 
-The single permitted per-page difference is the aria-current="page" marker on
-the active nav link, which is normalised away before comparison.
+WHAT IS LEFT IS WHAT IS STILL PASTED:
+
+  the hero circuit   decoration around a page title, with no content in it and
+                     nothing editable about it, so it stayed literal
+  the script tags    a page loads the modules it needs, which differ page to
+                     page -- but the shared ones must be the same set, in the
+                     same order, at the same version
+  lib/body.php       the one copy, asserted to still carry the hooks the
+                     scripts bind to. See the end of this file for why that is
+                     worth a check of its own
+
+The single permitted per-page difference in a pasted block is the
+aria-current="page" marker, which is normalised away before comparison.
 """
 
 import re
@@ -24,21 +36,6 @@ TEMPLATES = ROOT / "tools" / "templates"
 
 # name -> (template file, regex capturing that block in a page)
 BLOCKS = {
-    "header": (
-        "header.html",
-        re.compile(r'<a class="skip-link".*?</header>', re.S),
-    ),
-    # The small-screen navigation. Delimited by comments rather than by its
-    # tags: it contains a <nav> and ends in nested </div>s, so there is no
-    # closing tag unique enough to match on safely.
-    "dock": (
-        "dock.html",
-        re.compile(r"<!--dock:start-->.*?<!--dock:end-->", re.S),
-    ),
-    "footer": (
-        "footer.html",
-        re.compile(r'<footer class="site-footer">.*?</footer>', re.S),
-    ),
     # Only on pages with a title band, which the home page and the 404 do not
     # have. Absence is not drift; a copy that differs is.
     "hero-circuit": (
@@ -72,6 +69,18 @@ OPTIONAL_SCRIPTS = {
     # The charges in the title band; the two pages without a band omit it.
     "/assets/js/circuit.js",
 }
+
+# The hooks the scripts bind to in the header, footer and dock. Attribute
+# names, not whole tags: what matters is that the hook is still emitted, not
+# where in the line it sits.
+BODY_HOOKS = [
+    "data-theme-toggle",    # theme-toggle.js — the sun/moon button
+    "data-dock",            # nav.js — the dock itself
+    "data-nav-drawer",      # nav.js — the panel it opens
+    "data-nav-toggle",      # nav.js — the button that opens it
+    "data-back-to-top",     # main.js — the footer key
+    "data-current-year",    # main.js — refreshCopyrightYear()
+]
 
 ARIA_CURRENT = re.compile(r'\s*aria-current="page"')
 WHITESPACE = re.compile(r"\s+")
@@ -218,6 +227,32 @@ def main() -> None:
                         "flashes the wrong theme before first paint")
     else:
         print("  lib/head.php  — emits theme-init.js for all 17")
+
+    # And the same question asked of the file that replaced the other 6,800
+    # lines. lib/body.php emits the header, footer and dock, and every browser
+    # behaviour in them is bound by a data- attribute: the theme toggle, the
+    # dock panel and its button, back-to-top, and the copyright year a tab left
+    # open across midnight corrects itself with.
+    #
+    # NOTHING ELSE HERE WOULD NOTICE ONE GOING MISSING. audit_pages.py reads
+    # rendered output and would still find one <header>, one <footer> and every
+    # link resolving; the page would be valid, and the feature would be gone.
+    # The suites that WOULD notice -- test_nav.py, test_theme.py -- need
+    # Firefox and geckodriver, so they are not in the run before a commit.
+    body = ROOT / "lib" / "body.php"
+    if not body.is_file():
+        problems.append("lib/body.php: missing, so no page has a header, "
+                        "footer or dock at all")
+    else:
+        text = body.read_text()
+        absent = [hook for hook in BODY_HOOKS if hook not in text]
+        if absent:
+            problems.append(
+                f"lib/body.php: does not emit {', '.join(absent)} — the markup "
+                f"still renders and the behaviour behind it silently does not")
+        else:
+            print(f"  lib/body.php  — emits all {len(BODY_HOOKS)} script hooks "
+                  f"the chrome carries")
 
     if problems:
         print(f"\n{len(problems)} drift issue(s):\n")

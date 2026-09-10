@@ -66,13 +66,14 @@ because `.htaccess` resolves it. The homepage is the exception: it stays at the 
 **The seven services pages are one document, not seven.** `content/services.json` holds the index
 *and* every detail page under it, because a seventh service has to be addable from the editor and
 `CONTRACT_DOCUMENTS` is a constant in code — so a service is a row in a list rather than a document
-of its own. `lib/services.php` draws all seven; each page file carries only its own head and the
-shared chrome.
+of its own. `lib/services.php` draws all seven; each page file carries only its own `<main>`.
 
-**Every page carries its own copy of the header and footer**, because runtime `fetch()` partials are
-forbidden. `tools/templates/` holds the canonical copies and `check_shared_markup.py` proves no page
-has drifted. Never hand-edit a header in one page — see
-[shared-markup.md](../10-development/frontend/shared-markup.md).
+**No page carries a header or a footer.** Runtime `fetch()` partials are forbidden, so those used to
+be copied into every page; they are emitted by `lib/body.php` from `content/chrome.json` on the
+request now, which is a complete document either way. What is still copied is the hero circuit and
+the script tags — `tools/templates/` holds those and `check_shared_markup.py` proves no page has
+drifted. [shared-markup.md](../10-development/frontend/shared-markup.md) ·
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 ---
 
@@ -115,7 +116,6 @@ Never reachable over HTTP: `.htaccess` has `RewriteRule ^lib/ - [F,L]`.
 | `contact.php` | what this side does with the contact page: the ContactPage schema |
 | `private.php` | where the secrets are, and the keys derived from them |
 | `throttle.php` | counting attempts, so guessing costs something |
-| `footer-fingerprint.php` | **generated** — what this site's footers currently say |
 
 **Shared** means byte-identical with `tech4time-website-backend`. `tools/check_shared_lib.py` compares all
 three against a committed digest; the real guarantee is `CONTRACT_VERSION`, checked at run time by

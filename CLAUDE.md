@@ -39,8 +39,11 @@ its record before acting.
    byte-identical** with `tech4time-website-backend`. Change one and you change both, in the
    same breath.
 9. **`tools/` is never deployed.**
-10. **Never edit a header or footer in a page file.** Edit `tools/templates/`, then
-    `python3 tools/propagate_shared.py`.
+10. **Never edit a header, footer or dock in a page file.** There is nothing there to edit: they
+    are `content/chrome.json`, emitted by `lib/body.php`. Their words will be edited at
+    `https://admin.tech4time.bd/?s=chrome` — **that screen is not built yet**, so until it is, a
+    change to the chrome is a change to `chrome_defaults()` in `lib/contract.php` and a deploy.
+    [ADR 0023](docs/90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 ---
 
@@ -52,6 +55,7 @@ its record before acting.
 | `pages/services/detail.php` | not a page: it serves any service the editor added that has no directory |
 | `sitemap.php` `robots.php` `manifest.php` | generated, and served at `/sitemap.xml`, `/robots.txt` and `/site.webmanifest` — those addresses must not change |
 | `lib/head.php` | every page's `<head>`, emitted once. Not shared markup: there is nothing to propagate |
+| `lib/body.php` | every page's header, footer and dock, likewise — from `content/chrome.json` |
 | `assets/` | css, js, fonts, icons, images — all self-hosted |
 | `lib/` | server-side PHP: rendering, the contract, the publish format |
 | `api/publish.php` | where the backend's content arrives. The only thing here that writes |
@@ -76,7 +80,8 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | A colour | `assets/css/theme.css` — tokens only, never a hex elsewhere |
 | Layout, components | `assets/css/layout.css`, `components.css` |
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
-| Header / footer | `tools/templates/` → `propagate_shared.py` |
+| Header / footer / dock | **`https://admin.tech4time.bd/?s=chrome`** if it is words or links; `lib/body.php` if it is markup. Never a page file |
+| The hero circuit around a page title | `tools/templates/hero-circuit.html` → `propagate_shared.py` |
 | Anything in a page's `<head>` | `lib/head.php` if it is code, **`https://admin.tech4time.bd/?s=seo`** if it is words. Never a page file |
 | A title, description, keywords, share card, crawl setting, the sitemap, `robots.txt`, the manifest | **`https://admin.tech4time.bd/?s=seo`** |
 | Whether Google Analytics runs, and against which property | **`https://admin.tech4time.bd/?s=seo&site=crawl`** — a field, not a deploy |
@@ -140,6 +145,11 @@ five shared ones, the `seo_head()` call for a page's own. A **script** is still 
 Touched `api/publish.php`, `lib/contract.php` or `lib/publish.php`? Also `test_publish.py` **and
 `test_publish_asset.py`** — the second endpoint is easy to forget, and CI runs it — **and
 `check_shared_lib.py --update`, and copy the changed file to the backend.**
+
+Touched `lib/body.php`, `lib/chrome.php` or `content/chrome.json`? Also **`audit_pages.py`** —
+it reads rendered output and is the only check that sees the header, footer and dock a visitor
+actually receives — and `check_shared_markup.py`, which asserts the emitter still carries the six
+`data-` hooks the scripts bind to.
 
 Touched `lib/head.php`, `lib/seo.php`, `sitemap.php`, `robots.php` or `manifest.php`? Also
 **`python3 tools/test_sitemap.py`** and `audit_pages.py`. All three of those files are served at an

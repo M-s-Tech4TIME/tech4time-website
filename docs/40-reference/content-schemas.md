@@ -66,7 +66,6 @@ structured data from these.
 ```json
 {
   "updated": "…",
-  "footer_synced": "…",
   "meta":    { … },
   "hero":    { "title": "…", "subtitle": "…" },
   "form":    { "title": "…", "lead": "…", "subject_hint": "…", "note": "…",
@@ -80,7 +79,6 @@ structured data from these.
 | Field | |
 |---|---|
 | `updated` | ISO 8601, written on save. Bookkeeping |
-| `footer_synced` | the fingerprint of the contact details as last pushed into the pages' footers. Drives the drift banner — [shared-markup.md](../10-development/frontend/shared-markup.md) |
 | `meta` | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document) |
 | `hero` | the page's heading and subheading |
 | `form` | the enquiry form's copy, and `service_types` — the subject options offered |
@@ -183,9 +181,10 @@ put the old mark beside the new one, which is the one outcome nobody wants from 
 logo". A new light logo may read poorly on a dark background; the previous brand does not read
 poorly, it is wrong. The editor says so and offers the second slot.
 
-**This is the logo in that section and nowhere else.** The header, the footer, the browser tab,
-the social share card and `Organization.logo` in the structured data are shared markup and build
-artefacts, not content, and still need a developer and a deploy.
+**This is the logo in that section and nowhere else.** The header's and the footer's are fields of
+`content/chrome.json`, edited on the **Header & Footer** screen; the browser tab, the social share
+card and `Organization.logo` in the structured data are build artefacts, not content, and still need
+a developer and a deploy.
 
 A picture record is kept rather than cleared on a row whose layout is not `logo`, so switching back
 does not lose it — which is also why `about_images()` counts both halves when the unused-upload
@@ -720,9 +719,15 @@ page.
 
 ## `content/chrome.json`
 
-The furniture around every page: the header, the footer and the small-screen dock. It was literal
-markup in seventeen page files until 2026-09-10 — about 6,800 lines of duplication kept in step by
-`propagate_shared.py`.
+The furniture around every page: the header, the footer and the small-screen dock. Rendered by
+`lib/body.php` on the request. It was literal markup in seventeen page files until 2026-09-10 —
+about 6,800 lines of duplication kept in step by `propagate_shared.py` —
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
+
+> **The screen is not built yet.** `content/chrome.json` already renders every page's header,
+> footer and dock, and it is what the site shipped with. The editor that will change them —
+> `?s=chrome`, referred to throughout this page — is the next piece of work, and until it exists
+> a change to the chrome is a change to `chrome_defaults()` in `lib/contract.php` and a deploy.
 
 ```json
 {
@@ -837,8 +842,8 @@ so alignment is a class from a fixed list.
 
 **Everything is escaped on output** with `h()`, regardless of having been sanitised on the way in.
 
-**Bookkeeping fields** — `updated`, `footer_synced` — are exempt from the content-model check in
-both directions. Nothing renders them and the form does not write them.
+**Bookkeeping fields** — `updated`, `revision` — are exempt from the content-model check in both
+directions. Nothing renders them and the form does not write them.
 
 **Ids are generated, not typed.** `careers_slug()` and `contact_slug()` make them.
 

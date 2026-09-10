@@ -16,7 +16,7 @@ Fast, no browser needed. Run all seven.
 ```bash
 python3 tools/check_contrast.py        # WCAG AA in both colour modes
 python3 tools/inject_icons.py --check  # every page's inlined icon block is current
-python3 tools/check_shared_markup.py   # no page's header or footer has drifted
+python3 tools/check_shared_markup.py   # no page's copied markup has drifted
 python3 tools/check_content_model.py   # model, form and renderer still agree
 python3 tools/check_secrets.py         # nothing secret committed; no protection removed
 python3 tools/check_docs.py            # the docs still describe the code
@@ -78,7 +78,7 @@ python3 tools/check_focus.py           # tab every page: the ring is visible and
 |---|---|
 | `check_contrast.py` | every text/background pair in `theme.css` meets WCAG AA, in both modes, including the 3:1 bar for component boundaries |
 | `inject_icons.py --check` | each page inlines exactly the icon symbols it references — no missing symbol, no dead weight |
-| `check_shared_markup.py` | every page's header, footer and script block is byte-identical to `tools/templates/` |
+| `check_shared_markup.py` | every page's hero circuit and script block is byte-identical to `tools/templates/`, and `lib/head.php` and `lib/body.php` still emit the script hooks whose absence nothing else would notice |
 | `check_content_model.py` | the model, the editor form and the page renderer describe the same fields — **in both directions**, so a field dropped from the page but left in the form is caught; and that every editor in `ADMIN_PAGE_SECTIONS` is checked either here or by a named test that exists |
 | `check_secrets.py` | no secret is committed; the private store still refuses the web root; no auth bypass constant has returned; cookie flags intact; no password reachable by the audit log; every admin page shape noindexed |
 | `check_docs.py` | every tool, library and admin section is documented; no doc cites a path that does not exist; no internal link is broken; no doc quotes a constant that has changed |
@@ -92,7 +92,7 @@ These start a real PHP server on a spare port and drive it over HTTP.
 
 | Script | Proves |
 |---|---|
-| `test_publish.py` | `api/publish.php` driven over real HTTP with real signatures: the happy path, then **every way past it that does not involve holding the key** — no signature, another key's signature, a tampered body, an old timestamp, a replay, a lower revision, a different `contract_version`, and a `<script>` from a sender that signed correctly. Also that **every field the model declares reaches the visitor**, by sending a marker through each one and reading it back off the public page. And that **a service added in the editor becomes a page**: an address with no file behind it, its own head, a line in the sitemap, a link from the index, and a 404 when it is hidden or removed. For the privacy policy it also checks that each of the **six block kinds** is drawn as the kind it is — a subheading as an `<h3>`, a table with scoped headers, a note as the tinted paragraph — that the blocks stay **flat** children of `.legal__body` so `:first-of-type` still matches, and that a fragment link into the page keeps its `href` |
+| `test_publish.py` | `api/publish.php` driven over real HTTP with real signatures: the happy path, then **every way past it that does not involve holding the key** — no signature, another key's signature, a tampered body, an old timestamp, a replay, a lower revision, a different `contract_version`, and a `<script>` from a sender that signed correctly. Also that **every field the model declares reaches the visitor**, by sending a marker through each one and reading it back off the public page. And that **a chrome document published from the editor reaches every page** — a marker in the nav, the footer's headings, its contact rows, the copyright and the dock comes back out of an ordinary page, a hidden nav row does not, the services column is read from `content/services.json`, and the brand link on the home page carries no `aria-current`. And that **a service added in the editor becomes a page**: an address with no file behind it, its own head, a line in the sitemap, a link from the index, and a 404 when it is hidden or removed. For the privacy policy it also checks that each of the **six block kinds** is drawn as the kind it is — a subheading as an `<h3>`, a table with scoped headers, a note as the tinted paragraph — that the blocks stay **flat** children of `.legal__body` so `:first-of-type` still matches, and that a fragment link into the page keeps its `href` |
 | `test_sitemap.py` | `sitemap.php`, `robots.php` and `manifest.php` — the three files served at an address that looks static and is not. That each answers with the right `Content-Type`; that the sitemap is well-formed XML listing **exactly** the indexable routes, so a page set to `noindex` and a hidden service both leave it; that `lastmod` is a real publish stamp or absent rather than today's date; that `robots.txt` cannot lose its `Allow: /` or its `Sitemap:` line, and never names the editor's address; and that the manifest is valid JSON |
 | `test_contact_handler.py` | method check, honeypot, every validation rule, CR/LF injection into each field, the assembled message, non-ASCII round trips, the rate limit, and the no-JavaScript HTML response |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
@@ -132,8 +132,10 @@ so a machine without a browser can still run everything else.
 
 ## Reading a failure
 
-**`check_shared_markup.py` fails** — someone edited a header or footer in a page instead of in
-`tools/templates/`. Fix the template, then `python3 tools/propagate_shared.py`.
+**`check_shared_markup.py` fails** — someone edited the hero circuit in a page instead of in
+`tools/templates/`. Fix the template, then `python3 tools/propagate_shared.py`. If it names
+`lib/body.php` instead, a `data-` hook has been dropped from the emitter and a browser behaviour has
+silently gone with it; the message says which one.
 
 **`check_content_model.py` fails** — you changed a content shape in one of the three places it
 lives. The message names the field and which layer is missing it.

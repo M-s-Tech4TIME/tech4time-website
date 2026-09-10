@@ -27,9 +27,10 @@
  *
  * THE ADDRESSES AND TELEPHONE NUMBERS IN THE GRAPH COME FROM THE CONTACT
  * DOCUMENT, not from here. They were pasted literally into seventeen heads and
- * went stale on sixteen of them the first time an office moved;
- * tools/sync_site_contact.py was written to paper over exactly that. They are
- * read at render time now, from the one document that owns them.
+ * went stale on sixteen of them the first time an office moved, and a build
+ * script -- tools/sync_site_contact.py, since deleted -- was written to paper
+ * over exactly that. They are read at render time now, from the one document
+ * that owns them.
  */
 
 declare(strict_types=1);
@@ -71,6 +72,18 @@ function seo_site(): array
 function seo_identity(): array
 {
     return seo_load()['identity'];
+}
+
+/**
+ * The profiles the Organization says are also it.
+ *
+ * Read by the graph, and by the footer -- chrome_social() in lib/chrome.php
+ * derives the social links from these rows rather than storing a second copy,
+ * so a URL is changed in one place and the two cannot disagree.
+ */
+function seo_sameas(): array
+{
+    return seo_load()['sameas'];
 }
 
 /** What robots.txt is told, and what connects this site to somebody's console. */

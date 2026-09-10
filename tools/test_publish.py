@@ -246,9 +246,8 @@ def run(base: str, key: bytes, r: Results) -> None:
             f"{status} {answer}")
     r.check("and the answer says which revision now stands",
             answer.get("revision") == 1, str(answer))
-    r.check("and reports what the site's footers say",
-            isinstance(answer.get("footer_synced"), str) and answer["footer_synced"] != "",
-            "footer_synced should carry lib/footer-fingerprint.php")
+    r.check("and names the document it landed",
+            answer.get("document") == "careers", str(answer))
 
     stored = json.loads(CAREERS.read_text())
     r.check("the replica on disk is what was sent",
@@ -1917,16 +1916,16 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
 def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
     """The header, footer and dock travel the same road.
 
-    THIS DOCUMENT IS NOT A PAGE EITHER, and unlike the SEO record it is not
-    rendered by anything yet: lib/body.php is the next commit. So what is
-    proved here is the contract half — that every band survives the endpoint,
-    that normalising happens on the receiving side and not only on the sending
-    one, and that the rules the shape depends on are enforced against a file
-    rather than against a form.
+    THIS DOCUMENT IS NOT A PAGE. It is on EVERY page, which makes the last
+    group below the important one: a marker published into this document has
+    to come back out of an ordinary page, or the whole conversion in ADR 0023
+    is unproved.
 
-    That last part is the reason to test it at this end at all. api/publish.php
+    Before that, the contract half — that every band survives the endpoint, and
+    that normalising happens on the RECEIVING side and not only on the sending
+    one. That is the reason to test it at this end at all: api/publish.php
     re-normalises what it was sent, so a document written by a compromised or
-    simply older backend still arrives in the shape the renderer assumes. A bar
+    simply older backend still arrives in the shape lib/body.php assumes. A bar
     with six keys, a contact row of an invented kind and a logo pointing at
     another origin are all things a signature would happily carry.
     """
@@ -2040,6 +2039,43 @@ def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("  the contact row is still 'phone-bangladesh'",
             stored["footer"]["contact"]["items"][0]["id"] == "phone-bangladesh",
             stored["footer"]["contact"]["items"][0]["id"])
+
+    # AND IT REACHES A PAGE. Everything above proves the document landed in the
+    # right shape; this proves lib/body.php renders THAT document rather than
+    # anything of its own. The about page is picked because it is an ordinary
+    # page with no relationship to the chrome — if the marker is in its header,
+    # its footer and its dock, it is in all seventeen.
+    print("  and a visitor sees it, on a page that knows nothing about it")
+    _, page = get(base, "/pages/about/")
+
+    for what, mark in [
+        ("the header's nav link", f"{MARK}-navhome"),
+        ("the footer's tagline", f"{MARK}-tagline"),
+        ("the footer's quick-links heading", f"{MARK}-linksheading"),
+        ("the footer's contact note", f"{MARK}-note"),
+        ("the copyright name", f"{MARK}-copyname"),
+        ("the dock panel's description", f"{MARK}-panel"),
+        ("a dock bar label", f"{MARK}-bar0"),
+        ("the menu button's label", f"{MARK}-menu"),
+    ]:
+        r.check(f"  {what}", mark in page, "not in the rendered page")
+
+    r.check("  a hidden nav row is absent from the page",
+            f"{MARK}-navhidden" not in page,
+            "a row marked hidden was rendered anyway")
+
+    # The services column stores nothing, so it must be reading the services
+    # document -- not the chrome one, and not a copy.
+    r.check("  the services column is read from content/services.json",
+            "/pages/services/cybersecurity/" in page and f"{MARK}-indexlabel" in page)
+
+    # The one per-page difference, and the defect this conversion fixed: the
+    # brand link must NOT be marked, on the one page where it used to be.
+    _, home = get(base, "/")
+    brand = re.search(r'<a class="site-header__brand"[^>]*>', home)
+    r.check("  and the brand link on the home page carries no aria-current",
+            brand is not None and "aria-current" not in brand.group(0),
+            brand.group(0) if brand else "no brand link found")
 
 
 def home_round_trip(base: str, key: bytes, r: Results) -> None:

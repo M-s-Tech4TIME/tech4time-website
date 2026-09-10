@@ -1,16 +1,14 @@
 # Shared markup templates
 
 **These files are not deployed.** They are the single source of truth for the
-markup that has to be byte-identical on every page: the site header, the site
-footer, the dock, the hero circuit, and the script tags.
+markup that has to be byte-identical on every page — which is now the hero
+circuit and the script tags, and nothing else.
 
-The project rules forbid runtime `fetch()`-based partials, so this markup is
-pasted directly into each page rather than included at runtime.
-
-That creates a real maintenance risk: sixteen copies of the same header, free to
-drift apart. `tools/check_shared_markup.py` closes it by asserting that every
-page in the site still contains these blocks verbatim. Run it after touching any
-page.
+The project rules forbid runtime `fetch()`-based partials, so markup that
+cannot be composed on the server is pasted directly into each page. That
+creates a real maintenance risk: seventeen copies, free to drift apart.
+`tools/check_shared_markup.py` closes it by asserting that every page still
+contains these blocks verbatim. Run it after touching any page.
 
 ## The `<head>` is not here any more
 
@@ -38,27 +36,52 @@ at `admin.tech4time.bd` on the SEO Management screen.
 [ADR 0020](../../docs/90-decisions/0020-page-metadata-is-content.md) ·
 [seo.md](../../docs/40-reference/seo.md)
 
+## And neither are the header, the footer or the dock
+
+`header.html`, `footer.html` and `dock.html` were here until 2026-09-10: 74,
+136 and 191 lines, copied into seventeen page files, about 6,800 lines of
+duplication. Nothing in them could be changed without a developer and a deploy —
+not a nav link, not the tagline, not a phone number, not the copyright name —
+and that arrangement had produced three live defects by the time it was
+replaced.
+
+They are one document now, `content/chrome.json`, emitted by `lib/body.php` on
+the request:
+
+```php
+<?php body_header('/pages/about/'); ?>
+<?php body_footer(); ?>
+<?php body_dock('/pages/about/'); ?>
+```
+
+Their words and links are edited at `admin.tech4time.bd` on the **Header &
+Footer** screen. `propagate_shared.py` and `check_shared_markup.py` lost most of
+what they did with them.
+[ADR 0023](../../docs/90-decisions/0023-the-header-and-footer-are-emitted-once.md) ·
+[shared-markup.md](../../docs/10-development/frontend/shared-markup.md)
+
 ## Files
 
 | File | Purpose |
 |---|---|
-| `header.html` | Skip link, sticky site header, nav drawer, theme toggle. Identical on every page except the `aria-current` marker. |
-| `footer.html` | Site footer, including contact details and the back-to-top control. Identical on every page. |
-| `dock.html` | The floating dock. Identical on every page. |
-| `hero-circuit.html` | The hero's circuit artwork. Identical on every page that has one. |
+| `hero-circuit.html` | The hero's circuit artwork. Identical on every page that has one. Decoration: aria-hidden, no text, sixty lines of path coordinates — nothing anybody should be offered a form for, which is why it did not become a document with the rest. |
 | `scripts.html` | Deferred script tags, in dependency order. Identical on every page. |
 
 ## Editing rules
 
 1. Change the template here first.
-2. `python3 tools/propagate_shared.py` — it carries the header, footer, dock and
-   hero circuit. It does **not** carry `scripts.html`, which is edited in every
-   page by hand.
+2. `python3 tools/propagate_shared.py` — it carries the hero circuit. It does
+   **not** carry `scripts.html`, which is edited in every page by hand.
 3. `python3 tools/check_shared_markup.py` to confirm nothing drifted.
 
 ## Nav structure
 
-The header carries the six routes the NextJS source defines. The three pages
-ported from the live site (Branding & Advertisement, Resource Certifications,
-Privacy Policy) and the four services sub-pages are reachable from the footer and
-from the services hub, so no page is orphaned while the header stays legible.
+The header carries six routes; the three pages ported from the live site
+(Branding & Advertisement, Resource Certifications, Privacy Policy) and the six
+services sub-pages are reachable from the footer and from the services hub, so
+no page is orphaned while the header stays legible.
+
+**That is what the document ships with, not what the site must have.** Those are
+rows of `content/chrome.json` now, and an operator can add, reorder or hide any
+of them. A row picks a destination from the site's own routes, so no nav link
+can point at an address that does not exist.

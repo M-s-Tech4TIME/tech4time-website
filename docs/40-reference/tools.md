@@ -27,7 +27,7 @@ browser tests speak to geckodriver over its wire protocol — there is no Seleni
 |---|---|
 | `check_contrast.py` | the palette meets WCAG 2.1 AA in both modes |
 | `check_css.py` | every stylesheet's comments and braces balance, and no shorthand (`outline`, `border`) is handed a bare colour token — which parses, computes to a colour and a width, and draws nothing, because the shorthand reset the style to `none` |
-| `check_shared_markup.py` | the header, footer and script blocks have not drifted between pages |
+| `check_shared_markup.py` | the hero circuit and the script blocks have not drifted between pages, and the two emitters still carry the script hooks whose absence nothing else would notice |
 | `check_content_model.py` | the editor, the data and the page still describe the same thing, and no editor is unchecked |
 | `check_secrets.py` | nothing protecting the admin has quietly stopped protecting it |
 | `check_docs.py` | the documentation still describes the code: undocumented tools, libraries and **assets**; dead links; cited paths that have gone; constants whose documented values drifted. The asset and tool checks run **both** ways — a stylesheet or script named in the prose but absent from disk fails too, unless some document says in full which repository it moved to |
@@ -87,11 +87,10 @@ that writes to it.
 
 | Script | Does |
 |---|---|
-| `assemble_page.py` | Assemble a page from the shared templates plus a per-page `<main>` block. **For creating a page, not maintaining one** |
-| `propagate_shared.py` | Push a change in `tools/templates/` out to every page |
+| `assemble_page.py` | Write a new page's skeleton — the requires, the `<head>` calls, the `<body>` calls — around a per-page `<main>` block. **For creating a page, not maintaining one** |
+| `propagate_shared.py` | Push a change in `tools/templates/` out to every page — the hero circuit, and nothing else since [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md) |
 | `inject_icons.py` | Inline each page's icon subset from the master sprite |
 | `apply_reveals.py` | Mark up the scroll-reveal targets on every page, from one structural rule |
-| `sync_site_contact.py` | Push the contact details out of `content/contact.json` into every page's footer, and record the fingerprint in `lib/footer-fingerprint.php` |
 | `htmltree.py` | *(a library)* a minimal HTML tree with source offsets, for tools that edit markup structurally |
 
 ---
@@ -187,7 +186,7 @@ could contain one. `check_secrets.py` asserts that on every run.
 
 | | |
 |---|---|
-| `tools/templates/` | the canonical header, footer, head and script markup |
+| `tools/templates/` | the canonical markup for what is still copied into pages: the hero circuit and the script tags |
 | `tools/masters/` | source artwork for the asset builders |
 | `tools/shots/` | screenshot output, gitignored |
 

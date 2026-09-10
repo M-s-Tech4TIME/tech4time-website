@@ -17,8 +17,6 @@
  *   {
  *     "updated":        set on every save
  *     "revision":       monotonic; see contract.php
- *     "footer_synced":  fingerprint of the details as last written into the
- *                       site-wide footer — see contact_fingerprint()
  *     "meta":    { title, description, share_title }
  *     "hero":    { title, subtitle }
  *     "form":    { title, lead, subject_hint, note, service_types[] }

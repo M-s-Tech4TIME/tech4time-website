@@ -43,6 +43,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/html.php';
+require_once __DIR__ . '/sprite.php';
 
 const CERTIFICATIONS_FILE = __DIR__ . '/../content/certifications.json';
 
@@ -104,52 +105,4 @@ function certifications_icons_used(array $data): array
         array_unique($names),
         static fn($n): bool => trim((string)$n) !== ''
     ));
-}
-
-/**
- * The inline sprite holding those symbols and no others.
- *
- * A SECOND sprite, sitting after the one tools/inject_icons.py maintains, and
- * the same arrangement lib/services.php uses for the same reason. That tool
- * owns the chrome -- header, dock, footer, theme toggle -- because those
- * symbols ARE in the page's source where it can see them. It cannot see an
- * icon a role group chose in the editor an hour ago, and no scan of the
- * markup ever could.
- *
- * Its markers are deliberately NOT icon-sprite:start/end. Those delimit the
- * block inject_icons.py rewrites, and a second pair would make its non-greedy
- * match end in the wrong place.
- *
- * A name with no symbol behind it is skipped rather than fatal: a sprite that
- * threw would take the whole page down over one bad row.
- */
-function certifications_sprite(array $names): string
-{
-    static $symbols = null;
-
-    if ($symbols === null) {
-        $symbols = [];
-        $svg = @file_get_contents(__DIR__ . '/../assets/icons/sprite.svg');
-        if ($svg !== false) {
-            preg_match_all('/<symbol id="([^"]+)".*?<\/symbol>/s', $svg, $m, PREG_SET_ORDER);
-            foreach ($m as $hit) {
-                $symbols[$hit[1]] = $hit[0];
-            }
-        }
-    }
-
-    /* Sprite order, not page order: the file is the canonical sequence, and a
-       block that reordered itself with the content would churn every diff. */
-    $body = '';
-    foreach ($symbols as $id => $markup) {
-        if (in_array($id, $names, true)) {
-            $body .= '  ' . $markup . "\n";
-        }
-    }
-
-    return "<!-- content-sprite:start -->\n"
-        . '<svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' . "\n"
-        . $body
-        . "</svg>\n"
-        . '<!-- content-sprite:end -->';
 }

@@ -80,9 +80,16 @@ One editable page in the admin — a row in `ADMIN_SECTIONS` plus a file in
 A value written to `t4t-private/setup-token.txt` that `tech4time-website-backend/public/setup.php` demands. Readable only with
 server access; destroyed the moment an account exists.
 
+### chrome
+The furniture around every page: the header, the footer and the small-screen dock. One document,
+`content/chrome.json`, emitted by `lib/body.php` on the request and edited on the **Header &
+Footer** screen. It was literal markup in seventeen page files until
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
+
 ### shared markup
-The head, header, footer, dock and script blocks that must be byte-identical on every page. Source
-of truth is `tools/templates/`; never edited in a page.
+Markup that must be byte-identical on every page because it is still *copied* into every page.
+Source of truth is `tools/templates/`; never edited in a page. Only the hero circuit and the script
+tags are left: the head became `lib/head.php` and the chrome became `lib/body.php`.
 
 ### sprite
 `assets/icons/sprite.svg`, the master icon set. Pages **inline** the symbols they use rather than
