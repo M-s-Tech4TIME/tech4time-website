@@ -144,6 +144,12 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+`contract_image_paths()` answers the other half of the same question: **every** file a picture record
+names, srcset entries included. A ladder keeps most of its files inside `srcset` and nowhere else —
+only the top rung is also the `src` — so a caller reading `src` and `webp` alone sees two of six.
+The seven `*_images()` collectors all ask it rather than each carrying its own walk, which is what
+makes adding a field to a picture record one edit instead of seven.
+
 
 `contract_sanitise()` runs every rich field back through `html.php`, driven off
 `CAREERS_RICH_FIELDS` / `CONTACT_RICH_FIELDS` rather than a list of its own — so a rich field added
