@@ -36,9 +36,13 @@ Clone it beside this one and run both servers to watch content actually travel �
 **Your secrets live outside the repository**, at `../t4t-private`, beside your clone — the same
 shape as `/home/USER/t4t-private` on the host, so nothing about the layout differs in development.
 
-**The header and footer are copied into every page**, not included at runtime. Edit
-`tools/templates/`, then propagate. Never hand-edit one page's header.
-[shared-markup.md](frontend/shared-markup.md)
+**The header, footer and dock are emitted, not copied.** `lib/body.php` renders them from
+`content/chrome.json` on the request, and every link, label and contact row in them is edited at
+`https://admin.tech4time.bd/?s=chrome`. Never hand-edit one in a page file — there is nothing there
+to edit. What *is* still copied into every page is the hero circuit and the script tags: for those,
+edit `tools/templates/`, then propagate.
+[shared-markup.md](frontend/shared-markup.md) ·
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 ---
 
@@ -60,7 +64,7 @@ shape as `/home/USER/t4t-private` on the host, so nothing about the layout diffe
 ```bash
 python3 tools/check_contrast.py        # WCAG AA, both modes
 python3 tools/inject_icons.py --check  # every page's icon block is current
-python3 tools/check_shared_markup.py   # no header/footer has drifted
+python3 tools/check_shared_markup.py   # no copied markup has drifted
 python3 tools/check_content_model.py   # model, form and renderer still agree
 python3 tools/check_secrets.py         # nothing secret committed, no protection removed
 python3 tools/check_docs.py            # the docs still describe the code

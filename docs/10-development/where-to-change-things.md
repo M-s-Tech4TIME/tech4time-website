@@ -7,8 +7,8 @@ one page in this documentation, make it this one.
 
 **The general rule:** if it is *content*, it is edited at **admin.tech4time.bd** and you should not
 touch a file — not here, and not on this server either. If it is *design or behaviour*, it is in
-`assets/`. If it is *structure*, it is in `pages/` or `tools/templates/`. If it is *rules*, it is in
-`lib/` or `.htaccess`.
+`assets/`. If it is *structure*, it is in `pages/` or `lib/`. If it is *rules*, it is in `lib/` or
+`.htaccess`.
 
 **This is the frontend.** The editor, the sign-in and everything they need live in
 **tech4time-website-backend**; this repository is the public site and its one inbound endpoint. Rows below
@@ -46,10 +46,12 @@ publish overwrites it. [publish-api.md](server-side/publish-api.md)
 *content-runbook.md* (in tech4time-website-backend) ·
 [content-schemas.md](../40-reference/content-schemas.md)
 
-> **The footer is the exception.** The contact details repeated in every page's footer are *markup*,
-> not content, so the editor cannot reach them. After changing them in the admin, run
-> `python3 tools/sync_site_contact.py` to push them out to all sixteen pages, then redeploy.
-> The admin shows a banner when the two have drifted.
+> **The footer's contact details are separate, deliberately.** They are the footer's own rows, on
+> the **Header & Footer** screen — `?s=chrome` — and not a copy of the contact page's. The contact
+> page holds everything in full; the footer holds the part worth putting in a footer, in whatever
+> order and wording suits it. A standing notice in the editor reports when the two differ, and never
+> blocks a save.
+> [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 ---
 
@@ -97,7 +99,8 @@ off. [javascript.md](frontend/javascript.md) · [motion.md](frontend/motion.md)
 
 | I want to change | Where |
 |---|---|
-| **The header or footer** | `tools/templates/`, then `python3 tools/propagate_shared.py` — **never one page** |
+| **The header, footer or dock** | **`https://admin.tech4time.bd/?s=chrome`** — every link, label, heading and contact row. The markup is `lib/body.php`; **never a page file** |
+| The hero circuit around a page title | `tools/templates/hero-circuit.html`, then `python3 tools/propagate_shared.py` — **never one page** |
 | A page's content | `pages/<name>/index.php` — its **words** are in the admin, above |
 | The homepage | `index.php`, at the repository root — likewise |
 | The 404 page | `404.php` — its markup here, its title and description in the admin |

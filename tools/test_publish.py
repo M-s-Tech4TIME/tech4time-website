@@ -71,6 +71,7 @@ CERTIFICATIONS = ROOT / "content" / "certifications.json"
 BRANDING = ROOT / "content" / "branding.json"
 PRIVACY = ROOT / "content" / "privacy.json"
 SEO = ROOT / "content" / "seo.json"
+CHROME = ROOT / "content" / "chrome.json"
 
 MARK = "PUBLISHMARK"
 
@@ -103,6 +104,25 @@ class Results:
 
 
 # ------------------------------------------------------------------- wiring
+
+
+def documents() -> list[Path]:
+    """content/<name>.json for every document there is, asked of the contract.
+
+    This test writes into the real content/ and puts it back afterwards, so the
+    list it restores has to be the list that exists. A second copy kept here
+    would go out of step in the way that does not announce itself — see the
+    note where the restore happens.
+    """
+    out = subprocess.run(
+        ["php", "-r", "require 'lib/contract.php'; echo implode(' ', CONTRACT_DOCUMENTS);"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if out.returncode != 0 or not out.stdout.strip():
+        raise SystemExit("could not read CONTRACT_DOCUMENTS from lib/contract.php:\n"
+                         + (out.stderr or out.stdout)[:400])
+
+    return [ROOT / "content" / f"{name}.json" for name in out.stdout.split()]
 
 
 def free_port() -> int:
@@ -226,9 +246,8 @@ def run(base: str, key: bytes, r: Results) -> None:
             f"{status} {answer}")
     r.check("and the answer says which revision now stands",
             answer.get("revision") == 1, str(answer))
-    r.check("and reports what the site's footers say",
-            isinstance(answer.get("footer_synced"), str) and answer["footer_synced"] != "",
-            "footer_synced should carry lib/footer-fingerprint.php")
+    r.check("and names the document it landed",
+            answer.get("document") == "careers", str(answer))
 
     stored = json.loads(CAREERS.read_text())
     r.check("the replica on disk is what was sent",
@@ -367,6 +386,7 @@ def run(base: str, key: bytes, r: Results) -> None:
     branding_round_trip(base, key, r)
     privacy_round_trip(base, key, r)
     seo_round_trip(base, key, r)
+    chrome_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -1893,6 +1913,171 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("and says so in its own head",
             'name="robots" content="noindex, follow"' in page)
 
+def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
+    """The header, footer and dock travel the same road.
+
+    THIS DOCUMENT IS NOT A PAGE. It is on EVERY page, which makes the last
+    group below the important one: a marker published into this document has
+    to come back out of an ordinary page, or the whole conversion in ADR 0023
+    is unproved.
+
+    Before that, the contract half — that every band survives the endpoint, and
+    that normalising happens on the RECEIVING side and not only on the sending
+    one. That is the reason to test it at this end at all: api/publish.php
+    re-normalises what it was sent, so a document written by a compromised or
+    simply older backend still arrives in the shape lib/body.php assumes. A bar
+    with six keys, a contact row of an invented kind and a logo pointing at
+    another origin are all things a signature would happily carry.
+    """
+    print("\nthe chrome travels the same road")
+
+    data = json.loads(CHROME.read_text())
+    data["revision"] = 90
+
+    data["header"]["brand_label"] = f"{MARK}-brandlabel"
+    data["header"]["logo"]["alt"] = f"{MARK}-logoalt"
+    data["header"]["nav"]["items"] = [
+        {"id": "home", "target": "home", "label": f"{MARK}-navhome", "status": "shown"},
+        {"id": "about", "target": "about", "label": f"{MARK}-navhidden", "status": "hidden"},
+    ]
+
+    data["footer"]["tagline"] = f"{MARK}-tagline"
+    data["footer"]["description"] = f"{MARK}-description"
+    data["footer"]["links"]["heading"] = f"{MARK}-linksheading"
+    data["footer"]["services"]["heading"] = f"{MARK}-servicesheading"
+    data["footer"]["services"]["index_label"] = f"{MARK}-indexlabel"
+    data["footer"]["contact"]["heading"] = f"{MARK}-contactheading"
+    data["footer"]["copyright"]["name"] = f"{MARK}-copyname"
+    data["footer"]["copyright"]["rights"] = f"{MARK}-rights"
+    data["footer"]["legal"]["items"] = [
+        {"id": "privacy", "target": "privacy", "label": f"{MARK}-legal", "status": "shown"},
+    ]
+    data["footer"]["contact"]["items"] = [
+        {"id": "phone-bangladesh", "kind": "phone", "label": f"{MARK}-office",
+         "lines": [f"{MARK}-number", "", "  "], "note": f"{MARK}-note", "status": "shown"},
+        # A kind nothing offers. It must come back as the safe default rather
+        # than reaching a renderer that would look up an icon for it.
+        {"id": "odd", "kind": "carrier-pigeon", "label": "Odd",
+         "lines": ["nowhere"], "note": "", "status": "shown"},
+    ]
+
+    data["dock"]["menu_label"] = f"{MARK}-menu"
+    data["dock"]["panel"]["items"] = [
+        {"id": "home", "target": "home", "label": "", "description": f"{MARK}-panel",
+         "status": "shown"},
+    ]
+    # Six keys for a four-key grid, and an icon the picker does not offer.
+    data["dock"]["bar"]["items"] = [
+        {"id": f"k{i}", "target": "home", "label": f"{MARK}-bar{i}",
+         "icon": "home" if i < 5 else "not-an-icon", "emphasis": "plain"}
+        for i in range(6)
+    ]
+
+    # A logo pointing at somebody else's server, and a srcset with one good
+    # entry and one that is not a path this site will serve.
+    data["header"]["logo"]["light"]["src"] = "https://evil.example/logo.png"
+    data["header"]["logo"]["light"]["srcset"] = (
+        "/assets/images/logo/logo-light-360.png 360w, "
+        "https://evil.example/logo.png 540w")
+
+    status, _ = publish(base, key, "chrome", data)
+    r.check("the chrome document is accepted", status == 200, f"status {status}")
+
+    stored = json.loads(CHROME.read_text())
+
+    print("  every band arrived")
+    for what, got in [
+        ("the header's brand label", stored["header"]["brand_label"]),
+        ("the logo's alt text", stored["header"]["logo"]["alt"]),
+        ("a nav row's label", stored["header"]["nav"]["items"][0]["label"]),
+        ("the footer's tagline", stored["footer"]["tagline"]),
+        ("the footer's description", stored["footer"]["description"]),
+        ("the quick-links heading", stored["footer"]["links"]["heading"]),
+        ("the services heading", stored["footer"]["services"]["heading"]),
+        ("the services index label", stored["footer"]["services"]["index_label"]),
+        ("the contact heading", stored["footer"]["contact"]["heading"]),
+        ("a contact row's label", stored["footer"]["contact"]["items"][0]["label"]),
+        ("a contact row's note", stored["footer"]["contact"]["items"][0]["note"]),
+        ("a contact line", stored["footer"]["contact"]["items"][0]["lines"][0]),
+        ("the copyright name", stored["footer"]["copyright"]["name"]),
+        ("the rights sentence", stored["footer"]["copyright"]["rights"]),
+        ("a legal row's label", stored["footer"]["legal"]["items"][0]["label"]),
+        ("a dock panel description", stored["dock"]["panel"]["items"][0]["description"]),
+        ("the dock's menu label", stored["dock"]["menu_label"]),
+        ("a dock bar label", stored["dock"]["bar"]["items"][0]["label"]),
+    ]:
+        r.check(f"  {what}", MARK in str(got), repr(got))
+
+    print("  and the receiving side normalised it, rather than trusting it")
+    r.check("  a hidden nav row is still hidden",
+            stored["header"]["nav"]["items"][1]["status"] == "hidden")
+    r.check("  the bar is cut back to four keys",
+            len(stored["dock"]["bar"]["items"]) == 4,
+            f'{len(stored["dock"]["bar"]["items"])} keys')
+    r.check("  an icon the picker does not offer is dropped",
+            all(row["icon"] in ("", "home") for row in stored["dock"]["bar"]["items"]))
+    r.check("  a contact kind nothing offers falls back to a known one",
+            stored["footer"]["contact"]["items"][1]["kind"] == "phone",
+            stored["footer"]["contact"]["items"][1]["kind"])
+    r.check("  empty contact lines are dropped",
+            stored["footer"]["contact"]["items"][0]["lines"] == [f"{MARK}-number"],
+            repr(stored["footer"]["contact"]["items"][0]["lines"]))
+    r.check("  a logo pointing at another origin is refused",
+            stored["header"]["logo"]["light"]["src"] == "",
+            stored["header"]["logo"]["light"]["src"])
+    r.check("  and only the good half of a srcset survives",
+            stored["header"]["logo"]["light"]["srcset"]
+            == "/assets/images/logo/logo-light-360.png 360w",
+            stored["header"]["logo"]["light"]["srcset"])
+    r.check("  the services column still stores no rows of its own",
+            "items" not in stored["footer"]["services"])
+
+    print("  a row keeps the id it was given")
+    r.check("  the nav row is still 'home'",
+            stored["header"]["nav"]["items"][0]["id"] == "home",
+            stored["header"]["nav"]["items"][0]["id"])
+    r.check("  the contact row is still 'phone-bangladesh'",
+            stored["footer"]["contact"]["items"][0]["id"] == "phone-bangladesh",
+            stored["footer"]["contact"]["items"][0]["id"])
+
+    # AND IT REACHES A PAGE. Everything above proves the document landed in the
+    # right shape; this proves lib/body.php renders THAT document rather than
+    # anything of its own. The about page is picked because it is an ordinary
+    # page with no relationship to the chrome — if the marker is in its header,
+    # its footer and its dock, it is in all seventeen.
+    print("  and a visitor sees it, on a page that knows nothing about it")
+    _, page = get(base, "/pages/about/")
+
+    for what, mark in [
+        ("the header's nav link", f"{MARK}-navhome"),
+        ("the footer's tagline", f"{MARK}-tagline"),
+        ("the footer's quick-links heading", f"{MARK}-linksheading"),
+        ("the footer's contact note", f"{MARK}-note"),
+        ("the copyright name", f"{MARK}-copyname"),
+        ("the dock panel's description", f"{MARK}-panel"),
+        ("a dock bar label", f"{MARK}-bar0"),
+        ("the menu button's label", f"{MARK}-menu"),
+    ]:
+        r.check(f"  {what}", mark in page, "not in the rendered page")
+
+    r.check("  a hidden nav row is absent from the page",
+            f"{MARK}-navhidden" not in page,
+            "a row marked hidden was rendered anyway")
+
+    # The services column stores nothing, so it must be reading the services
+    # document -- not the chrome one, and not a copy.
+    r.check("  the services column is read from content/services.json",
+            "/pages/services/cybersecurity/" in page and f"{MARK}-indexlabel" in page)
+
+    # The one per-page difference, and the defect this conversion fixed: the
+    # brand link must NOT be marked, on the one page where it used to be.
+    _, home = get(base, "/")
+    brand = re.search(r'<a class="site-header__brand"[^>]*>', home)
+    r.check("  and the brand link on the home page carries no aria-current",
+            brand is not None and "aria-current" not in brand.group(0),
+            brand.group(0) if brand else "no brand link found")
+
+
 def home_round_trip(base: str, key: bytes, r: Results) -> None:
     """Every field the home model declares, set and then read off the page.
 
@@ -2148,17 +2333,8 @@ def main() -> None:
         (private / "publish.key").write_text(key_hex + "\n")
         key = bytes.fromhex(key_hex)
 
-        careers_backup = CAREERS.read_text() if CAREERS.is_file() else None
-        contact_backup = CONTACT.read_text() if CONTACT.is_file() else None
-        company_backup = COMPANY.read_text() if COMPANY.is_file() else None
-        about_backup = ABOUT.read_text() if ABOUT.is_file() else None
-        home_backup = HOME.read_text() if HOME.is_file() else None
-        services_backup = SERVICES.read_text() if SERVICES.is_file() else None
-        certifications_backup = (CERTIFICATIONS.read_text()
-                                 if CERTIFICATIONS.is_file() else None)
-        branding_backup = BRANDING.read_text() if BRANDING.is_file() else None
-        privacy_backup = PRIVACY.read_text() if PRIVACY.is_file() else None
-        seo_backup = SEO.read_text() if SEO.is_file() else None
+        backups = {path: (path.read_text() if path.is_file() else None)
+                   for path in documents()}
 
         server = subprocess.Popen(
             ["php", "-S", f"127.0.0.1:{port}", "-t", str(ROOT),
@@ -2187,17 +2363,15 @@ def main() -> None:
             os.killpg(os.getpgid(server.pid), signal.SIGTERM)
             server.wait(timeout=10)
 
-            # EVERY document, not the ones somebody remembered. Leaving one out
-            # does not fail the run that left it out — it fails the NEXT run,
-            # which starts from a document the previous run raised the revision
-            # of, and is refused as not-newer. home.json was that one.
-            for path, backup in ((CAREERS, careers_backup), (CONTACT, contact_backup),
-                                 (COMPANY, company_backup), (ABOUT, about_backup),
-                                 (HOME, home_backup), (SERVICES, services_backup),
-                                 (CERTIFICATIONS, certifications_backup),
-                                 (BRANDING, branding_backup),
-                                 (PRIVACY, privacy_backup),
-                                 (SEO, seo_backup)):
+            # EVERY document, and no longer the ones somebody remembered.
+            # Leaving one out does not fail the run that left it out — it fails
+            # the NEXT run, which starts from a document the previous run raised
+            # the revision of, and is refused as not-newer. home.json was that
+            # one, and the comment that replaced it asked the reader to
+            # remember, which is not a mechanism. The list is CONTRACT_DOCUMENTS
+            # now, so a document added to the contract is restored by having
+            # been added.
+            for path, backup in sorted(backups.items()):
                 if backup is not None:
                     path.write_text(backup)
                 bak = path.with_suffix(".json.bak")

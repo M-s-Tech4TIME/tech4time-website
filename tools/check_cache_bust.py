@@ -83,8 +83,17 @@ def pages() -> list[str]:
     lib/head.php is in here because it holds the five shared stylesheet URLs
     and their version queries. It is not a page, but it is where a page's
     markup now comes from, which is the same thing to this check.
+
+    lib/body.php is here for the same reason and one more. The header, footer
+    and dock moved into it, so an asset URL those blocks name is named there
+    now and nowhere else -- and the file is listed BEFORE it exists, because
+    the failure it guards against is silent. A check that finds no reference
+    reports the asset as "no page references it directly; skipped" and passes,
+    which is exactly what it did to every stylesheet on the site for one commit
+    after the heads were collapsed. The list below drops a path that is not
+    there, so naming it early costs nothing and closes the window.
     """
-    found = ["index.php", "404.php", "lib/head.php"]
+    found = ["index.php", "404.php", "lib/head.php", "lib/body.php"]
     found += [str(p.relative_to(ROOT)) for p in (ROOT / "pages").rglob("index.*")]
     return sorted(p for p in found if (ROOT / p).exists())
 

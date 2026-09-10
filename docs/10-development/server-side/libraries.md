@@ -26,11 +26,13 @@ store they read from is outside the document root entirely.
 | [`branding.php`](#brandingphp) | the branding & advertisement page | `contract`, `store`, `html` |
 | [`privacy.php`](#privacyphp) | the privacy policy | `contract`, `store`, `html` |
 | [`seo.php`](#seophp) | the site-wide SEO record, and what is derived from it | `contract`, `store`, `html`, `contact` |
+| [`chrome.php`](#chromephp) | the header, footer and dock every page carries | `contract`, `store`, `html`, `services`, `seo`, `sprite` |
+| [`sprite.php`](#spritephp) *(frontend)* | the icon block a renderer writes for itself | — |
 | [`head.php`](#headphp) *(frontend)* | the `<head>` every page emits, and its structured data | `seo` |
+| [`body.php`](#bodyphp) *(frontend)* | the header, footer and dock every page emits | `chrome` |
 | [`svg.php`](#svgphp) **shared** | what a publishable vector file is |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
-| [`footer-fingerprint.php`](#footer-fingerprintphp) *(frontend, generated)* | what this site's footers currently say | — |
 | [`private.php`](#privatephp) | where the secrets are, and key derivation | — |
 | [`totp.php`](#totpphp) | RFC 6238 authenticator codes | — |
 | [`throttle.php`](#throttlephp) | counting attempts | `private`, `store` |
@@ -98,8 +100,8 @@ damage is recovered from. `tools/test_store.py` covers both.
 **Shared — byte-identical in `tech4time-website-frontend` and `tech4time-website-backend`.**
 
 `CONTRACT_VERSION` · `CONTRACT_DOCUMENTS` · `CONTRACT_BOOKKEEPING` · `contract_path()` ·
-`careers_normalise()` · `contact_normalise()` · `contact_defaults()` · `contact_fingerprint()` ·
-`contract_sanitise()` · `contract_next_revision()` · …
+`careers_normalise()` · `contact_normalise()` · `contact_defaults()` · `chrome_defaults()` ·
+`chrome_normalise()` · `chrome_targets()` · `contract_sanitise()` · `contract_next_revision()` · …
 
 `contract_path()` gives a document's record path — `content/<name>.json`, the same rule on both
 hosts. It exists for the things that have to work over *all* the documents without knowing their
@@ -127,8 +129,8 @@ disagreeing would only make one side's own page look wrong, it is not.
 `content/contact.json`, because the file is one instance of the shape and an optional field that
 happens to be absent from it is still a field.
 
-`CONTRACT_BOOKKEEPING` names the fields a document keeps about *itself* — `updated`, `revision`,
-`footer_synced`. Nothing edits them and nothing renders them, so both directions of
+`CONTRACT_BOOKKEEPING` names the fields a document keeps about *itself* — `updated` and `revision`.
+Nothing edits them and nothing renders them, so both directions of
 `check_content_model.py` and the round trip in `test_careers_admin.py` exempt them, and all three
 read the one list. They did not, once: `revision` was added, the careers test treated it as a
 site-wide setting, posted it on its own, and blanked `cv_form_url` doing so.
@@ -160,10 +162,10 @@ investigate.
 
 The same division for the contact page.
 
-The footer-drift banner is powered by `contact_footer_in_step()` in `contract.php`, comparing the
-details now held against `footer_synced` — which after the split is **what the frontend reported in
-the last publish response**, not something this side computed. See
-[`footer-fingerprint.php`](#footer-fingerprintphp).
+It used to carry a footer-drift banner and a **second `store_write()`** after the publish, to record
+the fingerprint the frontend reported for its own footers. The footer renders from
+`content/chrome.json` now and holds no copy of these details to go stale, so both are gone —
+[ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 
 ### `company.php`
 
@@ -512,21 +514,60 @@ The backend copy adds the two saves. `seo_edit()` writes `content/seo.json`; `se
 because the screen holds one band of a document whose other twenty were never in the form. A
 whole-document rebuild there would empty the page.
 
+### `chrome.php`
+
+`chrome_load()` · `chrome_header()` · `chrome_footer()` · `chrome_dock()` ·
+`chrome_target_list()` · `chrome_link()` · `chrome_services()` · `chrome_social()` ·
+`chrome_contact_groups()` · `chrome_contact_href()` · `chrome_is_current()` ·
+`chrome_icons_used()` · `chrome_sprite()`
+
+One document, `content/chrome.json`, holding the furniture around every page: the header's logo
+and nav, the footer's four columns, and the small-screen dock. It was literal markup in seventeen
+page files — about 6,800 lines of duplication kept in step by a propagation script — and the
+duplication had already produced three live defects: a footer service list that disagreed with
+`content/services.json`, a service that could never appear in the footer at all, and phone numbers
+that went stale because a script had to be run by hand before a deploy.
+
+**A link points at a route, never at a URL.** Every destination is a key of `chrome_targets()` in
+`contract.php` — `about`, `service:cybersecurity` — built from `SEO_ROUTES` and
+`content/services.json`. There is no way to type an address into a nav link, so a nav link cannot
+404, in the one component that appears on every page. An empty label means *whatever that page
+calls itself*, which is how renaming a page in `?s=seo` renames it in the header, the footer and
+the dock at once.
+
+**Two columns of the footer store nothing.** The services list is read from
+`content/services.json`, so a seventh service appears by itself and a hidden one goes; the social
+links are read from the SEO document's `sameas` rows, so a profile URL is changed in one place and
+the footer cannot disagree with the Organization graph.
+
+**The footer's contact rows deliberately are not.** They are the footer's own — added, worded,
+ordered, shown and hidden on the footer screen — and owe nothing to `content/contact.json`. The
+contact page holds every detail in full; a footer holds the part worth putting in a footer. What
+keeps the two honest is a notice the editor draws, never a refusal, for the reason the privacy
+policy's duplicated facts are reported rather than forbidden: requiring the two to agree before
+either could be saved means that after an office move, whichever page you edited first could not
+be saved.
+
+**A missing file is not an error.** `chrome_load()` fills from `chrome_defaults()`, which is the
+site's own header, footer and dock as they shipped, extracted from the markup rather than typed.
+A host that has never received a publish still renders a correct page — the failure that avoids is
+the whole site losing its navigation because one file did not arrive.
+
 ### `head.php`
 
 `seo_head()` · `seo_jsonld()` · `seo_graph()` · `seo_offices()` · `seo_lang()` — frontend only.
 
 The `<head>` of every page, emitted once. It used to be pasted: seventeen copies of between 222
 and 308 lines, about 4,250 lines in all, with no propagation tool and no drift check over any of
-it — `check_shared_markup.py` covers the header, footer, dock and hero-circuit, and the head was
-never in that set.
+it — `check_shared_markup.py` covered the header, footer and dock, and the head was never in that
+set. (Those three went the same way afterwards, into `body.php`.)
 
 It drifted exactly as that guarantees. The Organization graph carried three office addresses and
 four telephone numbers as literal JSON in sixteen of the seventeen heads; only the contact page
 rendered them from `content/contact.json`. Editing an office in the admin left sixteen pages
-advertising the old one, and `sync_site_contact.py` was written to paste the new values back
-before a deploy. The graph is built here now, on the request, from the document that owns the
-facts — and that half of `sync_site_contact.py` is gone.
+advertising the old one, and a build script — `sync_site_contact.py`, since deleted — was written
+to paste the new values back before a deploy. The graph is built here now, on the request, from the
+document that owns the facts.
 
 A page hands in **its own address** and **its own `meta` band**:
 
@@ -557,20 +598,65 @@ because a redirect on this route would post a signed document wherever it pointe
 
 `$T4T_PUBLISH_URL` overrides the endpoint — how `test_publish.py` points it at a local server.
 
-### `footer-fingerprint.php`
+### `sprite.php`
 
-**Frontend only, and generated** by `tools/sync_site_contact.py`. One constant,
-`FOOTER_FINGERPRINT`.
+**Frontend only.** `sprite_block()`
 
-The footer's contact details are literal markup in all sixteen pages, because the project forbids
-runtime partials. So the moment somebody edits an address in the admin, the contact page is right
-and the footers are behind — until the pages are rebuilt and deployed.
+The icon block a renderer writes for itself, in one place.
 
-This records the fingerprint the footers were last rebuilt **for**. It used to be stamped into
-`contact.json`, which stopped being possible when the backend took ownership of that file: the
-frontend's copy is a replica, and the next publish overwrites anything written into it. So the
-frontend keeps its own record, reports it in every publish response, and the backend compares. The
-side that knows what its own footers say is the side that answers.
+`tools/inject_icons.py` reads a page's **source** for `<use href="#name">` and inlines the matching
+`<symbol>`s, because Chromium and WebKit do not resolve `<use>` into another document. That works
+for every icon a page writes literally and cannot work for one chosen while the page renders — a
+service's icon is a field of `content/services.json`, a dock key's is a field of
+`content/chrome.json`, and neither appears in any page's source.
+
+So `services.php`, `certifications.php` and `chrome.php` each work out **which** symbols they need
+and hand the list here. It was written three times before it was written once: the first two copies
+were byte-identical, which is where a third is one too many.
+
+The markers are deliberately **not** `icon-sprite:start/end`. Those delimit the block
+`inject_icons.py` rewrites, and a second pair would make its non-greedy match end in the wrong
+place — it would swallow everything between the first start and this end, header included.
+
+Two `<symbol>` elements may share an id and several do — the chrome's `#cogs` and a service card's
+`#cogs` are the same markup from the same file. The first definition wins, the page renders the
+same, and `audit_pages.py` exempts symbol ids from its duplicate-id check for exactly this reason.
+[icons.md](../frontend/icons.md)
+
+### `body.php`
+
+**Frontend only.** `body_header()` · `body_footer()` · `body_dock()`
+
+The header, the footer and the dock, emitted once instead of pasted seventeen times. Named as
+`head.php` is named, and for the same reason: that file emits the shared part of `<head>`, this one
+emits the shared parts of `<body>`.
+
+A page calls three functions and passes the same address it hands `seo_head()`:
+
+```php
+<?php body_header('/pages/about/'); ?>
+<main class="page__main" id="main"> … </main>
+<?php body_footer(); ?>
+<?php body_dock('/pages/about/'); ?>
+```
+
+The route decides one thing — which link carries `aria-current="page"`. It is applied to one nav
+link and to at most one dock item and key, and **never to the brand**: `propagate_shared.py`
+re-marked every `<a>` whose href a page already marked, which is why `index.php` used to send
+`aria-current` on its logo link as well. A prefix counts, so on
+`/pages/services/cybersecurity/` the marked link is Services; `/` is excluded from the prefix rule,
+or Home would be current everywhere. The 404 passes `''` and marks nothing.
+
+**Nothing here reads a document and nothing here decides what a link says.** That is `chrome.php`.
+This file writes tags, escapes every value that goes into one, and holds the markup that is code
+rather than content — the landmarks, the class names, the dock's circuit, the CSS hooks the scripts
+bind to.
+
+`body_header()` also emits the chrome's icon sprite, because it is the first of the three to run and
+a `<symbol>` has to exist before the `<use>` that draws it.
+
+[shared-markup.md](../frontend/shared-markup.md) ·
+[ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 ---
 

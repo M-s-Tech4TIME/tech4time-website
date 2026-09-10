@@ -7,16 +7,22 @@ Build tool. NOT deployed to the web server (see tools/README.md).
     python3 tools/assemble_page.py <spec.json>
 
 WHY
-The project forbids runtime partials, so the header, footer and script tags are
-pasted into every page. Pasting by hand is what makes them drift; this composes
-them from tools/templates/ so they are byte-identical by construction and
-tools/check_shared_markup.py passes on the first try.
+The project forbids runtime partials, so a page has to be a complete document.
+That used to mean pasting one -- the head, the header, the footer, the dock and
+the script tags -- and pasting by hand is what makes copies drift.
 
-The <head> is no longer among them. It is emitted by lib/head.php, at request
-time, from the page's own document -- so there is nothing to paste and nothing
-to keep in step. A page written by this tool carries two calls where it used to
-carry 250 lines, and its title, description, share card and crawl directive are
-edited at admin.tech4time.bd like the rest of its content. See ADR 0020.
+Almost none of it is pasted any more. The <head> is emitted by lib/head.php
+(ADR 0020) and the header, footer and dock by lib/body.php from
+content/chrome.json (ADR 0023), both at request time, so there is nothing to
+copy and nothing to keep in step. A page written by this tool carries five
+calls where it used to carry six hundred lines, and its title, description,
+share card, nav link and footer link are all edited at admin.tech4time.bd like
+the rest of its content.
+
+What is left for this tool is the skeleton: the doc comment, the requires, the
+<head> calls, the <body> calls and the page's own <main>. The only thing it
+still reads from tools/templates/ is scripts.html, which every page holds its
+own copy of.
 
 IMPORTANT
 This is for creating a page, not for maintaining one. Once a page exists, edit
@@ -31,9 +37,13 @@ SPEC FORMAT (JSON)
       "route":       "/pages/about/",           its SEO_ROUTES route, with slashes
       "document":    "about",                   the content document it renders
       "page_css":    "about",                   optional; assets/css/pages/<name>.css
-      "nav_current": "/pages/about/",           optional; href to mark aria-current
       "extra_jsonld": "…"                       optional; raw <script> block(s)
     }
+
+There is no "nav_current" here any more either. lib/body.php marks the active
+link from the route the page passes it, so there is nothing to place by hand --
+and nothing to place on the wrong element, which is what the old propagation
+tool did to index.php's logo link.
 
 There is no "title", "description" or "canonical" here any more. The first two
 are content and belong in lib/contract.php's defaults for that document, where
@@ -75,15 +85,6 @@ def build(spec: dict) -> str:
     route = spec["route"]
     styles = f"['pages/{spec['page_css']}.css']" if spec.get("page_css") else "[]"
 
-    header = read("header.html")
-    if spec.get("nav_current"):
-        href = spec["nav_current"]
-        needle = f'<a class="nav-link" href="{href}">'
-        if needle not in header:
-            raise SystemExit(f"nav_current href not found in header template: {href}")
-        header = header.replace(
-            needle, f'<a class="nav-link" href="{href}" aria-current="page">', 1)
-
     parts = [
         "<?php",
         "/**",
@@ -96,10 +97,11 @@ def build(spec: dict) -> str:
         " *",
         " * Everything editable goes through h().",
         " *",
-        " * The header, footer, dock and hero circuit are shared markup and stay",
-        " * literal; tools/check_shared_markup.py holds them byte-identical to",
-        " * tools/templates/. The <head> is not shared markup -- lib/head.php emits",
-        " * it, so there is nothing here to keep in step.",
+        " * The <head> is emitted by lib/head.php and the header, footer and dock",
+        " * by lib/body.php, so there is nothing here to keep in step. Only the",
+        " * hero circuit is still copied markup, and only on pages with a title",
+        " * band -- tools/check_shared_markup.py holds that one byte-identical to",
+        " * tools/templates/.",
         " */",
         "",
         "declare(strict_types=1);",
@@ -109,6 +111,7 @@ def build(spec: dict) -> str:
         # would otherwise load it twice and die on the redeclaration. That has
         # happened once already, on the contact page.
         f"require_once __DIR__ . '{to_root}lib/head.php';",
+        f"require_once __DIR__ . '{to_root}lib/body.php';",
         f"require_once __DIR__ . '{to_root}lib/{doc}.php';",
         "",
         f"$data = {doc}_load();",
@@ -127,12 +130,16 @@ def build(spec: dict) -> str:
         "</head>",
         "",
         '<body class="page">',
-        "",
-        header,
+        # No icon-sprite block: tools/inject_icons.py writes one if the page's
+        # own markup references an icon, and leaves none if it does not. The
+        # chrome's symbols are emitted by body_header().
+        f"<?php body_header('{route}'); ?>",
         "",
         Path(spec["main"]).read_text().rstrip("\n"),
         "",
-        read("footer.html"),
+        f"<?php body_footer(); ?>",
+        "",
+        f"<?php body_dock('{route}'); ?>",
         "",
         read("scripts.html"),
         "</body>",

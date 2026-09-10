@@ -28,7 +28,7 @@
  * field goes back through this side's own lib/html.php before it is written.
  *
  * WHAT IT ANSWERS
- *   200  {"ok":true,  "revision":12, "footer_synced":"<sha256>"}
+ *   200  {"ok":true,  "revision":12, "document":"about"}
  *   4xx  {"ok":false, "code":"not-newer", "revision":12}
  *
  * The current revision is in every answer the caller is entitled to, so the
@@ -50,6 +50,7 @@ require_once __DIR__ . '/../lib/certifications.php';
 require_once __DIR__ . '/../lib/branding.php';
 require_once __DIR__ . '/../lib/privacy.php';
 require_once __DIR__ . '/../lib/seo.php';
+require_once __DIR__ . '/../lib/chrome.php';
 
 /**
  * Where each document lands, by name.
@@ -76,6 +77,7 @@ const PUBLISH_FILES = [
     'branding'       => BRANDING_FILE,
     'privacy'        => PRIVACY_FILE,
     'seo'            => SEO_FILE,
+    'chrome'         => CHROME_FILE,
 ];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -185,17 +187,8 @@ if (!store_write($file, $incoming)) {
     publish_refuse(500, 'write-failed', $held);
 }
 
-/* What this side's footers currently say. The backend records it and its
-   editor compares — see lib/footer-fingerprint.php. Absent only if
-   tools/sync_site_contact.py has never been run here. */
-$stamp = __DIR__ . '/../lib/footer-fingerprint.php';
-if (is_file($stamp)) {
-    require_once $stamp;
-}
-
 publish_answer(200, [
-    'ok'            => true,
-    'document'      => $document,
-    'revision'      => (int)$envelope['revision'],
-    'footer_synced' => defined('FOOTER_FINGERPRINT') ? FOOTER_FINGERPRINT : '',
+    'ok'       => true,
+    'document' => $document,
+    'revision' => (int)$envelope['revision'],
 ]);

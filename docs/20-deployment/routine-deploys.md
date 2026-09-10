@@ -138,24 +138,20 @@ revalidation on every asset forever. Prefer the query.
 
 ## Changing the footer's contact details
 
-The footer is markup, not content, so the editor cannot reach it. The sequence is:
+**This is not a deploy any more.** It is a save, at
+`https://admin.tech4time.bd/?s=chrome`, on the footer screen.
 
-```bash
-# 1. the server's copy is the real one — download it first
-scp user@tech4time.bd:~/public_html/content/contact.json content/contact.json
+The footer used to be markup, so the sequence was: download the server's `content/contact.json`,
+run a script that pushed the details into all sixteen pages, and upload the pages. Getting the
+download wrong pushed your stale local details into every one of them, and the admin carried a
+banner — fed by a fingerprint the frontend reported in every publish response — because the gap was
+otherwise invisible.
 
-# 2. push the details into every page
-python3 tools/sync_site_contact.py
-python3 tools/check_shared_markup.py
-
-# 3. upload the PAGES — and not content/
-```
-
-Getting step 1 wrong pushes your stale local details into all sixteen pages.
-
-The admin shows a banner when the details and the footers disagree — it learns the footers'
-fingerprint from `api/publish.php` in every publish response, so the gap is never invisible — but
-closing it is a deploy, not a save. [shared-markup.md](../10-development/frontend/shared-markup.md)
+The footer renders from `content/chrome.json` now. Its contact rows are the footer's **own**, not a
+copy of the contact page's, so there is nothing to push and nothing to fall behind; what keeps the
+two honest is a standing notice in the editor that never blocks a save.
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md) ·
+[shared-markup.md](../10-development/frontend/shared-markup.md)
 
 ---
 

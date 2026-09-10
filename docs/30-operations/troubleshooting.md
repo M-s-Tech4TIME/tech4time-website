@@ -48,9 +48,10 @@ seeing this, the watchdog did not run either — check the browser console for a
 python3 tools/test_motion.py
 ```
 
-### A page's header or footer differs from the others
+### A page's hero circuit differs from the others
 
-Somebody edited a page instead of the template.
+Somebody edited a page instead of the template. (A header or footer cannot differ: there is one of
+each, in `lib/body.php`.)
 
 ```bash
 python3 tools/propagate_shared.py --dry-run
@@ -153,21 +154,21 @@ python3 tools/verify_live.py https://tech4time.bd
 A GET of `/api/publish.php` must answer **405**. A 404 means it did not deploy; a 403 means a
 blocking rule is matching more than it should.
 
-### A banner in the admin says the footer is out of step
+### A notice in the admin says the footer's contact details differ from the contact page's
 
-The contact details in the data and the ones in this site's page footers disagree. Expected after
-editing contact details — the footer is markup, not content, and lives here.
+**Nothing is broken and nothing needs doing unless you want it to.** The footer's contact rows are
+its own — added, worded, ordered, shown and hidden on the **Header & Footer** screen — and are
+deliberately not a copy of the contact page's. The contact page holds every detail in full; a footer
+holds the part worth putting in a footer.
 
-```bash
-# in tech4time-website-frontend, with content/contact.json as this site now holds it
-python3 tools/sync_site_contact.py     # rewrites the footers and lib/footer-fingerprint.php
-python3 tools/check_shared_markup.py   # proves the sixteen still agree
-git commit && git push                 # the deploy carries it
-```
+The notice exists so the difference is never *invisible*, not to say it is wrong. It never blocks a
+save. If the difference is an oversight rather than a choice, edit the footer's rows at
+`https://admin.tech4time.bd/?s=chrome`, or press **Copy from the Contact page** to reseed them, and
+save. [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
-The banner clears on the next save in the admin, which is when the backend is told the new
-fingerprint. It is not stored in `content/contact.json` any more: that file is a replica, and the
-next publish would overwrite it.
+There used to be a different banner here saying the footer was *out of step*, which meant something
+else entirely: the footer was markup in sixteen pages, a build script had to push the details into
+them, and closing the gap was a deploy. That is gone.
 
 ### Anything about signing in
 

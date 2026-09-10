@@ -73,6 +73,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/html.php';
+require_once __DIR__ . '/sprite.php';
 
 const SERVICES_FILE = __DIR__ . '/../content/services.json';
 
@@ -770,59 +771,4 @@ function services_icons_used(array $data, ?array $service): array
     $names = array_filter(array_unique($names), static fn($n): bool => trim((string)$n) !== '');
 
     return array_values($names);
-}
-
-/**
- * The inline sprite, holding those symbols and no others.
- *
- * A SECOND sprite, sitting after the one tools/inject_icons.py maintains.
- * That tool still owns the chrome -- the header, the dock, the footer, the
- * theme toggle -- because those symbols ARE in the page's source, where it can
- * see them, and the set differs from page to page. This block owns only what
- * comes out of the document. Splitting them that way is what keeps the tool
- * working unchanged and keeps this function from having to know what a footer
- * contains.
- *
- * Its markers are deliberately NOT icon-sprite:start/end. Those delimit the
- * block inject_icons.py rewrites, and a second pair would make its non-greedy
- * match end in the wrong place.
- *
- * Two <symbol> elements with one id can overlap -- three do today, where a
- * card and the dock both use #cogs. The first definition wins and the two are
- * identical markup, so the page renders the same; it costs a few hundred bytes
- * to not have to tell this function what the chrome uses.
- *
- * A name with no symbol behind it is skipped rather than fatal: services_icon()
- * already refuses to draw an icon the model does not offer, and a sprite that
- * threw would take a whole page down over one bad row.
- */
-function services_sprite(array $names): string
-{
-    static $symbols = null;
-
-    if ($symbols === null) {
-        $symbols = [];
-        $svg = @file_get_contents(__DIR__ . '/../assets/icons/sprite.svg');
-        if ($svg !== false) {
-            preg_match_all('/<symbol id="([^"]+)".*?<\/symbol>/s', $svg, $m, PREG_SET_ORDER);
-            foreach ($m as $hit) {
-                $symbols[$hit[1]] = $hit[0];
-            }
-        }
-    }
-
-    /* Sprite order, not page order: the file is the canonical sequence, and a
-       block that reordered itself with the content would churn every diff. */
-    $body = '';
-    foreach ($symbols as $id => $markup) {
-        if (in_array($id, $names, true)) {
-            $body .= '  ' . $markup . "\n";
-        }
-    }
-
-    return "<!-- content-sprite:start -->\n"
-        . '<svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' . "\n"
-        . $body
-        . "</svg>\n"
-        . '<!-- content-sprite:end -->';
 }

@@ -23,7 +23,7 @@ addable from the editor and `CONTRACT_DOCUMENTS` is a constant in code. If the p
 is another of something that already exists, add a row rather than a document.
 
 **A row is a URL.** The six service pages each keep a real `pages/services/<slug>/index.php`,
-because `audit_pages.py`, `check_shared_markup.py` and `inject_icons.py` all enumerate pages by
+because `audit_pages.py`, `apply_reveals.py` and `inject_icons.py` all enumerate pages by
 walking the filesystem, and a page they can see is a page they check. A service added in the admin
 at a slug with **no** directory is served by `pages/services/detail.php` instead: `.htaccess`
 rewrites `/pages/services/<slug>/` onto it when the request matches no file and no directory, and
@@ -34,15 +34,15 @@ document does not have, or whose service is hidden, answers 404.
 So adding a service needs no developer at all, and it gets an SEO card on `?s=seo` by itself,
 because that screen reads the services document rather than a list of keys. What a directory still
 buys is the filesystem walk: `audit_pages.py` reads the document and audits directory-less services
-through `detail.php` anyway, but `check_shared_markup.py` and `inject_icons.py` have nothing to look
-at. Promoting a service to its own directory is optional tidying, not a prerequisite.
+through `detail.php` anyway, but `inject_icons.py` and `apply_reveals.py` have nothing to look at.
+Promoting a service to its own directory is optional tidying, not a prerequisite.
 
 ---
 
 ## 1. Write the `<main>`
 
-Just the `<main>` element — the header, footer and scripts come from the templates, and the whole
-`<head>` is emitted by `lib/head.php`.
+Just the `<main>` element. The `<head>` is emitted by `lib/head.php`, the header, footer and dock by
+`lib/body.php`, and the script tags come from `tools/templates/scripts.html`.
 
 ```html
 <main id="main">
@@ -69,8 +69,7 @@ Save it somewhere temporary — `/tmp/mdr-main.html`.
   "main":        "/tmp/mdr-main.html",
   "route":       "/pages/services/managed-detection/",
   "document":    "mdr",
-  "page_css":    "service-detail",
-  "nav_current": "/pages/services/"
+  "page_css":    "service-detail"
 }
 ```
 
@@ -79,8 +78,11 @@ seeded in that document's `*_defaults()` in `lib/contract.php` and edited from t
 `https://admin.tech4time.bd/?s=seo`. The canonical is derived from `route` and is not editable
 anywhere — one page, one address.
 
-`page_css` is optional and names a file in `assets/css/pages/`. `nav_current` marks the header link
-that should show as active.
+**And no `nav_current`.** `lib/body.php` marks the active link from the `route` the page passes it,
+so there is nothing to place by hand — and nothing to place on the wrong element, which is what the
+old propagation tool did to `index.php`'s logo link.
+
+`page_css` is optional and names a file in `assets/css/pages/`.
 
 ## 3. Assemble
 
@@ -88,9 +90,9 @@ that should show as active.
 python3 tools/assemble_page.py /tmp/mdr-spec.json
 ```
 
-This composes the page from `tools/templates/` so the shared blocks are byte-identical by
-construction, and `check_shared_markup.py` passes on the first try. It prints the four things it
-cannot do for you; they are steps 4 and 5 below.
+This writes the skeleton: the doc comment, the requires, the two `<head>` calls, the three
+`<body>` calls and your `<main>`. The only thing it still reads from `tools/templates/` is
+`scripts.html`. It prints the four things it cannot do for you; they are steps 4 and 5 below.
 
 > **Once the page exists, edit the file directly.** Re-running `assemble_page.py` discards hand
 > edits to `<main>`. It is for creating a page, not maintaining one.
@@ -127,10 +129,16 @@ python3 tools/apply_reveals.py --write  # mark the scroll-reveal targets
 
 A page nothing links to is a page nobody finds, and `audit_pages.py` reports it as orphaned.
 
-- **A services sub-page** → add it to the services hub, and to the footer via
-  `tools/templates/footer.html` + `propagate_shared.py`
-- **A top-level page** → the header nav in `tools/templates/header.html`, if it belongs there. The
-  header carries six routes and stays legible on purpose; the footer is where the rest live.
+- **A services sub-page** → nothing to do. It is a row of `content/services.json`, and the footer's
+  services column is read from that document at render time.
+- **A top-level page** → add a row on the **Header & Footer** screen,
+  `https://admin.tech4time.bd/?s=chrome` — the header nav if it belongs there, the footer's Quick
+  Links otherwise. The header carries six routes and stays legible on purpose; the footer is where
+  the rest live. A row picks a route from a list, so it cannot point at an address that does not
+  exist, and leaving its label empty means "whatever that page calls itself". The header carries six routes and stays legible on purpose; the footer is where
+  the rest live. A row picks a route from a list, so it cannot point at an address that does not
+  exist, and leaving its label empty means "whatever that page calls itself".
+  [ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 **The sitemap needs no edit.** `sitemap.php` walks `SEO_ROUTES` and the services document, reads
 each page's `meta` for `changefreq` and `priority`, and omits anything set to `noindex`. There is no
@@ -142,7 +150,7 @@ stale before anybody noticed.
 ```bash
 python3 tools/audit_pages.py            # SEO, a11y, structure, links, canonicals
 python3 tools/test_sitemap.py           # the page is in the sitemap, once
-python3 tools/check_shared_markup.py    # no drift
+python3 tools/check_shared_markup.py    # no drift in what is still copied
 python3 tools/inject_icons.py --check
 python3 tools/check_contrast.py
 python3 tools/check_content_model.py    # every field the model defines is rendered

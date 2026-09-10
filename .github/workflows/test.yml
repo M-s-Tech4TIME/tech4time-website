@@ -123,6 +123,12 @@ jobs:
       # error in any of the three ships as a 500 at a URL no page links to and
       # nobody visits — /sitemap.xml is fetched by Google, not by people.
       - run: python3 tools/test_sitemap.py
+      # The header, footer and dock every page carries. They stopped being
+      # markup in seventeen files and became one document rendered by
+      # lib/body.php, so a fault in them is a fault on every page at once —
+      # including the case a fresh clone is in, where content/chrome.json does
+      # not exist yet and the defaults have to carry the whole site.
+      - run: python3 tools/test_chrome.py
 
   browser:
     name: firefox

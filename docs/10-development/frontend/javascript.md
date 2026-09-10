@@ -50,7 +50,7 @@ Two consequences worth knowing:
   behaviour down with it.
 
 To add a module: write the file, register it on `window.Tech4Time`, add its name to `MODULES`, and
-link it in the pages that need it (via `tools/templates/` if that is every page).
+link it in the pages that need it (via `tools/templates/scripts.html` and every page's own copy, if that is every page).
 
 ---
 
