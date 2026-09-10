@@ -166,10 +166,6 @@ save. If the difference is an oversight rather than a choice, edit the footer's 
 `https://admin.tech4time.bd/?s=chrome`, or press **Copy from the Contact page** to reseed them, and
 save. [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
-> **Not built yet:** the `?s=chrome` screen, and so neither is this notice.
-> `content/chrome.json` renders today's header, footer and dock; the editor that will change
-> them is the next piece of work.
-
 There used to be a different banner here saying the footer was *out of step*, which meant something
 else entirely: the footer was markup in sixteen pages, a build script had to push the details into
 them, and closing the gap was a deploy. That is gone.

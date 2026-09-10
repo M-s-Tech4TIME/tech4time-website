@@ -131,10 +131,11 @@ A page nothing links to is a page nobody finds, and `audit_pages.py` reports it 
 
 - **A services sub-page** → nothing to do. It is a row of `content/services.json`, and the footer's
   services column is read from that document at render time.
-- **A top-level page** → add a row to `content/chrome.json` — the header nav if it belongs there,
-  the footer's Quick Links otherwise. That will be a save on the **Header & Footer** screen,
-  `https://admin.tech4time.bd/?s=chrome`; **until that screen is built** it is a row in
-  `chrome_defaults()` in `lib/contract.php`, and a re-seed of `content/chrome.json`. The header carries six routes and stays legible on purpose; the footer is where
+- **A top-level page** → add a row on the **Header & Footer** screen,
+  `https://admin.tech4time.bd/?s=chrome` — the header nav if it belongs there, the footer's Quick
+  Links otherwise. The header carries six routes and stays legible on purpose; the footer is where
+  the rest live. A row picks a route from a list, so it cannot point at an address that does not
+  exist, and leaving its label empty means "whatever that page calls itself". The header carries six routes and stays legible on purpose; the footer is where
   the rest live. A row picks a route from a list, so it cannot point at an address that does not
   exist, and leaving its label empty means "whatever that page calls itself".
   [ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md)

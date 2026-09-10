@@ -153,9 +153,6 @@ two honest is a standing notice in the editor that never blocks a save.
 [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md) ·
 [shared-markup.md](../10-development/frontend/shared-markup.md)
 
-> **Not built yet:** the `?s=chrome` screen. `content/chrome.json` renders today's header, footer
-> and dock; the editor that will change them is the next piece of work.
-
 ---
 
 ## Rolling back

@@ -40,9 +40,8 @@ its record before acting.
    same breath.
 9. **`tools/` is never deployed.**
 10. **Never edit a header, footer or dock in a page file.** There is nothing there to edit: they
-    are `content/chrome.json`, emitted by `lib/body.php`. Their words will be edited at
-    `https://admin.tech4time.bd/?s=chrome` — **that screen is not built yet**, so until it is, a
-    change to the chrome is a change to `chrome_defaults()` in `lib/contract.php` and a deploy.
+    are `content/chrome.json`, emitted by `lib/body.php`, and their words are edited at
+    `https://admin.tech4time.bd/?s=chrome`.
     [ADR 0023](docs/90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 ---

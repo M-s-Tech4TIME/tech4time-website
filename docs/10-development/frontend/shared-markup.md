@@ -41,11 +41,6 @@ They render on the request from `content/chrome.json`, and everything in them is
 `https://admin.tech4time.bd/?s=chrome`: the nav links, the tagline, the footer's contact rows, the
 copyright name, the four dock keys. A page calls three functions:
 
-> **The screen is not built yet.** `content/chrome.json` already renders every page's header,
-> footer and dock, and it is what the site shipped with. The editor that will change them —
-> `?s=chrome`, referred to throughout this page — is the next piece of work, and until it exists
-> a change to the chrome is a change to `chrome_defaults()` in `lib/contract.php` and a deploy.
-
 ```php
 <?php body_header('/pages/about/'); ?>
 <main class="page__main" id="main"> … </main>

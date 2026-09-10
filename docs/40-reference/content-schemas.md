@@ -724,11 +724,6 @@ The furniture around every page: the header, the footer and the small-screen doc
 about 6,800 lines of duplication kept in step by `propagate_shared.py` —
 [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 
-> **The screen is not built yet.** `content/chrome.json` already renders every page's header,
-> footer and dock, and it is what the site shipped with. The editor that will change them —
-> `?s=chrome`, referred to throughout this page — is the next piece of work, and until it exists
-> a change to the chrome is a change to `chrome_defaults()` in `lib/contract.php` and a deploy.
-
 ```json
 {
   "updated":  "…",

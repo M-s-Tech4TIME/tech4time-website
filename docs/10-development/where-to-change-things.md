@@ -53,9 +53,6 @@ publish overwrites it. [publish-api.md](server-side/publish-api.md)
 > blocks a save.
 > [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
-> **Not built yet:** that screen. `content/chrome.json` renders today's header, footer and dock;
-> the editor that will change them is the next piece of work.
-
 ---
 
 ## Look and feel
