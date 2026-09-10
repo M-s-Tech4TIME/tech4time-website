@@ -31,8 +31,15 @@ $data = services_load();
 <?php seo_head('/pages/services/', $data['meta'], ['pages/services.css'], $data['updated']); ?>
 <?php seo_jsonld('/pages/services/', $data['meta'], $data['updated']); ?>
 
-<!-- The six practice areas, as the catalogue Tech4TIME offers. Mirrors the
-     section order on the page so the two never disagree. -->
+<!-- The six practice areas, as the catalogue Tech4TIME offers.
+     A SECOND COPY OF content/services.json, and it has already drifted once:
+     the service was renamed in the editor on 2026-09-10 and this block still
+     said the old name, because "mirrors the page so the two never disagree" is
+     an instruction to remember rather than a mechanism. It is still literal
+     because the model has nowhere to put alternateName, which is the one field
+     here that is not in the document. Deriving it means adding that field to
+     lib/contract.php in both repositories -- worth doing, and not worth doing
+     silently in the middle of a rename. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -64,8 +71,8 @@ $data = services_load();
     },
     {
       "@type": "Service",
-      "name": "HRaaS",
-      "alternateName": "Human Resource as a Service",
+      "name": "Human Resource as a Service",
+      "alternateName": "HRaaS",
       "serviceType": "IT Staffing",
       "url": "https://tech4time.bd/pages/services/hr-solutions/",
       "description": "Certified technical resources engaged as dedicated staff, a shared pool, project-based teams or retainer-based access."
