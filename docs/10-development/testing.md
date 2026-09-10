@@ -181,6 +181,37 @@ If your change makes a protection that could be removed without anything failing
 `check_secrets.py` — and **prove the check works by deliberately breaking the thing it guards**
 before you trust it.
 
+### If you are measuring geometry
+
+`CONTRACT_IMAGE_SLOTS` holds the width every uploaded picture is actually drawn at. Those numbers
+decide how many files each upload writes and what goes in its `sizes=` attribute, so they are
+measured against a real browser rather than read off a stylesheet — a stylesheet says `width: 100%`
+and tells you nothing about what that resolves to.
+
+**Measure in an iframe, not a window.** Firefox will not make a window narrower than about 500px:
+ask for 320 and you measure 488, with no error. `check_responsive.py` explains this at length and is
+the model to copy. The frame's own scrollbar takes about 12px, so a frame asked for 1280 reports a
+`clientWidth` of 1268 — report the width you measured, never the one you asked for.
+
+**Force lazy images eager before measuring, and wait for them.** Two hours went into this twice
+over. `loading="lazy"` means an image below the fold has not loaded, and an unloaded `<img>` whose
+CSS width is a percentage of an indefinite box measures **zero** — the branding page's four previews
+looked like a live layout bug and were not. Scrolling one image into view does not help either: the
+ones between it and the fold stay unloaded, so "all complete" never arrives and every page times
+out. Set `loading = 'eager'` on all of them, return, then poll until `complete && naturalWidth`.
+
+**The widest point is often not the widest screen.** Two of the seven slots peak somewhere in the
+middle, because a breakpoint takes the picture out of a full-width column:
+
+| Slot | Widest at | And at 1440 |
+|---|---|---|
+| `about.story` | **693px @ 768** — the last single-column width | 534px |
+| `company.clients` | **249px @ 360** — the grid drops to one column | 126px |
+
+Sampling only 320 and 1440 would have missed both and shipped a picture too small on exactly the
+width that needed it most. Sample across the breakpoints, in both themes — a lockup hidden by
+`display: none` in one theme measures zero in it.
+
 ### If you are measuring time
 
 The performance checks in `test_motion.py` cost two failed CI runs and one failed merge before they

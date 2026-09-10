@@ -174,7 +174,7 @@ which is what lets a section be added, reordered or hidden on its own.
 | `layout` | `photograph`, or `logo` for the light/dark wordmark lockup |
 | `side` | `left` or `right`; `right` renders `.about-split--reverse` |
 | `alt` | what the picture shows. Required even for `logo`, because the lockup is what gets announced |
-| `image` | `{ src, webp, width, height }`. The picture, or the light half of a logo pair |
+| `image` | `{ src, webp, width, height, srcset, webp_srcset }`. The picture, or the light half of a logo pair |
 | `image_dark` | the dark half of a logo pair. Only `layout: "logo"` draws it |
 | `status` | `shown` or `hidden` |
 
@@ -594,6 +594,46 @@ asks by containment whether the policy still states the current values, on a for
 whitespace collapsed, commas dropped and case folded, so it reports a different street and stays
 quiet about a different comma. The editor draws it as a standing notice and **never refuses a
 save**.
+
+## Which pictures are stored at several widths, and which are not
+
+Every uploaded picture record is `{ src, webp, width, height, srcset, webp_srcset }`.
+
+`src` and `webp` are the single files they have always been, and stay the ones a browser without
+`srcset` support is served — and the ones every scraper that reads an `<img>` without parsing a
+candidate list will take. **A ladder is an addition to a working picture, never a replacement for
+one.** `srcset` and `webp_srcset` are the same picture at several widths; empty means no ladder was
+stored and the renderer emits `src` alone, exactly as it always did.
+
+Which widths comes from `CONTRACT_IMAGE_SLOTS`, one row per upload slot, holding the width the
+picture is **drawn** at and the `sizes=` attribute that describes it. One row, two consumers: the
+uploader builds the ladder from `width`, the renderer builds `sizes=` from `sizes`. They are kept
+together because a ladder the browser cannot choose from correctly is **worse than no ladder** —
+with no `sizes=` a browser assumes the picture fills the viewport and takes the widest rung, so
+every phone would download the 3× file.
+
+| Slot | Drawn at | Ladders |
+|---|---|---|
+| `about.story` | 700 | yes — 1×, 2×, 3× |
+| `company.journey` | 480 | yes |
+| `home.destinations` | 400 | yes |
+| `branding.asset` | 360 | yes |
+| `company.clients` | 250 | yes |
+| `company.technology` | 120 | yes |
+| `contact.offices` | 56 | yes |
+| `branding.file` | — | **no**: a deliverable somebody downloads, not something a page draws |
+| `seo.share` | — | **no**: read by scrapers that do not implement `srcset` and want exactly 1200×630 |
+| `seo.logo` | — | **no**: `Organization.logo` is one image, named once, to a consumer that picks nothing |
+
+`contract_slot_widths()` never upscales and never stores a rung nothing can draw from. Each density
+is capped at what actually arrived, which handles both directions with one rule: a 4000px
+photograph in the 700 slot stores 700/1400/1600, a 500px one stores 500 alone, and a 1600px flag in
+the 56 slot stores 56/112/168 rather than carrying a 1600px file to every phone that asks.
+
+**The widths were measured in a browser, not estimated** — and two of them are not where anybody
+would guess. `about.story` is widest at a 768px viewport, not on a desktop, because that is the last
+width before the two-column breakpoint; `company.clients` is widest at 360. See "If you are
+measuring geometry" in [testing.md](../10-development/testing.md).
 
 ## Which pictures get a light/dark pair, and which do not
 
