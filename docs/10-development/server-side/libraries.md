@@ -27,6 +27,7 @@ store they read from is outside the document root entirely.
 | [`privacy.php`](#privacyphp) | the privacy policy | `contract`, `store`, `html` |
 | [`seo.php`](#seophp) | the site-wide SEO record, and what is derived from it | `contract`, `store`, `html`, `contact` |
 | [`chrome.php`](#chromephp) | the header, footer and dock every page carries | `contract`, `store`, `html`, `services`, `seo`, `sprite` |
+| [`settings.php`](#settingsphp) | the site's identity: the mark, the icons, the colours, the address | `contract`, `store` |
 | [`sprite.php`](#spritephp) *(frontend)* | the icon block a renderer writes for itself | — |
 | [`head.php`](#headphp) *(frontend)* | the `<head>` every page emits, and its structured data | `seo` |
 | [`body.php`](#bodyphp) *(frontend)* | the header, footer and dock every page emits | `chrome` |
@@ -545,6 +546,35 @@ The backend copy adds the two saves. `seo_edit()` writes `content/seo.json`; `se
 `seo_service_meta_edit()` write **one band of another document** under `store_edit()`'s lock,
 because the screen holds one band of a document whose other twenty were never in the form. A
 whole-document rebuild there would empty the page.
+
+### `settings.php`
+
+`settings_load()` · `settings_logo()` · `settings_logo_is_shared()` · `settings_colours()`
+
+One document, `content/settings.json`, holding the four things every page depends on and no page
+owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
+from, and the address the contact form sends to. Until it existed none of them could be changed
+without a developer — the logo was twelve committed files and a Python script, the favicon another
+eight and another script, the colours were literals in a stylesheet, and the address was a constant
+in the handler.
+
+**It is its own document because none of it belongs to a page.** The logo alone is drawn in the
+header, the footer and the About page, and named in `Organization.logo`, in
+`JobPosting.hiringOrganization.logo`, in the favicon set, in the branding kit and in the admin's own
+rail. Putting it in any one page's document would make the other eight consumers read a document
+about something else.
+
+**A missing file is not an error, and here that matters more than anywhere.** `settings_normalise()`
+fills from `settings_defaults()`, which is the site's own mark, icons and colours exactly as they
+ship — read off the files they replace rather than typed, so a host that has never received a
+publish renders what it renders today, byte for byte.
+
+`settings_logo()` returns the light mark when the dark half is empty, and `settings_logo_is_shared()`
+says when that is happening. **An empty dark half is an answer, not an omission**: plenty of marks
+are one colour and read on both grounds. What must never happen is the other reading — an empty
+half rendering as *nothing*, which would put a hole in the header of every page in dark mode. The
+editor carries a standing notice saying which case it is in, because only the person who drew the
+mark knows whether theirs reads on a dark ground.
 
 ### `chrome.php`
 

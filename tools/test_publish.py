@@ -72,6 +72,7 @@ BRANDING = ROOT / "content" / "branding.json"
 PRIVACY = ROOT / "content" / "privacy.json"
 SEO = ROOT / "content" / "seo.json"
 CHROME = ROOT / "content" / "chrome.json"
+SETTINGS = ROOT / "content" / "settings.json"
 
 MARK = "PUBLISHMARK"
 
@@ -387,6 +388,7 @@ def run(base: str, key: bytes, r: Results) -> None:
     privacy_round_trip(base, key, r)
     seo_round_trip(base, key, r)
     chrome_round_trip(base, key, r)
+    settings_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -1913,6 +1915,121 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("and says so in its own head",
             'name="robots" content="noindex, follow"' in page)
 
+def settings_round_trip(base: str, key: bytes, r: Results) -> None:
+    """The site's identity travels the same road.
+
+    NOT A PAGE EITHER, and further from one than the chrome: nothing here is
+    words on a screen. It is a mark, a set of icons, twenty-eight colours and
+    the address the contact form posts to — every one of which is read by
+    several pages and owned by none.
+
+    THIS DOCUMENT IS THE ONE WHERE RE-NORMALISING ON RECEIPT EARNS ITS KEEP.
+    Its values do not become text on a page; they become an <img src>, a
+    <link rel="icon">, a CSS declaration and the To: line of an email. A
+    signature proves who sent a document and says nothing about what is inside
+    it, so each of those is given something hostile below and has to come back
+    safe — from THIS side, which is the side that would be serving it.
+
+    There is no "and a visitor sees it" group yet, because no renderer reads
+    this document until the stage that converts them. What is proved here is
+    the road: the name has a home, the bands survive it, and the poison does
+    not.
+    """
+    print("\nthe site's identity travels the same road")
+
+    data = json.loads(SETTINGS.read_text()) if SETTINGS.is_file() else {}
+    data["revision"] = 90
+
+    # A mark on somebody else's server, and a ladder with one good rung and one
+    # that is not a path this site will ever serve.
+    data["logo"] = {
+        "light": {
+            "src": "https://evil.example/logo.png",
+            "webp": "/assets/images/logo/logo-light-360.webp",
+            "width": 360, "height": 128,
+            "srcset": "/assets/images/logo/logo-light-180.png 180w, "
+                      "https://evil.example/logo.png 540w",
+            "webp_srcset": "",
+        },
+        # Cleared on purpose. It must STAY cleared: filling it back in from the
+        # defaults would put the shipped lockup underneath somebody else's mark.
+        "dark": {"src": "", "webp": "", "width": 0, "height": 0,
+                 "srcset": "", "webp_srcset": ""},
+    }
+
+    data["icon"] = {
+        "master": {"src": "/uploads/00112233aabbccdd.png", "webp": "",
+                   "width": 512, "height": 512, "srcset": "", "webp_srcset": ""},
+        "generated": {"ico": "/uploads/44556677eeff0011.png",
+                      # Not under a root this site serves from.
+                      "png16": "../../etc/passwd",
+                      "png32": "/uploads/8899aabbccddeeff.png"},
+    }
+
+    # Six hex digits, and two things that are not: one that would close the
+    # declaration and start a new rule, and one that is simply not a colour.
+    data["colours"] = {
+        "light": {"bg-base": "#AABBCC",
+                  "text-primary": "red; } body { display: none"},
+        "dark": {"accent-text": "#123456", "focus-ring": "chartreuse"},
+    }
+
+    data["contact"] = {"mail_to": "attacker@evil.example\nBcc: everyone@evil.example",
+                       "mail_subject": f"{MARK}-subject"}
+
+    status, _ = publish(base, key, "settings", data)
+    r.check("the settings document is accepted", status == 200, f"status {status}")
+
+    stored = json.loads(SETTINGS.read_text())
+
+    print("  what arrived is what this host will serve")
+    r.check("a logo on another origin is dropped",
+            stored["logo"]["light"]["src"] == "", str(stored["logo"]["light"])[:200])
+    r.check("and the one good rung of its ladder is kept, the other dropped",
+            stored["logo"]["light"]["srcset"]
+            == "/assets/images/logo/logo-light-180.png 180w",
+            stored["logo"]["light"]["srcset"])
+    r.check("a dark half cleared on purpose stays cleared",
+            stored["logo"]["dark"]["src"] == "", str(stored["logo"]["dark"])[:200])
+
+    r.check("the icon master arrives", stored["icon"]["master"]["src"]
+            == "/uploads/00112233aabbccdd.png", str(stored["icon"]["master"])[:160])
+    r.check("a generated icon outside the served roots is dropped",
+            stored["icon"]["generated"]["png16"] == "",
+            str(stored["icon"]["generated"])[:200])
+    r.check("and the ones inside them are kept",
+            stored["icon"]["generated"]["ico"] == "/uploads/44556677eeff0011.png"
+            and stored["icon"]["generated"]["png32"] == "/uploads/8899aabbccddeeff.png",
+            str(stored["icon"]["generated"])[:200])
+    r.check("every icon slot the shape declares is present",
+            set(stored["icon"]["generated"]) == {"ico", "png16", "png32", "png48",
+                                                 "png96", "png192", "png512", "apple"},
+            str(sorted(stored["icon"]["generated"])))
+
+    r.check("a real colour arrives, lower-cased",
+            stored["colours"]["light"]["bg-base"] == "#aabbcc",
+            str(stored["colours"]["light"])[:160])
+    # This one ends up inside a generated stylesheet. "red; } body { display:
+    # none" is a valid CSS value right up until the moment it is not.
+    r.check("one that would close the declaration is refused for the shipped one",
+            stored["colours"]["light"]["text-primary"] == "#111113",
+            str(stored["colours"]["light"])[:200])
+    r.check("a colour name rather than a hex value is refused too",
+            stored["colours"]["dark"]["focus-ring"] == "#b8babe",
+            str(stored["colours"]["dark"])[:200])
+    r.check("and every token is present whether it was sent or not",
+            len(stored["colours"]["light"]) == len(stored["colours"]["dark"]) == 14,
+            f'{len(stored["colours"]["light"])} light, {len(stored["colours"]["dark"])} dark')
+
+    # An address with a newline in it is header injection into the mail the
+    # contact form sends, which is the one field here that becomes SMTP.
+    r.check("a mail address with a header break in it is refused",
+            stored["contact"]["mail_to"] == "info@tech4time.bd",
+            repr(stored["contact"]["mail_to"]))
+    r.check("and the subject line arrives", stored["contact"]["mail_subject"]
+            == f"{MARK}-subject", stored["contact"]["mail_subject"])
+
+
 def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
     """The header, footer and dock travel the same road.
 
@@ -2374,6 +2491,13 @@ def main() -> None:
             for path, backup in sorted(backups.items()):
                 if backup is not None:
                     path.write_text(backup)
+                elif path.is_file():
+                    # A document with no committed file — one whose editor
+                    # exists before anybody has saved it. Restoring "what was
+                    # there" means removing it, not leaving it: content/ is
+                    # committed in this repository, and a file this test wrote
+                    # is one a stray "git add -A" would publish as content.
+                    path.unlink()
                 bak = path.with_suffix(".json.bak")
                 if bak.is_file():
                     bak.unlink()

@@ -116,6 +116,7 @@ Never reachable over HTTP: `.htaccess` has `RewriteRule ^lib/ - [F,L]`.
 | `head.php` | every page's `<head>`, from `content/seo.json` |
 | `body.php` | every page's header, footer and dock, from `content/chrome.json` |
 | `chrome.php` | what those three are made of: destinations, derived columns, the current page |
+| `settings.php` | the site's identity: the logo, the tab icon, the brand colours, the enquiry address |
 | `seo.php` | titles, descriptions, the structured data, the sitemap's membership |
 | `sprite.php` | the run-time icon sprite, for symbols chosen by a document rather than typed |
 | `services.php` | the index and all seven detail pages, from one document |
