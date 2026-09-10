@@ -32,8 +32,13 @@ and no attribute check can ask.
 WHAT IS BEING TESTED NOW
 The drawer and hamburger are gone. Below 64em the header nav is hidden and
 the navigation is the dock: a floating bar at the bottom of the viewport with
-four real links and a call to action, plus a panel of six sections that opens
-above it. Above 64em the dock is hidden and the header nav is the navigation.
+four real links and a call to action, plus a panel of sections that opens above
+it. Above 64em the dock is hidden and the header nav is the navigation.
+
+HOW MANY OF EACH IS READ FROM content/chrome.json, not typed here. Those links
+were markup in seventeen pages when this file was written and are a document
+now (ADR 0023), so an operator hiding a nav row would otherwise fail a suite
+that had nothing to say about it -- see shown_rows() below.
 The rule under all of it is that exactly one navigation is usable at any
 width — having two was what produced the first bug.
 """
@@ -254,7 +259,53 @@ class Browser:
             pass
 
 
+def shown_rows() -> dict:
+    """How many links each band of the chrome draws, from the document.
+
+    THE SIX AND THE FOUR USED TO BE TYPED HERE. They were true of markup that
+    was pasted into seventeen pages, so nothing could change them without a
+    developer; the header, footer and dock are content/chrome.json now
+    (ADR 0023), and an operator hiding a nav row would have failed this suite
+    with "all six header links can be clicked" -- which is not a fault, and
+    reads like one.
+
+    Read rather than counted off the page: the page is what is being tested,
+    and a test that counts its subject and then checks the count against itself
+    asserts nothing. lib/chrome.php resolves a row the way the renderer does,
+    so a row pointing at a page that has gone is not counted here either.
+
+    The dock BAR is not among them. It is CHROME_BAR_SLOTS keys, that number is
+    code, and the grid is written for it -- so it stays a literal below, which
+    is the honest way round: what is code is typed, what is content is asked
+    for.
+    """
+    out = subprocess.run(
+        ["php", "-r", """
+        require 'lib/chrome.php';
+        $n = static function (array $rows): int {
+            $count = 0;
+            foreach (chrome_rows_shown($rows) as $row) {
+                if (chrome_link($row) !== null) { $count++; }
+            }
+            return $count;
+        };
+        echo json_encode([
+            'header' => $n(chrome_header()['nav']['items']),
+            'panel'  => $n(chrome_dock()['panel']['items']),
+            'bar'    => CHROME_BAR_SLOTS,
+        ]);"""],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if out.returncode != 0 or not out.stdout.strip():
+        raise SystemExit("could not read content/chrome.json through lib/chrome.php:\n"
+                         + out.stderr.strip()[:400])
+
+    return json.loads(out.stdout)
+
+
 def run(b: Browser, origin: str, r: Results) -> None:
+    rows = shown_rows()
+
     print(f"\ndesktop ({DESKTOP}px): the header nav, and no dock")
     b.size(DESKTOP, 900)
     b.go(origin + PAGE)
@@ -263,9 +314,10 @@ def run(b: Browser, origin: str, r: Results) -> None:
             d["viewport"][0] >= 1024, f"got {d['viewport'][0]}px")
     r.check("the header nav is shown", d["header_nav_display"] != "none",
             f"display is {d['header_nav_display']!r}")
-    r.check("all six header links can be clicked",
-            d["header_reachable"] == d["header_links"] == 6,
-            f"{d['header_reachable']} of {d['header_links']} reachable")
+    r.check(f"all {rows['header']} header links can be clicked",
+            d["header_reachable"] == d["header_links"] == rows["header"],
+            f"{d['header_reachable']} of {d['header_links']} reachable, "
+            f"{rows['header']} in content/chrome.json")
     r.check("the dock is hidden", d["dock_display"] == "none",
             f"display is {d['dock_display']!r}")
     r.check("nothing in the dock is reachable",
@@ -286,16 +338,22 @@ def run(b: Browser, origin: str, r: Results) -> None:
     r.check("no header link is reachable", d["header_reachable"] == 0,
             f"{d['header_reachable']} reachable")
     # These are plain <a>, so they are the part of the navigation that still
-    # works with JavaScript disabled.
-    # Four links: Home, Services, Careers, and the call to action. The menu
-    # button is a <button> and is counted separately.
-    r.check("all four bar destinations are clickable",
-            d["bar_reachable"] == d["bar_links"] == 4,
-            f"{d['bar_reachable']} of {d['bar_links']} reachable")
+    # works with JavaScript disabled. CHROME_BAR_SLOTS of them, whichever
+    # pages they have been pointed at; the menu button is a <button> and is
+    # counted separately.
+    r.check(f"all {rows['bar']} bar destinations are clickable",
+            d["bar_reachable"] == d["bar_links"] == rows["bar"],
+            f"{d['bar_reachable']} of {d['bar_links']} reachable, "
+            f"CHROME_BAR_SLOTS is {rows['bar']}")
     r.check("the menu button is clickable too", d["toggle_display"] != "none",
             f"display is {d['toggle_display']!r}")
-    r.check("the emphasised key goes to the contact page",
-            d["cta_href"] == "/pages/contact/", f"href is {d['cta_href']!r}")
+    # NOT "goes to the contact page" any more: which key is emphasised, and
+    # where it goes, are fields. What must stay true is that the emphasis is on
+    # a real link rather than a button -- it goes to a page, and a <button>
+    # would be a lie to anything reading the markup rather than looking at it.
+    r.check("the emphasised key is a link to a page of this site",
+            isinstance(d["cta_href"], str) and d["cta_href"].startswith("/"),
+            f"href is {d['cta_href']!r}")
     r.check("the menu button shows the dotted grid while closed",
             d["menu_icon"] == "#grid-dots", f"showing {d['menu_icon']!r}")
 
@@ -323,9 +381,10 @@ def run(b: Browser, origin: str, r: Results) -> None:
             and d["panel_rect"][3] > 100,
             f"panel rect is {d['panel_rect']} in a "
             f"{d['viewport'][0]}x{d['viewport'][1]} viewport")
-    r.check("all six sections are on screen and clickable",
-            d["panel_reachable"] == d["panel_links"] == 6,
-            f"{d['panel_reachable']} of {d['panel_links']} reachable")
+    r.check(f"all {rows['panel']} sections are on screen and clickable",
+            d["panel_reachable"] == d["panel_links"] == rows["panel"],
+            f"{d['panel_reachable']} of {d['panel_links']} reachable, "
+            f"{rows['panel']} in content/chrome.json")
     r.check("the page behind it cannot scroll", d["body_overflow"] == "hidden",
             f"body overflow is {d['body_overflow']!r}")
     r.check("the menu button shows the close mark while open",

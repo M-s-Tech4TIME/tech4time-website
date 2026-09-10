@@ -71,6 +71,7 @@ that writes to it.
 | `test_publish.py` | `api/publish.php` and `publish_push()` over real HTTP: the happy path, and every way past it that does not involve holding the key |
 | `test_publish_asset.py` | the endpoint pictures arrive on: a signed picture accepted, everything else refused — a PHP script, a GIF, a script wearing a PNG header, and a header claiming a picture nobody could hold. Also that a vector file is accepted only when it is already the sanitiser's own output, so this host proves it rather than trusting the sender, and that the name is always this side's and never the sender's |
 | `test_sitemap.py` | the three files that are addresses rather than pages — `/sitemap.xml`, `/robots.txt` and `/site.webmanifest`, each rendered by a `.php` file behind an internal rewrite. That all three answer with the right `Content-Type`, that the sitemap is well-formed and lists exactly the indexable routes, that a page set to noindex and a hidden service both leave it, that `robots.txt` always allows the whole site and always names the sitemap whatever the document says, and that a page which has never been published claims no `lastmod` rather than inventing today's date |
+| `test_chrome.py` | the header, footer and dock every page carries, rendered from `content/chrome.json` by `lib/body.php`. That a hidden row is absent rather than faint, that `aria-current` lands on exactly one nav link and never on the brand, that the header and the dock agree about where you are, that the footer's services column follows `content/services.json` including a service hidden after the fact, that a contact row draws the `tel:` or `mailto:` form its kind calls for — and that **every page still renders correctly with `content/chrome.json` deleted**, which is the state a fresh clone and a failed publish are both in — while a band emptied on purpose stays empty, because filling that one back in would put links somebody deliberately removed back on every page |
 | `test_svg.py` **shared** | the SVG sanitiser, tested as the security boundary it is: a real logo survives and still draws, sanitising it twice changes nothing — which is what lets the receiving host prove bytes are clean without editing them — and script, event handlers, entities, embedded rasters, animation, filters and any reference off the file are each refused rather than quietly stripped |
 
 ### In a real browser
@@ -78,7 +79,7 @@ that writes to it.
 | Script | Proves |
 |---|---|
 | `test_motion.py` | the scroll reveal never leaves anything unread |
-| `test_nav.py` | the navigation is usable at both widths |
+| `test_nav.py` | the navigation is usable at both widths. The link counts it checks are **read from `content/chrome.json`**, not typed, so the suite keeps meaning after somebody edits the nav — `CHROME_BAR_SLOTS` stays a literal, because four is code |
 | `test_theme.py` | the theme switch behaves, with a real OS preference |
 
 ---

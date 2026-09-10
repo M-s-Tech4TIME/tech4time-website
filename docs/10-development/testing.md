@@ -52,6 +52,19 @@ python3 tools/check_shared_lib.py --update    # re-record the digests
 # and bump CONTRACT_VERSION if the SHAPE of a document changed
 ```
 
+## When you touched the header, the footer or the dock
+
+```bash
+python3 tools/test_chrome.py           # what every page carries, from content/chrome.json
+python3 tools/audit_pages.py           # the same markup, audited as a visitor receives it
+python3 tools/check_shared_markup.py   # the emitter still carries the scripts' data- hooks
+```
+
+`test_chrome.py` is the one that reads the **words**; `audit_pages.py` is the one that reads the
+**structure**, and neither is a substitute for the other. Run `check_responsive.py` too if you
+changed the markup rather than only the document — it measures the nav at the widest the picker
+can make it, which is a width no shipped document produces.
+
 ## When you touched CSS, markup or motion
 
 Needs Firefox and geckodriver. Slower.
@@ -94,6 +107,7 @@ These start a real PHP server on a spare port and drive it over HTTP.
 |---|---|
 | `test_publish.py` | `api/publish.php` driven over real HTTP with real signatures: the happy path, then **every way past it that does not involve holding the key** — no signature, another key's signature, a tampered body, an old timestamp, a replay, a lower revision, a different `contract_version`, and a `<script>` from a sender that signed correctly. Also that **every field the model declares reaches the visitor**, by sending a marker through each one and reading it back off the public page. And that **a chrome document published from the editor reaches every page** — a marker in the nav, the footer's headings, its contact rows, the copyright and the dock comes back out of an ordinary page, a hidden nav row does not, the services column is read from `content/services.json`, and the brand link on the home page carries no `aria-current`. And that **a service added in the editor becomes a page**: an address with no file behind it, its own head, a line in the sitemap, a link from the index, and a 404 when it is hidden or removed. For the privacy policy it also checks that each of the **six block kinds** is drawn as the kind it is — a subheading as an `<h3>`, a table with scoped headers, a note as the tinted paragraph — that the blocks stay **flat** children of `.legal__body` so `:first-of-type` still matches, and that a fragment link into the page keeps its `href` |
 | `test_sitemap.py` | `sitemap.php`, `robots.php` and `manifest.php` — the three files served at an address that looks static and is not. That each answers with the right `Content-Type`; that the sitemap is well-formed XML listing **exactly** the indexable routes, so a page set to `noindex` and a hidden service both leave it; that `lastmod` is a real publish stamp or absent rather than today's date; that `robots.txt` cannot lose its `Allow: /` or its `Sitemap:` line, and never names the editor's address; and that the manifest is valid JSON |
+| `test_chrome.py` | the header, footer and dock, rendered from `content/chrome.json` by `lib/body.php` and read back off five real pages. A hidden row is **absent**, not faint; `aria-current` lands on exactly one nav link and never on the brand; the header and the dock agree about where you are, including on a service page, where it is the Services link that is marked; the footer's services column follows `content/services.json`, losing a service hidden after the fact; a contact row draws the `tel:` or `mailto:` form its `kind` calls for. And the group that matters most on a fresh clone: **every page renders correctly with `content/chrome.json` deleted**, because `chrome_normalise()` falls back to `chrome_defaults()` band by band — and its opposite, that a band emptied on purpose is left empty, because the two failures are in opposite directions and a fix for one is how you write the other |
 | `test_contact_handler.py` | method check, honeypot, every validation rule, CR/LF injection into each field, the assembled message, non-ASCII round trips, the rate limit, and the no-JavaScript HTML response |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
 
@@ -118,11 +132,11 @@ passes or fails, and against a private store in a throwaway directory under `/tm
 | Script | Proves |
 |---|---|
 | `test_motion.py` | every page scrolled end to end, with every reveal-marked element required to finish opaque — the reveal never leaves anything unread |
-| `test_nav.py` | navigation is usable at desktop and mobile widths, with a keyboard as well as a pointer |
+| `test_nav.py` | navigation is usable at desktop and mobile widths, with a keyboard as well as a pointer. Its link counts are **read from `content/chrome.json`** rather than typed, so editing the nav does not silently retire the assertion — `CHROME_BAR_SLOTS` stays a literal, because four slots is code and not content |
 | `test_theme.py` | the theme switch honours an explicit choice, falls back to the OS preference, and survives a reload without a flash |
 | `check_hover.py` | every interactive element visibly responds to a real pointer |
 | `check_dark_mode.py` | every page in both themes, as painted — catching what a CSS reader cannot, like a token that resolves to the same colour as its background |
-| `check_responsive.py` | every page at 320, 360, 414, 640, 768, 1024 and 1440px: the document does not scroll sideways, no link, button or field is wider than the screen, and no tap target is under 24px. Each width is a frame, not a window — see [0015](../90-decisions/0015-narrow-widths-need-a-frame.md), because Firefox silently clamps a window at about 500px and a check written the obvious way reports widths it never tested |
+| `check_responsive.py` | every page at 320, 360, 414, 640, 768, 1024 and 1440px: the document does not scroll sideways, no link, button or field is wider than the screen, and no tap target is under 24px. Each width is a frame, not a window — see [0015](../90-decisions/0015-narrow-widths-need-a-frame.md), because Firefox silently clamps a window at about 500px and a check written the obvious way reports widths it never tested. Then a **second pass**: two pages at the four narrow widths with `content/chrome.json` replaced by the widest document the picker can produce — every route in the nav, the links, the legal row and the dock panel, each drawing the page's own name, and the longest of those names in all four dock keys. An editable nav is the one thing here that can newly overflow, and no shipped document is as wide as what somebody is allowed to save |
 | `check_focus.py` | every page tabbed one stop at a time, at desktop and mobile widths: each focused element has a visible ring (SC 2.4.7) and is not entirely covered by the sticky header or the fixed dock (SC 2.4.11). Runs with reduced motion so scrolling is instant, and **refuses to run** if that preference did not take effect — otherwise every position it reads is mid-scroll |
 
 They skip with a notice and exit 0 when Firefox or geckodriver is missing, rather than failing —

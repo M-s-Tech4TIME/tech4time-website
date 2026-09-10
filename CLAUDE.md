@@ -145,10 +145,13 @@ Touched `api/publish.php`, `lib/contract.php` or `lib/publish.php`? Also `test_p
 `test_publish_asset.py`** — the second endpoint is easy to forget, and CI runs it — **and
 `check_shared_lib.py --update`, and copy the changed file to the backend.**
 
-Touched `lib/body.php`, `lib/chrome.php` or `content/chrome.json`? Also **`audit_pages.py`** —
-it reads rendered output and is the only check that sees the header, footer and dock a visitor
-actually receives — and `check_shared_markup.py`, which asserts the emitter still carries the six
-`data-` hooks the scripts bind to.
+Touched `lib/body.php`, `lib/chrome.php` or `content/chrome.json`? Also
+**`python3 tools/test_chrome.py`**, which reads the words — hidden rows absent, `aria-current` on
+one nav link and never the brand, the derived services column, and every page still right with
+`content/chrome.json` deleted — and **`audit_pages.py`**, which reads the structure and is the only
+check that sees the header, footer and dock a visitor actually receives, and
+`check_shared_markup.py`, which asserts the emitter still carries the six `data-` hooks the scripts
+bind to.
 
 Touched `lib/head.php`, `lib/seo.php`, `sitemap.php`, `robots.php` or `manifest.php`? Also
 **`python3 tools/test_sitemap.py`** and `audit_pages.py`. All three of those files are served at an

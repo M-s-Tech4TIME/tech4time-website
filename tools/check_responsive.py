@@ -50,6 +50,20 @@ cut off in silence — the page does not scroll and nothing looks broken except
 the half a word that is missing. Both failures shipped; both are fixed; this
 is what keeps them fixed.
 
+AND THEN A SECOND PASS, WITH THE CHROME AT ITS WIDEST
+The header, footer and dock became editable in ADR 0023. Every pass above
+measures the navigation as it happens to be set today, which is six links whose
+labels somebody chose to fit — so it can only find a layout that is already
+broken, never one an operator is about to break. The second pass fills every
+band with one row per destination the picker offers, leaving each label empty
+so it draws that page's own name, and measures again at the narrow widths.
+
+That is the worst case the EDITOR can reach without anybody typing something
+absurd, and it is the only kind of worst case a check can honestly assert:
+a label is a free text field, so there is no upper bound on its length, and a
+check that failed on a 500-character nav link would be failing on a state
+nobody has ever created.
+
 FINDING THE CULPRIT
 When the document overflows, the offending element is reported. Elements
 inside something that clips them are skipped: a slider's off-screen slides
@@ -70,6 +84,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+CHROME = ROOT / "content" / "chrome.json"
 
 # 320 is the narrowest screen still in use and the one that found both bugs.
 # It is also WCAG 2.2 SC 1.4.10 Reflow, which is defined as exactly this width
@@ -99,6 +114,51 @@ PAGES = [
     "/pages/services/it-equipment-supply/",
     "/pages/services/software-development/",
 ]
+
+# THE SECOND PASS. The chrome is identical on every page, so a handful is
+# enough — and the widths are the narrow ones, because that is where a nav of
+# fifteen links has anywhere to go wrong. The home page has no page-title band
+# and the about page has one, which is the only difference above the fold.
+STRESS_PAGES = ["/", "/pages/about/"]
+STRESS_WIDTHS = [320, 360, 414, 640]
+
+# Builds the widest document the picker can produce, and prints it.
+#
+# EVERY LABEL IS LEFT EMPTY on purpose. An empty label means "whatever that
+# page calls itself", so each link draws the longest name the picker
+# guarantees — and those are the names the check can defend measuring, where a
+# typed label has no length limit at all. The dock bar is the exception: its
+# labels are typed rather than taken from the page, so the longest of those
+# same names is written into all four, which is the widest thing four keys can
+# be asked to hold without inventing a word.
+STRESS_PHP = r'''
+require 'lib/chrome.php';
+
+$targets = chrome_target_list();
+$rows    = [];
+foreach (array_keys($targets) as $key) {
+    $rows[] = ['id' => '', 'target' => $key, 'label' => '', 'status' => 'shown'];
+}
+
+$longest = '';
+foreach ($targets as $target) {
+    if (strlen($target['name']) > strlen($longest)) { $longest = $target['name']; }
+}
+
+$data = chrome_load();
+$data['header']['nav']['items']   = $rows;
+$data['footer']['links']['items'] = $rows;
+$data['footer']['legal']['items'] = $rows;
+$data['dock']['panel']['items']   = array_map(
+    static fn(array $r): array => $r + ['description' => $longest], $rows);
+
+foreach ($data['dock']['bar']['items'] as $i => $_key) {
+    $data['dock']['bar']['items'][$i]['label'] = $longest;
+}
+
+echo json_encode(chrome_normalise($data), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+                                          | JSON_UNESCAPED_UNICODE);
+'''
 
 # Runs in the outer window. Puts the page in a frame of the requested width,
 # waits for it, then measures inside it. Returns {"loading": true} until the
@@ -355,30 +415,47 @@ def run(b: Browser, origin: str, r: Results) -> None:
     b.size(max(WIDTHS) + 120, 1000)
     b.go(origin + "/404.php")
 
-    for width in WIDTHS:
-        print(f"\n{width}px")
+    measure_pages(b, origin, r, PAGES, WIDTHS)
+
+    # ------------------------------------------------ and with the widest nav
+    #
+    # content/ is a replica written by api/publish.php and by nothing else, so
+    # this puts it back from bytes taken before anything ran -- including if
+    # the run fails, which is what the finally in main() is for.
+    print("\n\nand again with every band as full as the picker can make it")
+
+    CHROME.write_text(widest_chrome())
+    measure_pages(b, origin, r, STRESS_PAGES, STRESS_WIDTHS, note="  (widest nav)")
+
+
+def measure_pages(b: Browser, origin: str, r: Results, pages: list[str],
+                  widths: list[int], note: str = "") -> None:
+    """One pass: every page in `pages`, at every width in `widths`."""
+    for width in widths:
+        print(f"\n{width}px{note}")
         measured = None
 
-        for page in PAGES:
+        for page in pages:
             out = b.measure(width, origin + page)
             if out is None:
-                r.check(f"{page} loads at {width}px", False, "the frame never finished loading")
+                r.check(f"{page} loads at {width}px{note}", False,
+                        "the frame never finished loading")
                 continue
 
             measured = out["vw"]
             r.check(
-                f"{page} does not scroll sideways at {width}px",
+                f"{page} does not scroll sideways at {width}px{note}",
                 out["over"] <= 1,
                 f"the page is {out['over']}px wider than its {out['vw']}px viewport\n          "
                 + "\n          ".join(out["culprits"] or ["(no unclipped element found)"]),
             )
             r.check(
-                f"{page} has no control wider than the screen at {width}px",
+                f"{page} has no control wider than the screen at {width}px{note}",
                 not out["toowide"],
                 "\n          ".join(out["toowide"]),
             )
             r.check(
-                f"{page} has no tap target under 24px at {width}px",
+                f"{page} has no tap target under 24px at {width}px{note}",
                 not out["small"],
                 "\n          ".join(out["small"]),
             )
@@ -390,11 +467,22 @@ def run(b: Browser, origin: str, r: Results) -> None:
         if measured is not None:
             slack = width - measured
             print(f"  measured viewport {measured}px"
-                  f"  ({slack}px of scrollbar)  — {len(PAGES)} pages")
+                  f"  ({slack}px of scrollbar)  — {len(pages)} pages")
             if not 0 <= slack <= 40:
-                r.check(f"the {width}px frame really is {width}px wide", False,
+                r.check(f"the {width}px frame really is {width}px wide{note}", False,
                         f"asked for {width}, measured {measured} — the frame is being "
                         f"clamped, so nothing checked at this width can be believed")
+
+
+def widest_chrome() -> str:
+    """content/chrome.json with every band as full as the picker can make it."""
+    out = subprocess.run(["php", "-r", STRESS_PHP],
+                         cwd=str(ROOT), capture_output=True, text=True)
+    if out.returncode != 0 or not out.stdout.strip():
+        raise SystemExit("could not build the stress document:\n"
+                         + out.stderr.strip()[:400])
+
+    return out.stdout
 
 
 def main() -> None:
@@ -417,13 +505,18 @@ def main() -> None:
         raise SystemExit("php or geckodriver did not start")
 
     print(f"firefox (headless) against 127.0.0.1:{web_port}")
-    print(f"{len(PAGES)} pages x {len(WIDTHS)} widths, each in a frame of its own")
+    print(f"{len(PAGES)} pages x {len(WIDTHS)} widths, each in a frame of its own,")
+    print(f"then {len(STRESS_PAGES)} x {len(STRESS_WIDTHS)} with the navigation at its widest")
     results = Results()
     browser = None
+    chrome_backup = CHROME.read_bytes() if CHROME.is_file() else None
     try:
         browser = Browser(drv_port)
         run(browser, f"http://127.0.0.1:{web_port}", results)
     finally:
+        if chrome_backup is not None:
+            CHROME.write_bytes(chrome_backup)
+            print("\ncontent/chrome.json restored")
         if browser:
             browser.quit()
         for proc in (drv, php):
