@@ -80,7 +80,8 @@ function company_load(): array
  * which the editor does not allow and a hand-edited file might. Guessing would
  * move the page; leaving them out says "unknown", which is true.
  */
-function company_picture(array $image, string $class, string $alt): string
+function company_picture(array $image, string $class, string $alt,
+                         string $slot = ''): string
 {
     $src = trim((string)($image['src'] ?? ''));
     if ($src === '') {
@@ -93,7 +94,18 @@ function company_picture(array $image, string $class, string $alt): string
               . ' height="' . (int)$image['height'] . '"';
     }
 
-    $img = '<img class="' . h($class) . '" src="' . h($src) . '"'
+    /* One picture at several widths, when this one was stored that way and
+       the slot says how wide it is drawn. Both halves or neither: see
+       contract_picture_ladder(). THE SLOT IS A PARAMETER HERE and a literal in
+       the other four renderers, because this page draws three different
+       pictures -- a client's logo, a journey photograph and a technology mark
+       -- at three different widths, through one function. */
+    $ladder = contract_picture_ladder($image, $slot);
+    $rungs  = $ladder['srcset'] === '' ? ''
+            : ' srcset="' . h($ladder['srcset']) . '"'
+            . ' sizes="' . h($ladder['sizes']) . '"';
+
+    $img = '<img class="' . h($class) . '" src="' . h($src) . '"' . $rungs
          . ' alt="' . h($alt) . '"' . $size
          . ' loading="lazy" decoding="async">';
 
@@ -102,8 +114,12 @@ function company_picture(array $image, string $class, string $alt): string
         return $img;
     }
 
-    return '<picture><source srcset="' . h($webp) . '" type="image/webp">'
-         . $img . '</picture>';
+    $source = $ladder['webp_srcset'] === ''
+        ? '<source srcset="' . h($webp) . '" type="image/webp">'
+        : '<source srcset="' . h($ladder['webp_srcset']) . '"'
+        . ' sizes="' . h($ladder['sizes']) . '" type="image/webp">';
+
+    return '<picture>' . $source . $img . '</picture>';
 }
 
 /* --------------------------------------------------------- structured data */

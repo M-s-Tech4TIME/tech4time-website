@@ -83,7 +83,16 @@ function branding_picture(array $image, string $class, string $alt): string
         $size = ' width="' . (int)$image['width'] . '" height="' . (int)$image['height'] . '"';
     }
 
-    $img = '<img class="' . h($class) . '" src="' . h($src) . '"'
+    /* One picture at several widths, when this one was stored that way and
+       the slot says how wide it is drawn. Both halves or neither: see
+       contract_picture_ladder(). The DOWNLOADS on this page are not drawn and
+       do not ladder -- there the file is the deliverable. */
+    $ladder = contract_picture_ladder($image, 'branding.asset');
+    $rungs  = $ladder['srcset'] === '' ? ''
+            : ' srcset="' . h($ladder['srcset']) . '"'
+            . ' sizes="' . h($ladder['sizes']) . '"';
+
+    $img = '<img class="' . h($class) . '" src="' . h($src) . '"' . $rungs
          . ' alt="' . h($alt) . '"' . $size . ' loading="lazy" decoding="async">';
 
     $webp = trim((string)($image['webp'] ?? ''));
@@ -91,7 +100,12 @@ function branding_picture(array $image, string $class, string $alt): string
         return $img;
     }
 
-    return '<picture><source srcset="' . h($webp) . '" type="image/webp">' . $img . '</picture>';
+    $source = $ladder['webp_srcset'] === ''
+        ? '<source srcset="' . h($webp) . '" type="image/webp">'
+        : '<source srcset="' . h($ladder['webp_srcset']) . '"'
+        . ' sizes="' . h($ladder['sizes']) . '" type="image/webp">';
+
+    return '<picture>' . $source . $img . '</picture>';
 }
 
 /**

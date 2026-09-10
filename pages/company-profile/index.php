@@ -388,7 +388,8 @@ $data = company_load();
         <ul class="clients" role="list" data-reveal-rows>
 <?php foreach (company_shown($data, 'clients') as $row): ?>
           <li data-reveal data-reveal-delay class="client-card">
-            <?= company_picture($row['image'], 'client-card__logo', (string)$row['name']) ?>
+            <?= company_picture($row['image'], 'client-card__logo', (string)$row['name'],
+                                   'company.clients') ?>
 
             <span class="visually-hidden"><?= h($row['name']) ?></span>
           </li>
@@ -418,7 +419,8 @@ $data = company_load();
 <?php endif; ?>
               <div class="slider__slide">
                 <div class="journey__item">
-                  <?= company_picture($row['image'], 'journey__image', (string)$row['alt']) ?>
+                  <?= company_picture($row['image'], 'journey__image', (string)$row['alt'],
+                                     'company.journey') ?>
 
                 </div>
               </div>
@@ -500,7 +502,8 @@ $data = company_load();
 <?php foreach (company_shown($data, 'technology') as $row): ?>
           <li class="tech-sphere__item">
             <span class="tech-sphere__face">
-              <?= company_picture($row['image'], 'tech-sphere__logo', (string)$row['name']) ?>
+              <?= company_picture($row['image'], 'tech-sphere__logo', (string)$row['name'],
+                                   'company.technology') ?>
 
             </span>
           </li>

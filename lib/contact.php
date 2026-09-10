@@ -132,9 +132,25 @@ function contact_flag_picture(array $office): string
             ? ' width="' . (int)$image['width'] . '" height="' . (int)$image['height'] . '"'
             : '';
 
-        return '<picture class="office__flag-wrap">'
-             . ($webp !== '' ? '<source srcset="' . h($webp) . '" type="image/webp">' : '')
-             . '<img class="office__flag" src="' . h($src) . '"'
+        /* One flag at several widths, when this one was stored that way.
+           Only this branch: the slug below names files that ship with this
+           repository, one width each, and nothing here can make more of them.
+           See contract_picture_ladder() for why both halves or neither. */
+        $ladder = contract_picture_ladder($image, 'contact.offices');
+        $rungs  = $ladder['srcset'] === '' ? ''
+                : ' srcset="' . h($ladder['srcset']) . '"'
+                . ' sizes="' . h($ladder['sizes']) . '"';
+
+        $source = '';
+        if ($webp !== '') {
+            $source = $ladder['webp_srcset'] === ''
+                ? '<source srcset="' . h($webp) . '" type="image/webp">'
+                : '<source srcset="' . h($ladder['webp_srcset']) . '"'
+                . ' sizes="' . h($ladder['sizes']) . '" type="image/webp">';
+        }
+
+        return '<picture class="office__flag-wrap">' . $source
+             . '<img class="office__flag" src="' . h($src) . '"' . $rungs
              . ' alt="' . h($alt) . '"' . $size
              . ' loading="lazy" decoding="async"></picture>';
     }

@@ -92,7 +92,15 @@ function about_picture(array $image, string $class, string $alt): string
               . ' height="' . (int)$image['height'] . '"';
     }
 
-    $img = '<img class="' . h($class) . '" src="' . h($src) . '"'
+    /* One picture at several widths, when this one was stored that way and
+       the slot says how wide it is drawn. Both halves or neither: see
+       contract_picture_ladder(). */
+    $ladder = contract_picture_ladder($image, 'about.story');
+    $rungs  = $ladder['srcset'] === '' ? ''
+            : ' srcset="' . h($ladder['srcset']) . '"'
+            . ' sizes="' . h($ladder['sizes']) . '"';
+
+    $img = '<img class="' . h($class) . '" src="' . h($src) . '"' . $rungs
          . ' alt="' . h($alt) . '"' . $size
          . ' loading="lazy" decoding="async">';
 
@@ -101,8 +109,12 @@ function about_picture(array $image, string $class, string $alt): string
         return $img;
     }
 
-    return '<picture><source srcset="' . h($webp) . '" type="image/webp">'
-         . $img . '</picture>';
+    $source = $ladder['webp_srcset'] === ''
+        ? '<source srcset="' . h($webp) . '" type="image/webp">'
+        : '<source srcset="' . h($ladder['webp_srcset']) . '"'
+        . ' sizes="' . h($ladder['sizes']) . '" type="image/webp">';
+
+    return '<picture>' . $source . $img . '</picture>';
 }
 
 /**

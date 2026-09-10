@@ -52,6 +52,23 @@ python3 tools/check_shared_lib.py --update    # re-record the digests
 # and bump CONTRACT_VERSION if the SHAPE of a document changed
 ```
 
+## When you touched a picture, or how wide one is drawn
+
+```bash
+python3 tools/test_pictures.py         # what a ladder turns into on the page
+python3 tools/audit_pages.py           # and that no page ends up with one it cannot use
+```
+
+`test_pictures.py` puts a ladder into each document and reads the markup back, because
+`audit_pages.py` audits the documents *as they are* and none of them holds one yet — so the rule it
+enforces has nothing to enforce it on until somebody uploads a picture. Both halves matter and the
+second is the one that is easy to lose: **a `srcset` of widths with no `sizes=` beside it is a
+regression, not a missing improvement.** The browser is required to assume the picture fills the
+viewport, so it takes the widest rung on every screen.
+
+Changed a number in `CONTRACT_IMAGE_SLOTS`? **Measure it, do not estimate it** — "If you are
+measuring geometry" below has the technique, and two of the seven are not where anybody would guess.
+
 ## When you touched the header, the footer or the dock
 
 ```bash

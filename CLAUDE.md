@@ -161,6 +161,15 @@ links to, which Google fetches and people do not.
 Touched the contact handler? Also `test_contact_handler.py`. Touched `lib/store.php`? Also
 `test_store.py`.
 
+Touched a renderer that draws an uploaded picture — `about_picture()`, `home_picture()`,
+`company_picture()`, `branding_picture()`, `contact_flag_picture()` — or a number in
+`CONTRACT_IMAGE_SLOTS`? Also **`python3 tools/test_pictures.py`** and `audit_pages.py`. The first
+puts a ladder into each document and reads the markup back; the second is the only check that sees a
+`srcset` of widths shipped with no `sizes=` beside it, which is a regression rather than a missing
+improvement — without it the browser takes the widest rung on every screen. A width in that table is
+**measured, not estimated**: two of the seven are widest on a phone or a tablet rather than a
+desktop.
+
 Touched CSS, markup or motion? Also `test_motion.py`, `test_nav.py`, `test_theme.py`,
 `check_hover.py`, `check_dark_mode.py`, `check_responsive.py`, `check_focus.py` — these need
 Firefox and geckodriver, and leave processes behind if interrupted (`pkill firefox geckodriver`).

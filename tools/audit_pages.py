@@ -15,6 +15,9 @@ Checks, per page:
   - every form control has a label, and every link and button an accessible name
   - every <img> carries an alt attribute (alt="" is valid for decoration)
   - every <img> carries width and height, or CSS aspect-ratio, to avoid CLS
+  - every srcset of widths carries a sizes= beside it, or the browser is
+    required to assume the picture fills the viewport and takes the widest
+    file every time — a ladder without one is worse than no ladder
   - every JSON-LD block parses as valid JSON
   - every external link carries rel="noopener noreferrer"
   - internal links resolve to a file that exists
@@ -57,6 +60,7 @@ class PageParser(HTMLParser):
         self.viewport = None
         self.headings = []          # (level, text)
         self.images = []            # dict of attrs
+        self.sources = []           # <source> inside <picture>, dict of attrs
         self.links = []             # dict of attrs
         self.jsonld = []            # raw script bodies
         self.symbol_ids = set()
@@ -121,6 +125,8 @@ class PageParser(HTMLParser):
             self._buffer = []
         elif tag == "img":
             self.images.append(a)
+        elif tag == "source":
+            self.sources.append(a)
         elif tag == "a":
             self.links.append(a)
         elif tag == "symbol" and a.get("id"):
@@ -529,6 +535,22 @@ def audit_page(path: Path, seen_titles: dict, seen_descriptions: dict,
             fail(f"<img> without alt: {src}")
         if not (img.get("width") and img.get("height")):
             fail(f"<img> without width/height (layout shift risk): {src}")
+
+    # A srcset of WIDTHS ("… 360w, … 720w") is a set of candidates the browser
+    # chooses between by comparing them against how wide the picture will be
+    # drawn — which it learns from sizes=, and cannot work out for itself
+    # before layout. With no sizes= the specification requires it to assume
+    # 100vw, so it takes the WIDEST candidate on every screen: a phone
+    # downloading the 3x file for a picture drawn at 56 pixels, which is worse
+    # than the single file it would otherwise have been sent. A srcset of
+    # DENSITIES ("… 2x") needs no sizes= and is left alone.
+    for el, tag in ([(i, "img") for i in parser.images]
+                    + [(s, "source") for s in parser.sources]):
+        srcset = (el.get("srcset") or "").strip()
+        if not srcset or not re.search(r"\s\d+(\.\d+)?w(\s*,|\s*$)", srcset):
+            continue
+        if not (el.get("sizes") or "").strip():
+            fail(f"<{tag} srcset> of widths with no sizes=: {srcset[:90]}")
 
     # --- links -----------------------------------------------------------
     for link in parser.links:
