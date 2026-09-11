@@ -2090,13 +2090,6 @@ def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
         for i in range(6)
     ]
 
-    # A logo pointing at somebody else's server, and a srcset with one good
-    # entry and one that is not a path this site will serve.
-    data["header"]["logo"]["light"]["src"] = "https://evil.example/logo.png"
-    data["header"]["logo"]["light"]["srcset"] = (
-        "/assets/images/logo/logo-light-360.png 360w, "
-        "https://evil.example/logo.png 540w")
-
     status, _ = publish(base, key, "chrome", data)
     r.check("the chrome document is accepted", status == 200, f"status {status}")
 
@@ -2139,13 +2132,15 @@ def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("  empty contact lines are dropped",
             stored["footer"]["contact"]["items"][0]["lines"] == [f"{MARK}-number"],
             repr(stored["footer"]["contact"]["items"][0]["lines"]))
-    r.check("  a logo pointing at another origin is refused",
-            stored["header"]["logo"]["light"]["src"] == "",
-            stored["header"]["logo"]["light"]["src"])
-    r.check("  and only the good half of a srcset survives",
-            stored["header"]["logo"]["light"]["srcset"]
-            == "/assets/images/logo/logo-light-360.png 360w",
-            stored["header"]["logo"]["light"]["srcset"])
+    # THE PICTURE IS NOT IN THIS DOCUMENT ANY MORE. It used to be, and the two
+    # checks here refused a logo on another origin and kept only the good half
+    # of a srcset. The mark moved to content/settings.json, read by the nine
+    # places that draw it, so both refusals moved with it — settings_round_trip()
+    # above sends exactly the same poison and asserts exactly the same outcome.
+    # What the chrome still says about the logo is the words:
+    r.check("  the chrome keeps the alt text and nothing else about the mark",
+            set(stored["header"]["logo"]) == {"alt", "sizes"},
+            str(sorted(stored["header"]["logo"])))
     r.check("  the services column still stores no rows of its own",
             "items" not in stored["footer"]["services"])
 

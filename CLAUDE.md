@@ -161,6 +161,12 @@ links to, which Google fetches and people do not.
 Touched the contact handler? Also `test_contact_handler.py`. Touched `lib/store.php`? Also
 `test_store.py`.
 
+Touched the logo, or anything that draws it — `lib/body.php`, `lib/about.php`, `lib/seo.php`,
+`lib/careers.php`? Also **`python3 tools/test_settings.py`**. The mark is in nine places across two
+repositories and `content/settings.json` exists so that they are one; that suite changes it once and
+reads it back out of all of them, plus the case a fresh clone is in, where the document is missing
+and the site still has a logo.
+
 Touched a renderer that draws an uploaded picture — `about_picture()`, `home_picture()`,
 `company_picture()`, `branding_picture()`, `contact_flag_picture()` — or a number in
 `CONTRACT_IMAGE_SLOTS`? Also **`python3 tools/test_pictures.py`** and `audit_pages.py`. The first

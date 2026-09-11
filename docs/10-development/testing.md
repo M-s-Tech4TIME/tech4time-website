@@ -52,6 +52,18 @@ python3 tools/check_shared_lib.py --update    # re-record the digests
 # and bump CONTRACT_VERSION if the SHAPE of a document changed
 ```
 
+## When you touched the logo, or anything that draws it
+
+```bash
+python3 tools/test_settings.py         # one mark, every place it is drawn
+python3 tools/audit_pages.py           # and the pages still audit
+```
+
+The mark is in nine places across two repositories, and the whole point of
+`content/settings.json` is that they are one. `test_settings.py` changes it once and reads it back
+out of the header, the footer, the About lockup, `Organization.logo` and the job postings — plus the
+case a fresh clone is in, where the document is **missing** and the site still has a logo.
+
 ## When you touched a picture, or how wide one is drawn
 
 ```bash

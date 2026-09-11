@@ -26,6 +26,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
+/* For seo_url() and the mark: the job posting names the hiring
+   organisation's logo, which is the site's, at an absolute URL. */
+require_once __DIR__ . '/seo.php';
+require_once __DIR__ . '/settings.php';
 
 const CAREERS_FILE = __DIR__ . '/../content/careers.json';
 
@@ -101,11 +105,16 @@ function careers_job_posting(array $job): array
             'name' => 'Tech4TIME',
             'value' => (string)($job['id'] ?? ''),
         ],
+        /* THE MARK IS READ, NOT TYPED. This was an absolute URL to one
+           committed file, so a company that replaced its logo went on telling
+           Google Jobs about the old one -- from a document nobody would think
+           to look in. The largest rendition, because a consumer of structured
+           data takes the one URL it is given. */
         'hiringOrganization' => [
             '@type' => 'Organization',
             'name' => 'Tech4TIME',
             'sameAs' => 'https://tech4time.bd',
-            'logo' => 'https://tech4time.bd/assets/images/logo/logo-light-360.png',
+            'logo' => seo_url((string)settings_logo_largest(settings_load())['src']),
         ],
         'jobLocation' => [
             '@type' => 'Place',

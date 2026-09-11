@@ -54,6 +54,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/chrome.php';
+require_once __DIR__ . '/settings.php';
 
 /**
  * The header: skip link, brand, nav, theme toggle -- and the chrome's sprite.
@@ -146,12 +147,19 @@ HTML;
  */
 function body_header_logo(array $logo, string $mode): string
 {
-    $image = $logo[$mode];
+    /* THE PICTURE COMES FROM THE SETTINGS AND THE WORDS FROM THE CHROME. One
+       mark is drawn in nine places; the sentence a screen reader announces
+       THIS link as is the header's own, and is legitimately not the footer's.
+       settings_logo() falls back to the light mark when no dark one was
+       uploaded, so an empty dark half draws the light one rather than a hole
+       in the header of every page. */
+    $image = settings_logo(settings_load(), $mode);
     $out   = [];
 
     $out[] = '      <picture class="site-header__logo-wrap site-header__logo-wrap--' . $mode . '">';
     $out[] = '        <source';
-    $out[] = '          srcset="' . h($image['webp']) . '"';
+    $out[] = '          srcset="' . h($image['webp_srcset'] !== ''
+                                     ? $image['webp_srcset'] : $image['webp']) . '"';
     if (trim((string)$logo['sizes']) !== '') {
         $out[] = '          sizes="' . h($logo['sizes']) . '"';
     }
@@ -166,8 +174,8 @@ function body_header_logo(array $logo, string $mode): string
         $out[] = '          sizes="' . h($logo['sizes']) . '"';
     }
     $out[] = '          alt="' . h($logo['alt']) . '"';
-    $out[] = '          width="' . (int)$logo['width'] . '"';
-    $out[] = '          height="' . (int)$logo['height'] . '"';
+    $out[] = '          width="' . (int)$image['width'] . '"';
+    $out[] = '          height="' . (int)$image['height'] . '"';
     $out[] = $mode === 'light' ? '          fetchpriority="high"' : '          loading="lazy"';
     $out[] = '          decoding="async">';
     $out[] = '      </picture>';
@@ -331,14 +339,16 @@ function body_footer_link(string $href, string $label): string
  */
 function body_footer_logo(array $logo, string $mode): string
 {
-    $image = $logo[$mode];
+    /* The same mark as the header's, from the same document, drawn small and
+       lazily -- and announced in the footer's own words. */
+    $image = settings_logo(settings_load(), $mode);
     $out   = [];
 
     $out[] = '          <picture class="site-footer__logo-wrap site-footer__logo-wrap--' . $mode . '">';
     $out[] = '            <source srcset="' . h($image['webp']) . '" type="image/webp">';
     $out[] = '            <img class="site-footer__logo" src="' . h($image['src']) . '"';
-    $out[] = '                 alt="' . h($logo['alt']) . '" width="' . (int)$logo['width']
-           . '" height="' . (int)$logo['height'] . '" loading="lazy" decoding="async">';
+    $out[] = '                 alt="' . h($logo['alt']) . '" width="' . (int)$image['width']
+           . '" height="' . (int)$image['height'] . '" loading="lazy" decoding="async">';
     $out[] = '          </picture>';
 
     return implode("\n", $out);

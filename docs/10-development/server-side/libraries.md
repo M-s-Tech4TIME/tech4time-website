@@ -567,6 +567,19 @@ without a developer — the logo was twelve committed files and a Python script,
 eight and another script, the colours were literals in a stylesheet, and the address was a constant
 in the handler.
 
+**One mark, nine consumers, and now one document.** The logo is read from `content/settings.json` by
+the header, the footer, the About page's lockup, `Organization.logo`, every job posting's hiring
+organisation, the branding kit, the favicon set and the admin's own rail. It used to be typed into
+`content/chrome.json` as eleven text fields per part — twice, for the header and the footer — while
+the other seven named committed files nobody could reach from any editor at all. **The SEO screen
+already had a working logo upload that was completely disconnected from the header**, so changing
+one left the other showing the old mark with nothing comparing them.
+
+What stays in the chrome is the **alt text**, which is genuinely the chrome's: the header's and the
+footer's are different sentences about the same picture. `identity.logo` on the SEO screen stays as
+an **override** — empty means the site's mark, filled wins — because Google renders
+`Organization.logo` in a near-square slot and this lockup is nearly three to one.
+
 **It is its own document because none of it belongs to a page.** The logo alone is drawn in the
 header, the footer and the About page, and named in `Organization.logo`, in
 `JobPosting.hiringOrganization.logo`, in the favicon set, in the branding kit and in the admin's own
