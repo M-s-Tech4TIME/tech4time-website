@@ -557,8 +557,7 @@ whole-document rebuild there would empty the page.
 
 ### `settings.php`
 
-`settings_load()` · `settings_logo()` · `settings_logo_largest()` ·
-`settings_logo_is_shared()` · `settings_colours()`
+`settings_load()`
 
 One document, `content/settings.json`, holding the four things every page depends on and no page
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
@@ -585,6 +584,16 @@ header, the footer and the About page, and named in `Organization.logo`, in
 `JobPosting.hiringOrganization.logo`, in the favicon set, in the branding kit and in the admin's own
 rail. Putting it in any one page's document would make the other eight consumers read a document
 about something else.
+
+**Reading the identity is in [`contract.php`](#contractphp), not here, and that is a correction.**
+`settings_logo()` (which mark for which theme, falling back to the light one), `settings_logo_largest()`,
+`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_icon_is_stale()` and
+`settings_colours()` are pure functions of the document — none reads a file, emits markup or knows
+which host it is on — and **both halves render the mark**: the public site draws it in the header,
+the footer and the About row; the editor draws it in its own rail and on its sign-in page. Putting
+them on the renderer's side got `settings_logo_is_shared()` written out twice within the hour, which
+is the drift the shared file exists to prevent. What is left in each half is that half's own
+business: the file path and the read here, plus the save, the validation and the screens over there.
 
 **A missing file is not an error, and here that matters more than anywhere.** `settings_normalise()`
 fills from `settings_defaults()`, which is the site's own mark, icons and colours exactly as they

@@ -106,7 +106,7 @@ Run rarely — usually only when the source artwork changes. **These need Pillow
 |---|---|
 | `build_icon_sprite.py` | Build the self-hosted SVG icon sprite from Font Awesome Free metadata |
 | `build_images.py` | Copy, rename and optimise the site's content images |
-| `build_logos.py` | Normalise the master logo artwork into the web asset set |
+| `build_logos.py` | Normalise the master logo artwork into the web asset set — **the committed seed, not the live mark.** A company changing its logo uploads it at `?s=settings&part=logo`, which stores it under `/uploads/` and sends it here; this rebuilds what a fresh install shows before anybody has. Different input, different output, different lifecycle, so it stays |
 | `build_favicons.py` | Generate the favicon set from the 512px master |
 | `build_og_image.py` | Build the 1200×630 Open Graph / Twitter Card share image |
 | `fetch_fonts.py` | Fetch and self-host the Inter variable font (latin + latin-ext) |

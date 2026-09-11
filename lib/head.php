@@ -60,7 +60,7 @@ require_once __DIR__ . '/seo.php';
  */
 const HEAD_STYLES = [
     'base.css',
-    'theme.css',
+    'theme.css?v=2',
     'layout.css?v=4',
     'components.css',
     'animations.css',
