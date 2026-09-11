@@ -93,6 +93,33 @@ render its body. No second read, no second source.
 Two pages get no `BreadcrumbList`, both deliberately: the home page, because a one-item trail says
 nothing a crawler cannot read off the URL, and the 404, because it has no address to be a place in.
 
+### What a `LocalBusiness` node carries, and the two things it does not
+
+Each office contributes its own `@id`, name, address, telephone list, email, price range and — when
+a row on `?s=seo&site=crawl` is labelled after it — its opening hours. A row matching no office is
+left off rather than attached to all of them, because opening hours on the wrong continent are worse
+than none.
+
+**`image` is the site's share card, not the office's own picture.** That field is a *flag*: it
+overrides the shipped country slug, and `CONTRACT_IMAGE_SLOTS` stores it at 56px because 56px is
+where it is drawn. A 56-pixel flag offered to a search engine as the photograph of a place of
+business is a worse answer than none at all. A real photograph per office would be a different field
+at a different width; until there is one, every office carries the card the rest of the site carries.
+`Organization` uses the same card, so the two agree.
+
+**`geo` needs both halves or it is not emitted.** Latitude and longitude are editable per office at
+`?s=contact`, under *Address for search engines* — and they are the only pair in that document that
+is **checked** rather than trimmed. Every other field there is a line of an address, where whatever
+somebody types is what that place is called. A coordinate is a number with a range that no person
+reads, printed into a graph a search engine acts on, so `contact_coordinate()` refuses anything
+outside ±90 / ±180, anything with a stray character in it, and scientific notation — all of which
+become empty. One number is not half a pin; it is a pin somewhere on a line through the middle of
+the planet, so a half-filled pair is dropped entirely.
+
+They are stored as **strings**, deliberately. A round trip through a float rewrites what somebody
+typed: `23.80` loses its trailing zero, and how many places a coordinate was given to is a claim
+about precision this code has no business rounding.
+
 ---
 
 ## The three files that are addresses rather than pages

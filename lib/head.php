@@ -163,10 +163,22 @@ function head_styles(array $extra = []): array
  * every browser -- they are set for real in .htaccess, which is the
  * authoritative source. Referrer-Policy and CSP genuinely do work here, and
  * are kept in case the host strips response headers.
+ *
+ * AND frame-ancestors IS IN THAT SAME CATEGORY, which this file argued for two
+ * directives and then did not apply to a third. The CSP specification lists
+ * frame-ancestors among the directives IGNORED when a policy is delivered by
+ * <meta http-equiv>; only an HTTP header can carry it. So the copy that used
+ * to be here protected nothing and read as though it did -- which is worse
+ * than absent, because it invites somebody to conclude the page is safe to
+ * frame-block without checking the header.
+ *
+ * Framing is refused for real by .htaccess, twice: the Content-Security-Policy
+ * header carries frame-ancestors 'none' and X-Frame-Options: DENY is set
+ * beside it. Nothing is weakened by dropping it here; a claim is.
  */
 const HEAD_CSP = "default-src 'self'; img-src 'self' data:; style-src 'self'; "
                . "script-src 'self'; font-src 'self'; form-action 'self'; "
-               . "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+               . "base-uri 'self'; object-src 'none'";
 
 /**
  * The same policy, widened by exactly what Google Analytics needs.
@@ -190,7 +202,7 @@ const HEAD_CSP_ANALYTICS =
     . "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com "
     . "https://*.googletagmanager.com; "
     . "font-src 'self'; form-action 'self'; "
-    . "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+    . "base-uri 'self'; object-src 'none'";
 
 /** The pretty-printing every JSON-LD block on this site uses. */
 const HEAD_JSON_FLAGS = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
@@ -489,6 +501,7 @@ function seo_graph(): array
 function seo_offices(array $contact): array
 {
     $hours = seo_shown(seo_load(), 'hours');
+    $share = seo_share([]);        /* the site-wide card; see the note below */
     $out   = [];
 
     foreach (contact_shown_offices($contact) as $office) {
@@ -524,14 +537,44 @@ function seo_offices(array $contact): array
             )),
             'email'              => contact_email($contact),
             'priceRange'         => seo_identity()['price_range'],
+            /* THE SHARE CARD, WHICH IS WHAT Organization ALSO USES, and
+               deliberately NOT the office's own picture. That field is a flag:
+               it overrides the shipped country slug, CONTRACT_IMAGE_SLOTS
+               stores it at 56px because 56px is where it is drawn, and a
+               56-pixel flag offered to a search engine as the photograph of a
+               place of business is a worse answer than none at all.
+
+               A real photograph per office would be a different field at a
+               different width. Until there is one, each office carries the
+               card the rest of the site carries, which is at least accurate.
+
+               Set unconditionally, like 'email' and 'priceRange' above:
+               seo_graph() array_filter()s every node it assembles, so an empty
+               card drops the key rather than shipping "image": "". */
+            'image'              => $share['url'] ?? '',
         ];
 
-        $matched = array_values(array_filter(
-            $hours,
-            static fn(array $row): bool =>
-                $row['days'] !== []
-                && stripos((string)$row['label'], $name) !== false
-        ));
+        /* BOTH OR NEITHER. A GeoCoordinates node with one number in it is not
+           half a pin, it is a pin somewhere on a line of longitude through the
+           middle of the planet -- so a half-filled pair is dropped entirely
+           rather than published as far as it goes.
+
+           contact_coordinate() has already turned anything that is not a
+           coordinate into '', so this is the only test needed here. */
+        $lat = (string)($schema['latitude'] ?? '');
+        $lon = (string)($schema['longitude'] ?? '');
+
+        if ($lat !== '' && $lon !== '') {
+            $node['geo'] = [
+                '@type'     => 'GeoCoordinates',
+                'latitude'  => $lat,
+                'longitude' => $lon,
+            ];
+        }
+
+        /* The rule lives in the contract, because the editor asks it too --
+           it is what tells an operator which office has no hours attached. */
+        $matched = seo_hours_for_office($hours, $name);
 
         if ($matched !== []) {
             $node['openingHoursSpecification'] = array_map(

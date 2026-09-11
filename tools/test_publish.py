@@ -1848,6 +1848,17 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
             bd.get("openingHoursSpecification", [{}])[0].get("opens") == "07:00",
             str(bd.get("openingHoursSpecification")))
 
+    # THE SHARE CARD, NOT THE OFFICE'S OWN PICTURE. That field is a flag,
+    # stored at 56px because 56px is where it is drawn; offering it to a search
+    # engine as the photograph of a place of business would be worse than
+    # offering nothing. Organization uses the card too, so the two agree.
+    r.check("  each carries an image, and it is the site's share card",
+            all(o.get("image", "").endswith("/assets/images/og/tech4time-og.png")
+                for o in offices),
+            str([o.get("image") for o in offices]))
+
+    offices_geo(base, key, r)
+
     print("  the three generated files")
     _s, robots = get(base, "/robots.txt")
     r.check(f"  robots.txt carries the extra rule", f"/{MARK}-disallowed" in robots)
@@ -1946,6 +1957,84 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
     _s, page = get(base, "/pages/about/")
     r.check("and says so in its own head",
             'name="robots" content="noindex, follow"' in page)
+
+def offices_geo(base: str, key: bytes, r: Results) -> None:
+    """A pin on an office, and every way one is not a pin.
+
+    Coordinates are the one pair in a contact document that is checked rather
+    than trimmed. Every other field there is a line of an address: whatever
+    somebody types is what that place is called. A latitude is a number with a
+    range that no person ever reads, printed into a graph a search engine acts
+    on -- so "near the airport" in one does not degrade to a vaguer pin, it is
+    a broken property in a graph that was otherwise fine.
+    """
+    print("  and an office's coordinates, which are checked rather than trimmed")
+
+    def publish_offices(schema_extra: dict) -> list:
+        data = json.loads(CONTACT.read_text())
+        data["revision"] = data.get("revision", 0) + 1
+        data["offices"]["items"][0]["schema"].update(schema_extra)
+        status, _ = publish(base, key, "contact", data)
+        if status != 200:
+            return []
+        _s, page = get(base, "/pages/contact/")
+        graph = next((g for g in json_ld(page)
+                      if isinstance(g, dict) and "@graph" in g), None)
+        return [n for n in (graph or {}).get("@graph", [])
+                if isinstance(n, dict) and n.get("@type") == "LocalBusiness"]
+
+    got = publish_offices({"latitude": "23.8103", "longitude": "90.4125"})
+    geo = got[0].get("geo", {}) if got else {}
+    r.check("  a real pair becomes a GeoCoordinates node",
+            geo.get("@type") == "GeoCoordinates"
+            and geo.get("latitude") == "23.8103"
+            and geo.get("longitude") == "90.4125", str(geo))
+
+    # BOTH OR NEITHER. One number is not half a pin; it is a pin somewhere on a
+    # line through the middle of the planet.
+    got = publish_offices({"latitude": "23.8103", "longitude": ""})
+    r.check("  half a pair is dropped entirely rather than published as far as it goes",
+            "geo" not in (got[0] if got else {}), str(got[0].get("geo") if got else None))
+
+    for what, lat, lon in (("out of range", "90.1", "90.4125"),
+                           ("not a number", "near the airport", "90.4125"),
+                           ("scientific notation", "1e5", "90.4125")):
+        got = publish_offices({"latitude": lat, "longitude": lon})
+        r.check(f"  a latitude that is {what} never reaches the graph",
+                "geo" not in (got[0] if got else {}),
+                str(got[0].get("geo") if got else None))
+
+    got = publish_offices({"latitude": "", "longitude": ""})
+    r.check("  and an office with no pin simply has no geo",
+            got and "geo" not in got[0], str(got[0].get("geo") if got else None))
+
+    # THE IMAGE IS SET ONLY WHEN THERE IS ONE, and this is the case that proves
+    # it: the shipped document always has a share card, so a node that emitted
+    # the key unconditionally looked correct in every other check here. An
+    # operator can clear that card, and "image": "" is a property claiming a
+    # picture exists and naming none -- worse than the property being absent.
+    seo = json.loads(SEO.read_text())
+    held = json.loads(json.dumps(seo["site"]["share"]))
+
+    seo["revision"] = seo.get("revision", 0) + 1
+    seo["site"]["share"] = {"src": "", "webp": "", "width": 0, "height": 0}
+    status, _ = publish(base, key, "seo", seo)
+    r.check("  a seo document with no share card is accepted", status == 200,
+            f"status {status}")
+
+    _s, page = get(base, "/pages/contact/")
+    graph = next((g for g in json_ld(page)
+                  if isinstance(g, dict) and "@graph" in g), None)
+    without = [n for n in (graph or {}).get("@graph", [])
+               if isinstance(n, dict) and n.get("@type") == "LocalBusiness"]
+    r.check("  and then an office has NO image key at all, not an empty one",
+            without and all("image" not in o for o in without),
+            str([o.get("image", "(absent)") for o in without]))
+
+    seo["revision"] += 1
+    seo["site"]["share"] = held
+    publish(base, key, "seo", seo)
+
 
 def settings_round_trip(base: str, key: bytes, r: Results) -> None:
     """The site's identity travels the same road.
