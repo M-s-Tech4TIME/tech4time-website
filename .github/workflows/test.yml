@@ -61,6 +61,12 @@ jobs:
       - run: python3 tools/inject_icons.py --check
       - run: python3 tools/build_deploy_set.py --check
 
+      # The hero circuit is generated from the artwork in references/, and this
+      # is the half of that which needs no browser: it redraws the template from
+      # the committed geometry and refuses if what is on disk differs. Catches a
+      # coordinate edited by hand, and a geometry re-resolved and never rebuilt.
+      - run: python3 tools/build_hero_circuit.py --check
+
       # Filenames here are not content-hashed and .htaccess caches CSS, JS and
       # fonts for a year, so a changed asset behind an unchanged URL reaches
       # new visitors only. The rule is a version query bumped by hand, this is

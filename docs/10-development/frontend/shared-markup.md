@@ -92,7 +92,7 @@ title and description live in that page's own document.
 
 | File | What it is |
 |---|---|
-| `hero-circuit.html` | the circuitry framing the title band: four corner clusters and a chevron band top and bottom, with a charge on every trace, painted by `circuit.js` on a canvas; the SVG carries 24 as the fallback |
+| `hero-circuit.html` | the circuitry framing the title band: four corner clusters and a band top and bottom, with a charge on every trace, painted by `circuit.js` on a canvas; the SVG carries 24 as the fallback. **Generated** by `build_hero_circuit.py` from the artwork in `references/` — edit that, not this |
 | `scripts.html` | the deferred script tags, in dependency order |
 
 The circuit is decoration: aria-hidden, no text in it, sixty lines of path coordinates and nothing

@@ -13,7 +13,7 @@
    per second, roughly a core, and the site was reported as struggling.
 
    A canvas has no style to recalculate. One element, one clear, one pass of
-   short strokes — so the charge can go back on ALL 216 traces, which is what
+   short strokes — so the charge can go back on ALL 176 traces, which is what
    was wanted before the cost of doing it in CSS got in the way.
 
    THE GEOMETRY IS READ, NEVER DUPLICATED
@@ -56,17 +56,35 @@
   /* How many distinct alphas the fade is rounded to. Each one is a separate
      batched stroke, so this is a count of draw calls, not of traces. */
   var BUCKETS = 5;
+  /* THE CHARGE IS DRAWN AT THE WEIGHT THE DRAWING IS, NOT AT A FIXED ONE
+     This was a flat 2.6 device pixels on every layer at every size. That was
+     survivable while the band was full-bleed; it is not now. A band's box runs
+     from about 1,220px down to 345px for the same 1,440-unit viewBox, so the
+     static drawing under the charge renders from 2.2px down to 0.9px -- and a
+     charge held at 2.6 while its own trace fades to a hair stops being the lit
+     part of a line and becomes the only part. Measured at 768px it was exactly
+     that: a smear of moving white over a drawing nobody could see.
+
+     So the pen is READ, per layer, off .hero-circuit__wires and scaled the way
+     the browser scales it, for the same reason the ink is read rather than
+     written twice: one source, and a stylesheet change carries here by itself.
+     The charge stays half again heavier than its trace, which is what makes it
+     read as lit, and the bounds keep it visible on a phone and modest on a
+     desktop. */
+  var CHARGE_OVER_WIRE = 1.55;
+  var CHARGE_MIN = 1.2;
+  var CHARGE_MAX = 3.2;
 
   /* Which way each layer is turned. The SVG mirrors are done in CSS, and the
      canvas has to arrive at the same picture, so they are stated once here
      rather than read back out of a computed transform. */
   var LAYERS = {
-    "band-top": {view: [1440, 120], fit: "none", flipX: false, flipY: false},
-    "band-bottom": {view: [1440, 120], fit: "none", flipX: false, flipY: true},
-    "corner-tl": {view: [260, 200], fit: "meet", flipX: false, flipY: false},
-    "corner-tr": {view: [260, 200], fit: "meet", flipX: true, flipY: false},
-    "corner-bl": {view: [260, 200], fit: "meet", flipX: false, flipY: true},
-    "corner-br": {view: [260, 200], fit: "meet", flipX: true, flipY: true}
+    "band-top": {view: [1440, 114], fit: "none", flipX: false, flipY: false},
+    "band-bottom": {view: [1440, 114], fit: "none", flipX: false, flipY: true},
+    "corner-tl": {view: [200, 215], fit: "meet", flipX: false, flipY: false},
+    "corner-tr": {view: [200, 215], fit: "meet", flipX: true, flipY: false},
+    "corner-bl": {view: [200, 215], fit: "meet", flipX: false, flipY: true},
+    "corner-br": {view: [200, 215], fit: "meet", flipX: true, flipY: true}
   };
 
   function kindOf(layer) {
@@ -194,6 +212,16 @@
       var band = name.indexOf("band") === 0;
       var set = self.geometry[band ? "b" : "c"] || [];
 
+      /* A stroke is scaled with its drawing, and a band is scaled unevenly --
+         so the weight that decides legibility is the smaller of the two. */
+      var wires = layer.querySelector(".hero-circuit__wires");
+      var pen = wires
+        ? parseFloat(global.getComputedStyle(wires).strokeWidth) || 2
+        : 2;
+      var lit = pen * Math.min(sx, sy) * CHARGE_OVER_WIRE;
+      lit = Math.max(CHARGE_MIN, Math.min(CHARGE_MAX, lit));
+      lit = Math.round(lit * 4) / 4;
+
       function place(s, mirrorInView) {
         var pts = new Float32Array(s.pts.length), i, x, y;
         for (i = 0; i < s.pts.length; i += 2) {
@@ -217,6 +245,7 @@
         if (fade < 0.06) { return; }
         self.traces.push({
           alpha: Math.round(fade * BUCKETS) / BUCKETS,
+          width: lit,
           pts: pts,
           run: s.run,
           total: s.total,
@@ -263,12 +292,16 @@
     return true;
   };
 
+  /* Batched by the alpha its fade rounds to AND by the weight its layer draws
+     at, because both are set once per stroke(). Quantising the weight to a
+     quarter pixel above is what keeps that a handful of batches rather than
+     one per trace. */
   Circuit.prototype.group = function () {
     var by = {}, i, t, key;
     for (i = 0; i < this.traces.length; i += 1) {
       t = this.traces[i];
-      key = String(t.alpha);
-      if (!by[key]) { by[key] = {alpha: t.alpha, traces: []}; }
+      key = t.alpha + "@" + t.width;
+      if (!by[key]) { by[key] = {alpha: t.alpha, width: t.width, traces: []}; }
       by[key].traces.push(t);
     }
     this.groups = Object.keys(by).map(function (k) { return by[k]; });
@@ -296,12 +329,12 @@
     ctx.lineCap = "butt";
     ctx.lineJoin = "miter";
     ctx.strokeStyle = this.ink;
-    ctx.lineWidth = 2.6;
 
     for (g = 0; g < groups.length; g += 1) {
       list = groups[g].traces;
       if (!list.length) { continue; }
       ctx.globalAlpha = groups[g].alpha;
+      ctx.lineWidth = groups[g].width;
       ctx.beginPath();
       for (i = 0; i < list.length; i += 1) {
         t = list[i];
