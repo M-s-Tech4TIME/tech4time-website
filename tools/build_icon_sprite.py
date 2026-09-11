@@ -44,6 +44,21 @@ METADATA_URL = (
 NEXTJS_SRC = Path("/home/alsechemist/CodeSpace/Tech4TIME-web-ui/src")
 NOT_ICONS = {"spin"}  # fa-spin is an animation class, not an icon
 
+# ICONS THIS PROJECT NEEDS THAT THE OLD SITE NEVER DREW
+# The list above is read from the NextJS source, which is the site as it was.
+# Anything built since is not in it and cannot be: the admin's Settings screen
+# has no counterpart there at all. A name that is not in the sprite fails
+# SILENTLY -- <use href="#cog"> draws nothing, with no error and no console
+# line -- so "cog" sat in ADMIN_SECTIONS for a release, naming a glyph that did
+# not exist, and the rail row and the Overview tile were simply blank.
+#
+# tools/check_icons.py is what notices that now. This is where the answer goes.
+EXTRA_NAMES = {
+    # The admin's Settings rail row and its Overview tile. Resolved through the
+    # FA6 alias index like every FA5 name here: cog -> gear.
+    "cog",
+}
+
 # Icons whose style is not "solid" in the source markup.
 STYLE_OVERRIDES = {
     "github": "brands",
@@ -103,7 +118,7 @@ def collect_names() -> list[str]:
         text=True,
     ).stdout
     names = {line[3:] for line in out.splitlines() if line.startswith("fa-")}
-    return sorted(names - NOT_ICONS)
+    return sorted((names | EXTRA_NAMES) - NOT_ICONS)
 
 
 def load_metadata() -> dict:
@@ -142,7 +157,8 @@ def pick_style(svgs: dict, requested: str | None) -> str | None:
 
 def main() -> None:
     names = collect_names()
-    print(f"{len(names)} icon names found in the NextJS source")
+    print(f"{len(names)} icon names: the NextJS source plus "
+          f"{len(EXTRA_NAMES)} this project added since")
 
     meta = load_metadata()
     index = build_alias_index(meta)

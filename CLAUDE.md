@@ -135,6 +135,7 @@ python3 tools/check_shared_facts.py     python3 tools/check_form_dom.py
 python3 tools/audit_pages.py           python3 tools/check_shared_lib.py
 python3 tools/build_deploy_set.py --check
 python3 tools/build_hero_circuit.py --check
+python3 tools/check_icons.py
 ```
 
 Touched anything under `assets/`? Also **`python3 tools/check_cache_bust.py`** — filenames are not
