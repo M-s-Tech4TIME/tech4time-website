@@ -145,6 +145,15 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+`contract_ico_container()` writes a `.ico` by hand: a six-byte directory, a sixteen-byte entry per
+image, then the PNG payloads. **It is in the contract because it is assembled where it is served,
+not sent over the wire.** The asset channel carries what `getimagesizefromstring()` recognises — PNG,
+JPEG, WebP — and an `.ico` is none of them; widening that list so one file could travel would also
+widen what an editor can upload as page artwork. So the editor generates the PNGs and the public site
+builds the container from the three it already holds, which is why both halves need the same writer.
+Embedding PNG rather than the older BMP-with-mask has been valid since Windows Vista and is what the
+committed `favicon.ico` already contained — all three of its entries, checked before this was written.
+
 `contract_srcset_top()` answers the widest rung of a ladder, which is **not always the record's
 `src`.** For a picture the uploader stored it is — `upload_store()` names the top rung as `src`. For
 the logo the site *ships* with it is not: the header's `src` is the 360 px file and the ladder goes
@@ -557,7 +566,7 @@ whole-document rebuild there would empty the page.
 
 ### `settings.php`
 
-`settings_load()`
+`settings_load()` · `settings_icon()`
 
 One document, `content/settings.json`, holding the four things every page depends on and no page
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn

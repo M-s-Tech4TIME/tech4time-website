@@ -112,7 +112,7 @@ function respond(bool $ok, string $message, int $status = 200): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, follow">
 <title>{$title} | Tech4TIME</title>
-<link rel="icon" href="/assets/images/favicon/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/assets/css/base.css">
 <link rel="stylesheet" href="/assets/css/theme.css">
 <link rel="stylesheet" href="/assets/css/layout.css">

@@ -156,6 +156,25 @@
 
     RewriteRule ^site\.webmanifest$ /manifest.php [L]
 
+    # /favicon.ico, which had no answer at all
+    # ----------------------------------------------------------------------
+    # A browser probes this address BLINDLY: before it has read a line of the
+    # page, before any <link>, and on requests that have no page. There was no
+    # file at the root and no rule, so every one of those probes was a 404 --
+    # an error in the log on every cold visit.
+    #
+    # It is generated now, because the mark is content: favicon.php assembles
+    # the container from the PNGs content/settings.json names, and falls back
+    # to the committed file. Same shape as the three above -- a 301 for anyone
+    # who asks for the .php by name, guarded on THE_REQUEST so the internal
+    # rewrite does not feed itself back into it, then the unconditional
+    # internal rewrite so a favicon.ico left at the root by an older deploy
+    # cannot shadow the generated one.
+    RewriteCond %{THE_REQUEST} \s/favicon\.php[\s?] [NC]
+    RewriteRule ^favicon\.php$ /favicon.ico [R=301,L]
+
+    RewriteRule ^favicon\.ico$ /favicon.php [L]
+
     # Send /pages/about -> /pages/about/  (only where the directory exists)
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteCond %{REQUEST_URI} !/$

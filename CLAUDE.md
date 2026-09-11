@@ -52,7 +52,7 @@ its record before acting.
 |---|---|
 | `pages/` `index.php` | the sixteen pages. **All of them are `.php`** now and render from `content/` — `404.php` was the last static one |
 | `pages/services/detail.php` | not a page: it serves any service the editor added that has no directory |
-| `sitemap.php` `robots.php` `manifest.php` | generated, and served at `/sitemap.xml`, `/robots.txt` and `/site.webmanifest` — those addresses must not change |
+| `sitemap.php` `robots.php` `manifest.php` `favicon.php` | generated, and served at `/sitemap.xml`, `/robots.txt`, `/site.webmanifest` and `/favicon.ico` — those addresses must not change. The last had no answer at all until the mark became content; a browser probes it blindly, before it has read a line of the page |
 | `lib/head.php` | every page's `<head>`, emitted once. Not shared markup: there is nothing to propagate |
 | `lib/body.php` | every page's header, footer and dock, likewise — from `content/chrome.json` |
 | `assets/` | css, js, fonts, icons, images — all self-hosted |
@@ -153,7 +153,8 @@ check that sees the header, footer and dock a visitor actually receives, and
 `check_shared_markup.py`, which asserts the emitter still carries the six `data-` hooks the scripts
 bind to.
 
-Touched `lib/head.php`, `lib/seo.php`, `sitemap.php`, `robots.php` or `manifest.php`? Also
+Touched `lib/head.php`, `lib/seo.php`, `sitemap.php`, `robots.php`, `manifest.php` or
+`favicon.php`? Also
 **`python3 tools/test_sitemap.py`** and `audit_pages.py`. All three of those files are served at an
 address that looks static and none of them is; a PHP error in one ships as a 500 at a URL no page
 links to, which Google fetches and people do not.

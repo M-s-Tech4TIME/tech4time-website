@@ -44,6 +44,8 @@ the run passes or fails.
 
 import json
 import re
+import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -247,6 +249,26 @@ def the_dark_half(r: Results) -> None:
             or "<html" in home, "the page broke rather than drawing nothing")
 
 
+def served(path: str) -> bytes:
+    """What a generated file sends, run the way the router runs it."""
+    out = subprocess.run(
+        ["php", "-r", '$_SERVER["REQUEST_METHOD"]="GET"; ob_start();'
+                      f' include {json.dumps(str(ROOT / path))}; echo ob_get_clean();'],
+        cwd=ROOT, capture_output=True)
+    return out.stdout
+
+
+def icons(html: str) -> dict:
+    """Every favicon <link> on the page, by the size it declares."""
+    out = {}
+    for tag in re.findall(r'<link rel="(?:icon|apple-touch-icon)"[^>]*>', html):
+        size = re.search(r'sizes="([^"]*)"', tag)
+        href = re.search(r'href="([^"]*)"', tag)
+        if size and href:
+            out[size.group(1)] = href.group(1)
+    return out
+
+
 def targets():
     out = [(str(p.relative_to(ROOT)), p, None) for p in A.pages()]
     have = {str(p.relative_to(ROOT)) for p in A.pages()}
@@ -255,6 +277,88 @@ def targets():
         if rel not in have:
             out.append((f"pages/services/{slug}/", A.DETAIL, slug))
     return sorted(out)
+
+
+def the_icons(r: Results) -> None:
+    print("\nthe tab icon, and the address a browser probes before anything else")
+
+    shipped = (ROOT / "assets/images/favicon/favicon.ico").read_bytes()
+
+    # WITH NOTHING UPLOADED, EVERYTHING IS WHAT SHIPS. That is the state a
+    # fresh clone and a failed publish are both in, and a browser tab is not a
+    # place to discover it.
+    home = render(HOME)
+    r.check("every page points /favicon.ico at the site root",
+            icons(home).get("any") == "/favicon.ico", str(icons(home))[:200])
+    r.check("and it answers, where it used to 404",
+            served("favicon.php") == shipped,
+            f"{len(served('favicon.php'))} bytes vs {len(shipped)} shipped")
+    r.check("with the committed set named beside it",
+            icons(home).get("16x16") == "/assets/images/favicon/favicon-16.png"
+            and icons(home).get("180x180") == "/assets/images/favicon/apple-touch-icon.png",
+            str(icons(home))[:250])
+
+    made = {n: f"/uploads/cccccc{n}0000.png" for n in
+            ("png16", "png32", "png48", "png96", "apple", "png192", "png512")}
+    put(SETTINGS, lambda d: d["icon"].__setitem__("generated", dict(made)))
+
+    home = render(HOME)
+    r.check("an uploaded set reaches every <link> in the head",
+            icons(home).get("16x16") == made["png16"]
+            and icons(home).get("96x96") == made["png96"]
+            and icons(home).get("180x180") == made["apple"],
+            str(icons(home))[:250])
+
+    manifest = json.loads(served("manifest.php") or b"{}")
+    r.check("and both icons the manifest names",
+            [i["src"] for i in manifest.get("icons", [])] == [made["png192"], made["png512"]],
+            str(manifest.get("icons"))[:200])
+
+    # ALL OR NOTHING. A container built from two of three sizes is a valid file
+    # holding the wrong set; one built from a rung that never arrived is a
+    # valid file holding nothing. Either is worse than the mark that ships.
+    r.check("/favicon.ico falls back whole when a named file is not there",
+            served("favicon.php") == shipped, "it served a partial container")
+
+    print("\nthe container, assembled from what was published")
+    # Real files this time, so the bytes are real: the three the shape names
+    # for the .ico, copied from the committed set under upload-shaped names.
+    uploads = ROOT / "uploads"
+    uploads.mkdir(exist_ok=True)
+    written = []
+    try:
+        real = {}
+        for size in (16, 32, 48):
+            blob = (ROOT / f"assets/images/favicon/favicon-{size}.png").read_bytes()
+            name = f"dddddd{size:04d}00000000.png"
+            (uploads / name).write_bytes(blob)
+            written.append(uploads / name)
+            real[f"png{size}"] = "/uploads/" + name
+
+        put(SETTINGS, lambda d: d["icon"].__setitem__(
+            "generated", {**made, **real}))
+
+        ico = served("favicon.php")
+        res, kind, count = struct.unpack("<HHH", ico[:6])
+        r.check("it is an icon directory holding three images",
+                res == 0 and kind == 1 and count == 3, f"type={kind} entries={count}")
+
+        bad = []
+        for i in range(count):
+            w, h, _c, _r, _p, _bc, length, offset = struct.unpack(
+                "<BBBBHHII", ico[6 + i * 16:22 + i * 16])
+            payload = ico[offset:offset + length]
+            if len(payload) != length or payload[:8] != b"\x89PNG\r\n\x1a\n":
+                bad.append(f"{w}x{h} at {offset}")
+        r.check("every entry points at its own PNG payload", not bad, "; ".join(bad))
+        r.check("and the sizes are the ones the shape declares",
+                [struct.unpack("<B", ico[6 + i * 16:7 + i * 16])[0] for i in range(3)]
+                == [16, 32, 48], "wrong sizes")
+    finally:
+        for f in written:
+            f.unlink(missing_ok=True)
+        if uploads.is_dir() and not any(uploads.iterdir()):
+            uploads.rmdir()
 
 
 def main() -> None:
@@ -266,6 +370,7 @@ def main() -> None:
         one_change_moves_all(r)
         the_override(r)
         the_dark_half(r)
+        the_icons(r)
     finally:
         for p, blob in held.items():
             p.write_bytes(blob)

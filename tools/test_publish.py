@@ -1960,7 +1960,7 @@ def settings_round_trip(base: str, key: bytes, r: Results) -> None:
     data["icon"] = {
         "master": {"src": "/uploads/00112233aabbccdd.png", "webp": "",
                    "width": 512, "height": 512, "srcset": "", "webp_srcset": ""},
-        "generated": {"ico": "/uploads/44556677eeff0011.png",
+        "generated": {"png96": "/uploads/44556677eeff0011.png",
                       # Not under a root this site serves from.
                       "png16": "../../etc/passwd",
                       "png32": "/uploads/8899aabbccddeeff.png"},
@@ -1998,11 +1998,14 @@ def settings_round_trip(base: str, key: bytes, r: Results) -> None:
             stored["icon"]["generated"]["png16"] == "",
             str(stored["icon"]["generated"])[:200])
     r.check("and the ones inside them are kept",
-            stored["icon"]["generated"]["ico"] == "/uploads/44556677eeff0011.png"
+            stored["icon"]["generated"]["png96"] == "/uploads/44556677eeff0011.png"
             and stored["icon"]["generated"]["png32"] == "/uploads/8899aabbccddeeff.png",
             str(stored["icon"]["generated"])[:200])
-    r.check("every icon slot the shape declares is present",
-            set(stored["icon"]["generated"]) == {"ico", "png16", "png32", "png48",
+    # No 'ico' among them: the asset channel carries what
+    # getimagesizefromstring() recognises and an .ico is not among them, so the
+    # public site assembles that one itself at /favicon.ico.
+    r.check("every icon slot the shape declares is present, and no .ico",
+            set(stored["icon"]["generated"]) == {"png16", "png32", "png48",
                                                  "png96", "png192", "png512", "apple"},
             str(sorted(stored["icon"]["generated"])))
 

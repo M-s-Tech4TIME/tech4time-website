@@ -110,6 +110,14 @@ if ($path === '/site.webmanifest') {
     return true;
 }
 
+/* /favicon.ico likewise, and this one is the address a browser probes before
+   it has read anything at all. Without this rule the local server 404s on it
+   exactly as the host did before .htaccess gained the rewrite. */
+if ($path === '/favicon.ico') {
+    require $root . '/favicon.php';
+    return true;
+}
+
 /* Apache's DirectorySlash, and the first of .htaccess section 3's two service
    rules. On the host a directory asked for without its trailing slash is
    redirected to the slash — Apache does it for a real directory, and the

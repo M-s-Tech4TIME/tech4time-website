@@ -48,6 +48,23 @@ require_once __DIR__ . '/store.php';
 const SETTINGS_FILE = __DIR__ . '/../content/settings.json';
 
 /**
+ * Where one generated icon is, or the committed file it falls back to.
+ *
+ * THE FALLBACK IS NOT A NICETY. Until somebody uploads a square mark there is
+ * nothing generated at all, and every page still has to name a favicon -- so
+ * an empty slot answers with the file that ships, which is what makes a host
+ * that has never received a publish look exactly like one that has.
+ *
+ * $name is a key of SETTINGS_ICON_SIZES; $shipped is the committed file's path.
+ */
+function settings_icon(array $settings, string $name, string $shipped): string
+{
+    $held = trim((string)($settings['icon']['generated'][$name] ?? ''));
+
+    return $held !== '' ? $held : $shipped;
+}
+
+/**
  * The document, with every field a renderer reads guaranteed present.
  *
  * Memoised, like the chrome's and for the same reason: this one is read many

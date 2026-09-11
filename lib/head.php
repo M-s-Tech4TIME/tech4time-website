@@ -47,6 +47,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/seo.php';
+require_once __DIR__ . '/settings.php';
 
 /**
  * The stylesheets every page loads, in cascade order, before its own.
@@ -77,13 +78,43 @@ const HEAD_STYLES = [
  * which is a lot of machinery for six constant lines.
  */
 const HEAD_ICONS = [
-    '<link rel="icon" href="/assets/images/favicon/favicon.ico" sizes="any">',
-    '<link rel="icon" type="image/png" sizes="16x16" href="/assets/images/favicon/favicon-16.png">',
-    '<link rel="icon" type="image/png" sizes="32x32" href="/assets/images/favicon/favicon-32.png">',
-    '<link rel="icon" type="image/png" sizes="48x48" href="/assets/images/favicon/favicon-48.png">',
-    '<link rel="icon" type="image/png" sizes="96x96" href="/assets/images/favicon/favicon-96.png">',
-    '<link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">',
+    /*  name      the committed file, used until a square mark is uploaded  */
+    'png16'  => '/assets/images/favicon/favicon-16.png',
+    'png32'  => '/assets/images/favicon/favicon-32.png',
+    'png48'  => '/assets/images/favicon/favicon-48.png',
+    'png96'  => '/assets/images/favicon/favicon-96.png',
+    'apple'  => '/assets/images/favicon/apple-touch-icon.png',
 ];
+
+/**
+ * The favicon set, in the order a browser reads it.
+ *
+ * SIX LINES THAT NAMED SIX COMMITTED FILES, and a company could not change
+ * what its own browser tab shows without a developer. They are read from
+ * content/settings.json now, each falling back to the file that ships, so a
+ * host with no settings document sends exactly what it sent before.
+ *
+ * /favicon.ico is first and has no size of its own: it is the address a
+ * browser probes blindly, before it has read a single line of the page. It is
+ * assembled where it is served -- favicon.php -- which is why it is a path
+ * here and not a generated one.
+ */
+function head_icons(array $settings): array
+{
+    $out = ['<link rel="icon" href="/favicon.ico" sizes="any">'];
+
+    foreach (HEAD_ICONS as $name => $shipped) {
+        $href = h(settings_icon($settings, $name, $shipped));
+
+        $out[] = $name === 'apple'
+            ? '<link rel="apple-touch-icon" sizes="180x180" href="' . $href . '">'
+            : '<link rel="icon" type="image/png" sizes="'
+              . SETTINGS_ICON_SIZES[$name]['size'] . 'x'
+              . SETTINGS_ICON_SIZES[$name]['size'] . '" href="' . $href . '">';
+    }
+
+    return $out;
+}
 
 /**
  * The Content Security Policy, as defence in depth.
@@ -251,7 +282,7 @@ function seo_head(string $route, array $meta, array $styles = [],
 
     $out[] = '';
     $out[] = '<!-- Icons -->';
-    foreach (HEAD_ICONS as $icon) {
+    foreach (head_icons(settings_load()) as $icon) {
         $out[] = $icon;
     }
     $out[] = '<link rel="manifest" href="/site.webmanifest">';

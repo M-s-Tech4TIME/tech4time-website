@@ -19,6 +19,7 @@ tech4time-website/
 │                           Search Console was given and must not change
 ├── robots.php              generated; served at /robots.txt
 ├── manifest.php            generated; served at /site.webmanifest
+├── favicon.php             generated; served at /favicon.ico, which had no answer at all
 ├── .gitattributes          line endings and diff behaviour
 ├── .gitignore              includes the private store, as a backstop
 │

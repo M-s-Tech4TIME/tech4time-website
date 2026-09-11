@@ -6,18 +6,26 @@
  * names; .htaccess rewrites that URL here internally, so it does not change.
  *
  * The name, description and colours are content and come from
- * content/seo.json. THE ICON LIST IS CODE, and stays here: it names files that
- * must exist at those exact paths and sizes, and a manifest pointing at an
- * icon that is not there is an install prompt that fails silently on a
- * stranger's phone.
+ * content/seo.json, and the two app icons from content/settings.json -- the
+ * same two the editor generates from one square master, each falling back to
+ * the file that ships.
+ *
+ * WHICH SIZES ARE HERE IS STILL CODE. A manifest naming an icon that is not
+ * there is an install prompt that fails silently on a stranger's phone, so the
+ * list is 192 and 512 because those are the two a manifest is read for -- not
+ * because a document said so.
  */
 
 declare(strict_types=1);
 
 require __DIR__ . '/lib/seo.php';
+/* _once because lib/seo.php brings it in too — the Organization graph's
+   logo is derived from the same document. */
+require_once __DIR__ . '/lib/settings.php';
 
 $site     = seo_site();
 $manifest = seo_load()['manifest'];
+$settings = settings_load();
 
 /* The registered type. Not application/json: some browsers will not read a
    manifest served as anything else, and nosniff means nothing will guess. */
@@ -34,13 +42,15 @@ echo json_encode([
     'theme_color'      => $manifest['theme'],
     'icons'            => [
         [
-            'src'     => '/assets/images/favicon/favicon-192.png',
+            'src'     => settings_icon($settings, 'png192',
+                                       '/assets/images/favicon/favicon-192.png'),
             'sizes'   => '192x192',
             'type'    => 'image/png',
             'purpose' => 'any',
         ],
         [
-            'src'     => '/assets/images/favicon/favicon-512.png',
+            'src'     => settings_icon($settings, 'png512',
+                                       '/assets/images/favicon/favicon-512.png'),
             'sizes'   => '512x512',
             'type'    => 'image/png',
             'purpose' => 'any',
