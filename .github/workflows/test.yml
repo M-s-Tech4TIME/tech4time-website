@@ -37,7 +37,7 @@ jobs:
     name: checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # check_cache_bust.py compares this commit against origin/main, and a
           # shallow clone has neither the ref nor the history to do it.
@@ -90,7 +90,7 @@ jobs:
     name: php
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # These drive a real PHP server, and the private store lands beside the
       # checkout the same way it lands beside the document root on the host.
@@ -148,7 +148,7 @@ jobs:
     name: firefox
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # From Mozilla's tarball rather than apt. On Ubuntu 24.04 `apt install
       # firefox` is a transitional package that pulls the snap, which does not
