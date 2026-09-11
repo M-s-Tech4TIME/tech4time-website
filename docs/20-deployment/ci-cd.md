@@ -109,7 +109,7 @@ parallel:
 |---|---|---|
 | `checks` | the static checks, `build_deploy_set.py --check` (which parses every shipped `.php` with the host's `short_open_tag`), and `check_cache_bust.py` against `origin/main` | python, php |
 | `php` | every suite that drives a real PHP server, including the publish endpoint, the generated files, the chrome and the site's identity | php |
-| `firefox` | the eight browser suites, all of them, then a verdict | firefox, geckodriver, Pillow |
+| `firefox` | the eight browser suites, all of them, then a verdict | firefox, geckodriver, Chrome, Pillow |
 
 It is deliberately the **same list** as the pre-commit set in
 [testing.md](../10-development/testing.md). What gates a merge and what gates a release are one set
@@ -124,6 +124,20 @@ asserted nowhere. The backend had the same gap, three suites wide.
 
 Nothing catches this automatically. Adding a suite means adding it to `test.yml` in the same
 commit, for the same reason adding a tool means documenting it.
+
+### Chrome as well as Firefox, for the one measurement Firefox cannot make
+
+`check_style_budget.py` reads style-recalculation time out of Chrome's tracing, and it is
+the only thing in either repository that can see a page holding 60fps while burning a CPU
+core — which shipped on 2026-09-03 and was noticed by a person before any check. It was
+**not in this workflow at all** until the settings work was being prepared for deploy.
+
+It prints a notice and exits 0 with no Chrome on `PATH`. That is right on a laptop and is
+the silent-pass trap in CI, so the job asserts a Chrome binary first and fails loudly if
+there is none — the same bargain as `php-gd`, `php-xml` and `qrencode` in the other job.
+It relies on `google-chrome-stable` being in the runner image rather than installing it:
+Chrome is not in Ubuntu's archive, and `chromium` on 24.04 is the snap transitional
+package that the Firefox note below is about.
 
 ### All eight suites run before the job reports
 

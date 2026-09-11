@@ -184,7 +184,9 @@ Firefox and geckodriver, and leave processes behind if interrupted (`pkill firef
 
 Changed how much of the page **moves**? Also **`python3 tools/check_style_budget.py`** (needs
 Chrome). None of the suites above can see a page burning a CPU core while holding 60fps — that
-shipped on 2026-09-03 and a person noticed it before any check did.
+shipped on 2026-09-03 and a person noticed it before any check did. **It runs in CI now**, which it
+did not until 2026-09-11: it exits 0 with a notice when Chrome is absent, so it had been the one
+check capable of proving nothing while reporting success.
 
 **Added a suite? Add it to `.github/workflows/test.yml` in the same commit.** Nothing checks this,
 and two suites had been sitting on disk unrun — `test_settings.py` and `test_pictures.py`, 97

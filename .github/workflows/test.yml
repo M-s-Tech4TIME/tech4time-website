@@ -186,7 +186,29 @@ jobs:
           firefox --version
           geckodriver --version | head -1
 
-      # All seven, then a verdict — not seven steps that stop at the first
+      # CHROME, FOR THE ONE CHECK FIREFOX CANNOT MAKE. check_style_budget.py
+      # measures style recalculation, which only Chrome's tracing exposes — and
+      # it is the only thing in either repository that can see a page holding
+      # 60fps while burning a CPU core. That shipped on 2026-09-03 and a person
+      # noticed it before any check did.
+      #
+      # ASSERTED, NOT ASSUMED. The tool prints a notice and exits 0 with no
+      # Chrome on PATH, which is right on a laptop and is the silent-pass trap
+      # in CI — the same bargain as php-gd, php-xml and qrencode above. This
+      # relies on google-chrome-stable being present in the runner image; if
+      # that ever stops being true this step fails loudly with a name to fix
+      # rather than reporting a measurement it never took.
+      - name: chrome, so the style budget is actually measured
+        run: |
+          set -euo pipefail
+          command -v google-chrome-stable || command -v google-chrome || {
+            echo "::error::No Chrome on PATH — check_style_budget.py would have skipped,"
+            echo "which is a green tick over an unmeasured page. Install it in this job."
+            exit 1
+          }
+          (google-chrome-stable --version || google-chrome --version) | head -1
+
+      # All eight, then a verdict — not eight steps that stop at the first
       # failure. A step-per-suite hides everything behind the earliest
       # problem: test_motion failed on its third check and the five suites
       # after it had never run in CI at all, so each fix would have revealed
@@ -199,7 +221,8 @@ jobs:
           set -uo pipefail
           failed=""
           for s in test_nav test_theme test_motion \
-                   check_hover check_dark_mode check_responsive check_focus; do
+                   check_hover check_dark_mode check_responsive check_focus \
+                   check_style_budget; do
             echo "::group::$s"
             if python3 "tools/$s.py"; then
               echo "-- $s passed"
@@ -213,7 +236,7 @@ jobs:
             echo "::error::failing suites:$failed"
             exit 1
           fi
-          echo "all seven browser suites passed"
+          echo "all eight browser suites passed"
 
       # These leave processes behind when a step is cancelled, and a runner
       # that hangs on to Firefox never finishes.
