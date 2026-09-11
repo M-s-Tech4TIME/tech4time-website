@@ -160,8 +160,8 @@ function body_header_logo(array $logo, string $mode): string
     $out[] = '        <source';
     $out[] = '          srcset="' . h($image['webp_srcset'] !== ''
                                      ? $image['webp_srcset'] : $image['webp']) . '"';
-    if (trim((string)$logo['sizes']) !== '') {
-        $out[] = '          sizes="' . h($logo['sizes']) . '"';
+    if (contract_slot_sizes('settings.logo') !== '') {
+        $out[] = '          sizes="' . h(contract_slot_sizes('settings.logo')) . '"';
     }
     $out[] = '          type="image/webp">';
     $out[] = '        <img';
@@ -170,8 +170,12 @@ function body_header_logo(array $logo, string $mode): string
     if (trim((string)$image['srcset']) !== '') {
         $out[] = '          srcset="' . h($image['srcset']) . '"';
     }
-    if (trim((string)$logo['sizes']) !== '') {
-        $out[] = '          sizes="' . h($logo['sizes']) . '"';
+    /* HOW WIDE IT IS DRAWN IS A FACT ABOUT THE LAYOUT, so it comes from the
+       layout's own record rather than from a field somebody typed. It was a
+       field, and what was typed in it was wrong by 60% -- see
+       CONTRACT_IMAGE_SLOTS. */
+    if (contract_slot_sizes('settings.logo') !== '') {
+        $out[] = '          sizes="' . h(contract_slot_sizes('settings.logo')) . '"';
     }
     $out[] = '          alt="' . h($logo['alt']) . '"';
     $out[] = '          width="' . (int)$image['width'] . '"';

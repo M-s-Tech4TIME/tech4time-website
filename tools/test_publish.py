@@ -2139,7 +2139,7 @@ def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
     # above sends exactly the same poison and asserts exactly the same outcome.
     # What the chrome still says about the logo is the words:
     r.check("  the chrome keeps the alt text and nothing else about the mark",
-            set(stored["header"]["logo"]) == {"alt", "sizes"},
+            set(stored["header"]["logo"]) == {"alt"},
             str(sorted(stored["header"]["logo"])))
     r.check("  the services column still stores no rows of its own",
             "items" not in stored["footer"]["services"])
