@@ -103,6 +103,48 @@ function settings_logo_is_shared(array $settings): bool
 }
 
 /**
+ * The largest rendition of the mark: what the About page's lockup, the
+ * Organization graph and every job posting name.
+ *
+ * THREE PLACES DRAW THIS MARK BIG AND ONE DRAWS IT SMALL. The header wants the
+ * rung its 113px slot can use; the About row draws it at up to 693px, and the
+ * two structured-data graphs want one absolute URL for a consumer that picks
+ * nothing. So the largest rung is asked for rather than assumed — the record's
+ * src is the 360px file, and the ladder goes on to 540.
+ *
+ * The returned record carries no ladder of its own: everything that asks for
+ * this wants ONE file. Its height is scaled from the record's, which is exact
+ * rather than approximate — every rung of a ladder is the same picture, so the
+ * ratio is the same, and 128 × 540 ÷ 360 is 192 on the nose.
+ */
+function settings_logo_largest(array $settings, string $mode = 'light'): array
+{
+    $image = settings_logo($settings, $mode);
+    $top   = contract_srcset_top((string)$image['srcset']);
+
+    if ($top['src'] === '' || (int)$image['width'] <= 0
+            || $top['width'] <= (int)$image['width']) {
+        /* No ladder, or none of it wider than src: src IS the largest there
+           is. That is the case for every uploaded mark, because upload_store()
+           names the top rung as src. */
+        return ['src' => $image['src'], 'webp' => $image['webp'],
+                'width' => $image['width'], 'height' => $image['height'],
+                'srcset' => '', 'webp_srcset' => ''];
+    }
+
+    $webp = contract_srcset_top((string)$image['webp_srcset']);
+
+    return [
+        'src'    => $top['src'],
+        'webp'   => $webp['width'] === $top['width'] ? $webp['src'] : '',
+        'width'  => $top['width'],
+        'height' => (int)round((int)$image['height'] * $top['width'] / (int)$image['width']),
+        'srcset' => '',
+        'webp_srcset' => '',
+    ];
+}
+
+/**
  * The colour tokens for one theme, as name => '#rrggbb'.
  *
  * Always the full set: settings_normalise() fills any token a document is

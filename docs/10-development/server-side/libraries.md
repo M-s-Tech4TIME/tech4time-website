@@ -145,6 +145,14 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+`contract_srcset_top()` answers the widest rung of a ladder, which is **not always the record's
+`src`.** For a picture the uploader stored it is — `upload_store()` names the top rung as `src`. For
+the logo the site *ships* with it is not: the header's `src` is the 360 px file and the ladder goes
+on to 540, because those files were built before the settings document existed and the seed
+reproduces them rather than tidying them. So the About page's big lockup, `Organization.logo` and
+every job posting's hiring-organisation logo ask for the largest rendition instead of assuming, and
+each still names the file it names today.
+
 `contract_image_paths()` answers the other half of the same question: **every** file a picture record
 names, srcset entries included. A ladder keeps most of its files inside `srcset` and nowhere else —
 only the top rung is also the `src` — so a caller reading `src` and `webp` alone sees two of six.
@@ -549,7 +557,8 @@ whole-document rebuild there would empty the page.
 
 ### `settings.php`
 
-`settings_load()` · `settings_logo()` · `settings_logo_is_shared()` · `settings_colours()`
+`settings_load()` · `settings_logo()` · `settings_logo_largest()` ·
+`settings_logo_is_shared()` · `settings_colours()`
 
 One document, `content/settings.json`, holding the four things every page depends on and no page
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
@@ -568,6 +577,12 @@ about something else.
 fills from `settings_defaults()`, which is the site's own mark, icons and colours exactly as they
 ship — read off the files they replace rather than typed, so a host that has never received a
 publish renders what it renders today, byte for byte.
+
+`settings_logo_largest()` is for the three consumers that want **one** file rather than a ladder:
+the About page's lockup, which draws the mark at up to 693 px, and the two structured-data graphs,
+which are read by consumers that pick nothing from a candidate list. Its height is scaled from the
+record's, which is exact rather than approximate — every rung is the same picture, so 128 × 540 ÷ 360
+is 192 on the nose.
 
 `settings_logo()` returns the light mark when the dark half is empty, and `settings_logo_is_shared()`
 says when that is happening. **An empty dark half is an answer, not an omission**: plenty of marks
