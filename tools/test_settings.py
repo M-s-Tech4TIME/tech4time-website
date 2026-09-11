@@ -361,6 +361,52 @@ def the_icons(r: Results) -> None:
             uploads.rmdir()
 
 
+def the_colours(r: Results) -> None:
+    print("\nthe brand colours, which reach a page as a stylesheet or not at all")
+
+    # THE CSP IS style-src 'self'. No <style> block, no style= attribute, no
+    # exceptions — so a colour somebody picked has to be a FILE. Every check
+    # below is about that file being right, because there is no other route.
+    r.check("with the palette it ships with, the stylesheet is empty",
+            served("assets/css/brand.css.php") == b"",
+            repr(served("assets/css/brand.css.php")[:120]))
+    # Which is what makes this stage provable: a page whose bytes did not move
+    # cannot have had its colours moved.
+
+    home = render(HOME)
+    sheets = re.findall(r'<link rel="stylesheet" href="([^"]*)"', home)
+    r.check("and every page links it",
+            any(s.startswith("/assets/css/brand.css") for s in sheets), str(sheets))
+    r.check("immediately after theme.css, so the later one wins",
+            [Path(s.split("?")[0]).name for s in sheets[:3]]
+            == ["base.css", "theme.css", "brand.css"], str(sheets[:4]))
+
+    put(SETTINGS, lambda d: (d["colours"]["light"].__setitem__("accent-text", "#2a4d8f"),
+                             d["colours"]["dark"].__setitem__("bg-base", "#101014"),
+                             d.__setitem__("revision", 9)))
+
+    css = served("assets/css/brand.css.php").decode()
+    r.check("a changed light colour is declared on :root",
+            ":root {" in css and "--accent-text: #2a4d8f;" in css, css[:200])
+    # theme.css has THREE blocks, because the theme has three states: the OS
+    # preference, an explicit light choice overriding it, and an explicit dark
+    # one. An override that wrote only :root would repaint dark mode with light
+    # colours.
+    r.check("and a changed dark one in both of the blocks the theme uses",
+            '@media (prefers-color-scheme: dark)' in css
+            and ':root:not([data-theme="light"])' in css
+            and ':root[data-theme="dark"]' in css, css)
+    r.check("with nothing said about the tokens nobody changed",
+            css.count("--") == 3, css)
+
+    r.check("and the address carries the document's own revision",
+            "/assets/css/brand.css?v=9" in render(HOME),
+            str(re.findall(r"brand\.css[^\"]*", render(HOME))))
+    # .htaccess caches everything under assets/ for a year. Nobody edits this
+    # file, so nobody is here to bump a version by hand — without the revision
+    # in the address a returning visitor keeps last year's colours.
+
+
 def main() -> None:
     held = {p: p.read_bytes() for p in (SETTINGS, SEO)}
 
@@ -371,6 +417,7 @@ def main() -> None:
         the_override(r)
         the_dark_half(r)
         the_icons(r)
+        the_colours(r)
     finally:
         for p, blob in held.items():
             p.write_bytes(blob)

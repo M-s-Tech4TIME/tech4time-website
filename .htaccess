@@ -175,6 +175,20 @@
 
     RewriteRule ^favicon\.ico$ /favicon.php [L]
 
+    # /assets/css/brand.css, which is colours and not a file
+    # ----------------------------------------------------------------------
+    # The Content Security Policy is style-src 'self': no <style> block, no
+    # style= attribute. A colour somebody picked in the editor has to reach the
+    # page as a STYLESHEET or it does not reach the page at all. So it is
+    # generated, the same way the four above are, and served from the address
+    # every page's <link> already names.
+    #
+    # No 301 for the .php by name, unlike the four above: this one is under
+    # assets/, which section 2 already serves with a year-long cache, and a
+    # redirect there would be a second round trip on a render-blocking
+    # stylesheet. The internal rewrite alone is what is needed.
+    RewriteRule ^assets/css/brand\.css$ /assets/css/brand.css.php [L]
+
     # Send /pages/about -> /pages/about/  (only where the directory exists)
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteCond %{REQUEST_URI} !/$

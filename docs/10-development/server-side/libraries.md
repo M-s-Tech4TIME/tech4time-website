@@ -145,6 +145,19 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+**The contrast pairs and the sums that judge them are here, and that is a correction.**
+`SETTINGS_CONTRAST_PAIRS` says which pairs have to be readable and at what ratio;
+`contract_contrast_ratio()` and `settings_contrast_faults()` do the arithmetic. `tools/check_contrast.py`
+held its own copy of both, under a note reading *"keep this in sync with assets/css/theme.css"* — fine
+while a colour could only be changed by editing a stylesheet, and not fine the moment a person can
+pick one from a screen and the editor has to judge it too.
+
+So the data lives once and **the arithmetic deliberately does not**: `check_contrast.py` reads the
+palette and the pairs from here and keeps its own Python sums, then compares all 38 answers against
+this file's. That is `publish_stub.py`'s rule applied to colour — each side checked against an
+independent implementation, never against its own counterpart. A shared list cannot drift; a shared
+bug could.
+
 `contract_ico_container()` writes a `.ico` by hand: a six-byte directory, a sixteen-byte entry per
 image, then the PNG payloads. **It is in the contract because it is assembled where it is served,
 not sent over the wire.** The asset channel carries what `getimagesizefromstring()` recognises — PNG,
@@ -566,7 +579,7 @@ whole-document rebuild there would empty the page.
 
 ### `settings.php`
 
-`settings_load()` · `settings_icon()`
+`settings_load()` · `settings_icon()` · `head_styles()` *(in `head.php`)*
 
 One document, `content/settings.json`, holding the four things every page depends on and no page
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn

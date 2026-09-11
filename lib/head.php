@@ -62,6 +62,19 @@ require_once __DIR__ . '/settings.php';
 const HEAD_STYLES = [
     'base.css',
     'theme.css?v=2',
+    /* IMMEDIATELY AFTER theme.css AND NOWHERE ELSE. It is the same custom
+       properties at the same specificity, so the later one wins -- and it
+       holds only what a person changed, which is usually nothing at all. A
+       host with no settings document, or one holding the palette it was seeded
+       with, serves this as an EMPTY file. It is generated:
+       assets/css/brand.css.php.
+
+       ITS VERSION IS NOT WRITTEN HERE. Every other sheet is a file a developer
+       edits, so its query is bumped by hand in the same breath. This one
+       changes when somebody picks a colour, and nobody is here to bump
+       anything -- so head_styles() appends the settings document's own
+       revision, which contract_next_revision() already makes monotonic. */
+    'brand.css',
     'layout.css?v=4',
     'components.css',
     'animations.css',
@@ -111,6 +124,33 @@ function head_icons(array $settings): array
             : '<link rel="icon" type="image/png" sizes="'
               . SETTINGS_ICON_SIZES[$name]['size'] . 'x'
               . SETTINGS_ICON_SIZES[$name]['size'] . '" href="' . $href . '">';
+    }
+
+    return $out;
+}
+
+/**
+ * Every stylesheet a page loads, in order, each with its cache-busting query.
+ *
+ * ONE OF THEM IS VERSIONED BY THE DOCUMENT AND NOT BY HAND. brand.css is
+ * generated from content/settings.json, so what changes it is somebody picking
+ * a colour rather than somebody editing a file -- and .htaccess caches
+ * everything under assets/ for a year. Without a query that moves with the
+ * palette, a returning visitor would keep last year's colours and the editor
+ * would look broken to the only person who could see it.
+ *
+ * The revision is what moves: monotonic per document, minted by
+ * contract_next_revision() on every save, and already what the publish channel
+ * uses to decide which copy is newer.
+ */
+function head_styles(array $extra = []): array
+{
+    $out = [];
+
+    foreach ([...HEAD_STYLES, ...$extra] as $sheet) {
+        $out[] = $sheet === 'brand.css'
+            ? 'brand.css?v=' . max(0, (int)(settings_load()['revision'] ?? 0))
+            : $sheet;
     }
 
     return $out;
@@ -307,7 +347,7 @@ function seo_head(string $route, array $meta, array $styles = [],
            . "     bump it in the same breath as the file. Forget, and the release is for\n"
            . "     new visitors only, which looks like nothing at all from here.\n"
            . "     docs/20-deployment/routine-deploys.md, \"Cache busting\" -->";
-    foreach ([...HEAD_STYLES, ...$styles] as $sheet) {
+    foreach (head_styles($styles) as $sheet) {
         $out[] = '<link rel="stylesheet" href="/assets/css/' . h($sheet) . '">';
     }
 

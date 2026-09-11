@@ -118,6 +118,17 @@ if ($path === '/favicon.ico') {
     return true;
 }
 
+/* The brand colours are a generated stylesheet, for the reason every other
+   route here is generated: the CSP is style-src 'self', so a colour reaches a
+   page as a file or not at all. .htaccess rewrites this internally on the
+   host; without the same rule here the local server serves nothing and the
+   page falls back to theme.css, which looks exactly like the override not
+   working. */
+if ($path === '/assets/css/brand.css') {
+    require $root . '/assets/css/brand.css.php';
+    return true;
+}
+
 /* Apache's DirectorySlash, and the first of .htaccess section 3's two service
    rules. On the host a directory asked for without its trailing slash is
    redirected to the slash — Apache does it for a real directory, and the

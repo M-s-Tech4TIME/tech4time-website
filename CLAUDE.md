@@ -52,7 +52,7 @@ its record before acting.
 |---|---|
 | `pages/` `index.php` | the sixteen pages. **All of them are `.php`** now and render from `content/` — `404.php` was the last static one |
 | `pages/services/detail.php` | not a page: it serves any service the editor added that has no directory |
-| `sitemap.php` `robots.php` `manifest.php` `favicon.php` | generated, and served at `/sitemap.xml`, `/robots.txt`, `/site.webmanifest` and `/favicon.ico` — those addresses must not change. The last had no answer at all until the mark became content; a browser probes it blindly, before it has read a line of the page |
+| `sitemap.php` `robots.php` `manifest.php` `favicon.php` `assets/css/brand.css.php` | generated, and served at `/sitemap.xml`, `/robots.txt`, `/site.webmanifest` and `/favicon.ico` — those addresses must not change. The last had no answer at all until the mark became content; a browser probes it blindly, before it has read a line of the page |
 | `lib/head.php` | every page's `<head>`, emitted once. Not shared markup: there is nothing to propagate |
 | `lib/body.php` | every page's header, footer and dock, likewise — from `content/chrome.json` |
 | `assets/` | css, js, fonts, icons, images — all self-hosted |
@@ -76,7 +76,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 
 | Change | Where |
 |---|---|
-| A colour | `assets/css/theme.css` — tokens only, never a hex elsewhere |
+| A colour | `assets/css/theme.css` — tokens only, never a hex elsewhere. The **fourteen brand tokens** are editable at `https://admin.tech4time.bd/?s=settings&part=colour`, which overrides them through the generated `/assets/css/brand.css` and **refuses** anything below WCAG AA |
 | Layout, components | `assets/css/layout.css`, `components.css` |
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
 | Header / footer / dock | **`https://admin.tech4time.bd/?s=chrome`** if it is words or links; `lib/body.php` if it is markup. Never a page file |

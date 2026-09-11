@@ -20,6 +20,8 @@ tech4time-website/
 ├── robots.php              generated; served at /robots.txt
 ├── manifest.php            generated; served at /site.webmanifest
 ├── favicon.php             generated; served at /favicon.ico, which had no answer at all
+│                           assets/css/brand.css.php is generated too; served at
+│                           /assets/css/brand.css, and empty unless a colour was changed
 ├── .gitattributes          line endings and diff behaviour
 ├── .gitignore              includes the private store, as a backstop
 │
