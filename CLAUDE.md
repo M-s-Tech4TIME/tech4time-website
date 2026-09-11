@@ -86,6 +86,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Whether Google Analytics runs, and against which property | **`https://admin.tech4time.bd/?s=seo&site=crawl`** — a field, not a deploy |
 | An icon | the markup, then `python3 tools/inject_icons.py` |
 | A job post, a contact detail, a certification, a logo file, the privacy policy, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
+| Where the enquiry form's mail goes, and its subject line | **`https://admin.tech4time.bd/?s=settings&part=mail`**. What it is sent **as** is not editable — `SETTINGS_MAIL_FROM`, because the domain's SPF record is not something the editor can change |
 | A page's address | `SEO_ROUTES` in `lib/contract.php`, and `.htaccess`. A route is code; the editor cannot add, rename or remove one |
 | The shape of editable content | `lib/contract.php` — **and the same file in the backend** |
 | How a document is signed | `lib/publish.php` — likewise byte-identical |

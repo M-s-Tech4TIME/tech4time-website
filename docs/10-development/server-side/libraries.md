@@ -145,6 +145,15 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+`SETTINGS_MAIL_FROM` is what enquiry mail is sent **as**, and it is deliberately **not** editable.
+A message has to come from an address at this site's own domain or it fails SPF — the DNS record
+saying which servers may send as `tech4time.bd` — and is filed as spam. That record lives with the
+domain and nothing in the editor can change it, so a field for it would let somebody make every
+enquiry disappear into a spam folder with nothing on the screen to say why. It is here rather than
+in the handler because **both halves need it**: the frontend sends with it, and the editor's screen
+has to be able to *say* what messages are sent as, or the one field somebody might look for is
+simply absent with no explanation.
+
 **The contrast pairs and the sums that judge them are here, and that is a correction.**
 `SETTINGS_CONTRAST_PAIRS` says which pairs have to be readable and at what ratio;
 `contract_contrast_ratio()` and `settings_contrast_faults()` do the arithmetic. `tools/check_contrast.py`
