@@ -52,7 +52,7 @@ its record before acting.
 |---|---|
 | `pages/` `index.php` | the sixteen pages. **All of them are `.php`** now and render from `content/` — `404.php` was the last static one |
 | `pages/services/detail.php` | not a page: it serves any service the editor added that has no directory |
-| `sitemap.php` `robots.php` `manifest.php` | generated, and served at `/sitemap.xml`, `/robots.txt` and `/site.webmanifest` — those addresses must not change |
+| `sitemap.php` `robots.php` `manifest.php` `favicon.php` `assets/css/brand.css.php` | generated, and served at `/sitemap.xml`, `/robots.txt`, `/site.webmanifest` and `/favicon.ico` — those addresses must not change. The last had no answer at all until the mark became content; a browser probes it blindly, before it has read a line of the page |
 | `lib/head.php` | every page's `<head>`, emitted once. Not shared markup: there is nothing to propagate |
 | `lib/body.php` | every page's header, footer and dock, likewise — from `content/chrome.json` |
 | `assets/` | css, js, fonts, icons, images — all self-hosted |
@@ -76,7 +76,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 
 | Change | Where |
 |---|---|
-| A colour | `assets/css/theme.css` — tokens only, never a hex elsewhere |
+| A colour | `assets/css/theme.css` — tokens only, never a hex elsewhere. The **fourteen brand tokens** are editable at `https://admin.tech4time.bd/?s=settings&part=colour`, which overrides them through the generated `/assets/css/brand.css` and **refuses** anything below WCAG AA |
 | Layout, components | `assets/css/layout.css`, `components.css` |
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
 | Header / footer / dock | **`https://admin.tech4time.bd/?s=chrome`** if it is words or links; `lib/body.php` if it is markup. Never a page file |
@@ -86,6 +86,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Whether Google Analytics runs, and against which property | **`https://admin.tech4time.bd/?s=seo&site=crawl`** — a field, not a deploy |
 | An icon | the markup, then `python3 tools/inject_icons.py` |
 | A job post, a contact detail, a certification, a logo file, the privacy policy, the about or home page's copy | **`https://admin.tech4time.bd/`** — not a file, and not here |
+| Where the enquiry form's mail goes, and its subject line | **`https://admin.tech4time.bd/?s=settings&part=mail`**. What it is sent **as** is not editable — `SETTINGS_MAIL_FROM`, because the domain's SPF record is not something the editor can change |
 | A page's address | `SEO_ROUTES` in `lib/contract.php`, and `.htaccess`. A route is code; the editor cannot add, rename or remove one |
 | The shape of editable content | `lib/contract.php` — **and the same file in the backend** |
 | How a document is signed | `lib/publish.php` — likewise byte-identical |
@@ -153,7 +154,8 @@ check that sees the header, footer and dock a visitor actually receives, and
 `check_shared_markup.py`, which asserts the emitter still carries the six `data-` hooks the scripts
 bind to.
 
-Touched `lib/head.php`, `lib/seo.php`, `sitemap.php`, `robots.php` or `manifest.php`? Also
+Touched `lib/head.php`, `lib/seo.php`, `sitemap.php`, `robots.php`, `manifest.php` or
+`favicon.php`? Also
 **`python3 tools/test_sitemap.py`** and `audit_pages.py`. All three of those files are served at an
 address that looks static and none of them is; a PHP error in one ships as a 500 at a URL no page
 links to, which Google fetches and people do not.
@@ -161,13 +163,34 @@ links to, which Google fetches and people do not.
 Touched the contact handler? Also `test_contact_handler.py`. Touched `lib/store.php`? Also
 `test_store.py`.
 
+Touched the logo, or anything that draws it — `lib/body.php`, `lib/about.php`, `lib/seo.php`,
+`lib/careers.php`? Also **`python3 tools/test_settings.py`**. The mark is in nine places across two
+repositories and `content/settings.json` exists so that they are one; that suite changes it once and
+reads it back out of all of them, plus the case a fresh clone is in, where the document is missing
+and the site still has a logo.
+
+Touched a renderer that draws an uploaded picture — `about_picture()`, `home_picture()`,
+`company_picture()`, `branding_picture()`, `contact_flag_picture()` — or a number in
+`CONTRACT_IMAGE_SLOTS`? Also **`python3 tools/test_pictures.py`** and `audit_pages.py`. The first
+puts a ladder into each document and reads the markup back; the second is the only check that sees a
+`srcset` of widths shipped with no `sizes=` beside it, which is a regression rather than a missing
+improvement — without it the browser takes the widest rung on every screen. A width in that table is
+**measured, not estimated**: two of the seven are widest on a phone or a tablet rather than a
+desktop.
+
 Touched CSS, markup or motion? Also `test_motion.py`, `test_nav.py`, `test_theme.py`,
 `check_hover.py`, `check_dark_mode.py`, `check_responsive.py`, `check_focus.py` — these need
 Firefox and geckodriver, and leave processes behind if interrupted (`pkill firefox geckodriver`).
 
 Changed how much of the page **moves**? Also **`python3 tools/check_style_budget.py`** (needs
 Chrome). None of the suites above can see a page burning a CPU core while holding 60fps — that
-shipped on 2026-09-03 and a person noticed it before any check did.
+shipped on 2026-09-03 and a person noticed it before any check did. **It runs in CI now**, which it
+did not until 2026-09-11: it exits 0 with a notice when Chrome is absent, so it had been the one
+check capable of proving nothing while reporting success.
+
+**Added a suite? Add it to `.github/workflows/test.yml` in the same commit.** Nothing checks this,
+and two suites had been sitting on disk unrun — `test_settings.py` and `test_pictures.py`, 97
+checks asserted nowhere.
 
 [docs/10-development/testing.md](docs/10-development/testing.md)
 

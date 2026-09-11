@@ -36,8 +36,17 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/contract.php';
+require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/html.php';
+/* VESTIGIAL HERE AND LOAD-BEARING ELSEWHERE. Nothing in this file calls a
+   contact_* function. Six other files reach contact.php through this line
+   instead of requiring it themselves, so removing it breaks them rather than
+   tidying anything -- it is a require-hygiene change of its own.
+
+   It also makes a cycle with contact.php, which requires this file for
+   seo_site(). require_once resolves that safely PROVIDED neither file runs
+   anything at load time. Neither does. Keep it that way. */
 require_once __DIR__ . '/contact.php';
 
 const SEO_FILE = __DIR__ . '/../content/seo.json';
@@ -68,10 +77,33 @@ function seo_site(): array
     return seo_load()['site'];
 }
 
-/** The Organization's own facts, minus the ones the contact page owns. */
+/**
+ * The Organization's own facts, minus the ones the contact page owns.
+ *
+ * ITS LOGO IS DERIVED, AND OVERRIDABLE. Left empty it is the site's mark,
+ * which is what anybody changing the logo expects — otherwise the header would
+ * show the new one while a search engine went on being told the old, with
+ * nothing comparing them. That is the defect this whole document exists to
+ * stop, on the most visible asset the company has.
+ *
+ * Filled it wins, and the escape hatch is real rather than ceremonial: Google
+ * renders Organization.logo in a near-square slot and this lockup is nearly
+ * three to one, so a company may well want a different picture there. The same
+ * fallback rule as a chrome nav label — empty means "whatever it is called
+ * elsewhere", filled means this.
+ *
+ * The LARGEST rendition, because a consumer that reads structured data picks
+ * nothing from a candidate list: it takes the one URL it is given.
+ */
 function seo_identity(): array
 {
-    return seo_load()['identity'];
+    $identity = seo_load()['identity'];
+
+    if (trim((string)($identity['logo']['src'] ?? '')) === '') {
+        $identity['logo'] = settings_logo_largest(settings_load());
+    }
+
+    return $identity;
 }
 
 /**

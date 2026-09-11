@@ -145,6 +145,17 @@ origin is a failure; with one, that origin is expected and every other one still
 > The `.htaccess` copy is the one that counts; the `<meta>` equivalents are defence in depth for
 > hosts that strip headers.
 
+**`frame-ancestors` is in that same category, and used to be in the `<meta>` policy anyway.** The
+CSP specification lists it among the directives ignored when a policy is delivered by
+`<meta http-equiv>` — only a header can carry it. So the copy in `HEAD_CSP` protected nothing while
+reading as though it did, which is worse than absent: it invites the conclusion that the page is
+frame-blocked without anybody checking the header. It is gone from both `<meta>` policies.
+
+Framing is still refused twice, for real, in `.htaccess`: `frame-ancestors 'none'` inside the
+`Content-Security-Policy` header, and `X-Frame-Options: DENY` beside it. **Nothing was weakened by
+that removal; a claim was.** This is the difference the whole section is about — a security control
+that is present and a security control that is merely written down.
+
 ### Blocking
 
 ```apache

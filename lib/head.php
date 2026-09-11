@@ -47,6 +47,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/seo.php';
+require_once __DIR__ . '/settings.php';
 
 /**
  * The stylesheets every page loads, in cascade order, before its own.
@@ -60,8 +61,21 @@ require_once __DIR__ . '/seo.php';
  */
 const HEAD_STYLES = [
     'base.css',
-    'theme.css',
-    'layout.css?v=4',
+    'theme.css?v=2',
+    /* IMMEDIATELY AFTER theme.css AND NOWHERE ELSE. It is the same custom
+       properties at the same specificity, so the later one wins -- and it
+       holds only what a person changed, which is usually nothing at all. A
+       host with no settings document, or one holding the palette it was seeded
+       with, serves this as an EMPTY file. It is generated:
+       assets/css/brand.css.php.
+
+       ITS VERSION IS NOT WRITTEN HERE. Every other sheet is a file a developer
+       edits, so its query is bumped by hand in the same breath. This one
+       changes when somebody picks a colour, and nobody is here to bump
+       anything -- so head_styles() appends the settings document's own
+       revision, which contract_next_revision() already makes monotonic. */
+    'brand.css',
+    'layout.css?v=5',
     'components.css',
     'animations.css',
 ];
@@ -77,13 +91,70 @@ const HEAD_STYLES = [
  * which is a lot of machinery for six constant lines.
  */
 const HEAD_ICONS = [
-    '<link rel="icon" href="/assets/images/favicon/favicon.ico" sizes="any">',
-    '<link rel="icon" type="image/png" sizes="16x16" href="/assets/images/favicon/favicon-16.png">',
-    '<link rel="icon" type="image/png" sizes="32x32" href="/assets/images/favicon/favicon-32.png">',
-    '<link rel="icon" type="image/png" sizes="48x48" href="/assets/images/favicon/favicon-48.png">',
-    '<link rel="icon" type="image/png" sizes="96x96" href="/assets/images/favicon/favicon-96.png">',
-    '<link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">',
+    /*  name      the committed file, used until a square mark is uploaded  */
+    'png16'  => '/assets/images/favicon/favicon-16.png',
+    'png32'  => '/assets/images/favicon/favicon-32.png',
+    'png48'  => '/assets/images/favicon/favicon-48.png',
+    'png96'  => '/assets/images/favicon/favicon-96.png',
+    'apple'  => '/assets/images/favicon/apple-touch-icon.png',
 ];
+
+/**
+ * The favicon set, in the order a browser reads it.
+ *
+ * SIX LINES THAT NAMED SIX COMMITTED FILES, and a company could not change
+ * what its own browser tab shows without a developer. They are read from
+ * content/settings.json now, each falling back to the file that ships, so a
+ * host with no settings document sends exactly what it sent before.
+ *
+ * /favicon.ico is first and has no size of its own: it is the address a
+ * browser probes blindly, before it has read a single line of the page. It is
+ * assembled where it is served -- favicon.php -- which is why it is a path
+ * here and not a generated one.
+ */
+function head_icons(array $settings): array
+{
+    $out = ['<link rel="icon" href="/favicon.ico" sizes="any">'];
+
+    foreach (HEAD_ICONS as $name => $shipped) {
+        $href = h(settings_icon($settings, $name, $shipped));
+
+        $out[] = $name === 'apple'
+            ? '<link rel="apple-touch-icon" sizes="180x180" href="' . $href . '">'
+            : '<link rel="icon" type="image/png" sizes="'
+              . SETTINGS_ICON_SIZES[$name]['size'] . 'x'
+              . SETTINGS_ICON_SIZES[$name]['size'] . '" href="' . $href . '">';
+    }
+
+    return $out;
+}
+
+/**
+ * Every stylesheet a page loads, in order, each with its cache-busting query.
+ *
+ * ONE OF THEM IS VERSIONED BY THE DOCUMENT AND NOT BY HAND. brand.css is
+ * generated from content/settings.json, so what changes it is somebody picking
+ * a colour rather than somebody editing a file -- and .htaccess caches
+ * everything under assets/ for a year. Without a query that moves with the
+ * palette, a returning visitor would keep last year's colours and the editor
+ * would look broken to the only person who could see it.
+ *
+ * The revision is what moves: monotonic per document, minted by
+ * contract_next_revision() on every save, and already what the publish channel
+ * uses to decide which copy is newer.
+ */
+function head_styles(array $extra = []): array
+{
+    $out = [];
+
+    foreach ([...HEAD_STYLES, ...$extra] as $sheet) {
+        $out[] = $sheet === 'brand.css'
+            ? 'brand.css?v=' . max(0, (int)(settings_load()['revision'] ?? 0))
+            : $sheet;
+    }
+
+    return $out;
+}
 
 /**
  * The Content Security Policy, as defence in depth.
@@ -92,10 +163,22 @@ const HEAD_ICONS = [
  * every browser -- they are set for real in .htaccess, which is the
  * authoritative source. Referrer-Policy and CSP genuinely do work here, and
  * are kept in case the host strips response headers.
+ *
+ * AND frame-ancestors IS IN THAT SAME CATEGORY, which this file argued for two
+ * directives and then did not apply to a third. The CSP specification lists
+ * frame-ancestors among the directives IGNORED when a policy is delivered by
+ * <meta http-equiv>; only an HTTP header can carry it. So the copy that used
+ * to be here protected nothing and read as though it did -- which is worse
+ * than absent, because it invites somebody to conclude the page is safe to
+ * frame-block without checking the header.
+ *
+ * Framing is refused for real by .htaccess, twice: the Content-Security-Policy
+ * header carries frame-ancestors 'none' and X-Frame-Options: DENY is set
+ * beside it. Nothing is weakened by dropping it here; a claim is.
  */
 const HEAD_CSP = "default-src 'self'; img-src 'self' data:; style-src 'self'; "
                . "script-src 'self'; font-src 'self'; form-action 'self'; "
-               . "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+               . "base-uri 'self'; object-src 'none'";
 
 /**
  * The same policy, widened by exactly what Google Analytics needs.
@@ -119,7 +202,7 @@ const HEAD_CSP_ANALYTICS =
     . "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com "
     . "https://*.googletagmanager.com; "
     . "font-src 'self'; form-action 'self'; "
-    . "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+    . "base-uri 'self'; object-src 'none'";
 
 /** The pretty-printing every JSON-LD block on this site uses. */
 const HEAD_JSON_FLAGS = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
@@ -251,7 +334,7 @@ function seo_head(string $route, array $meta, array $styles = [],
 
     $out[] = '';
     $out[] = '<!-- Icons -->';
-    foreach (HEAD_ICONS as $icon) {
+    foreach (head_icons(settings_load()) as $icon) {
         $out[] = $icon;
     }
     $out[] = '<link rel="manifest" href="/site.webmanifest">';
@@ -276,7 +359,7 @@ function seo_head(string $route, array $meta, array $styles = [],
            . "     bump it in the same breath as the file. Forget, and the release is for\n"
            . "     new visitors only, which looks like nothing at all from here.\n"
            . "     docs/20-deployment/routine-deploys.md, \"Cache busting\" -->";
-    foreach ([...HEAD_STYLES, ...$styles] as $sheet) {
+    foreach (head_styles($styles) as $sheet) {
         $out[] = '<link rel="stylesheet" href="/assets/css/' . h($sheet) . '">';
     }
 
@@ -418,6 +501,7 @@ function seo_graph(): array
 function seo_offices(array $contact): array
 {
     $hours = seo_shown(seo_load(), 'hours');
+    $share = seo_share([]);        /* the site-wide card; see the note below */
     $out   = [];
 
     foreach (contact_shown_offices($contact) as $office) {
@@ -453,14 +537,44 @@ function seo_offices(array $contact): array
             )),
             'email'              => contact_email($contact),
             'priceRange'         => seo_identity()['price_range'],
+            /* THE SHARE CARD, WHICH IS WHAT Organization ALSO USES, and
+               deliberately NOT the office's own picture. That field is a flag:
+               it overrides the shipped country slug, CONTRACT_IMAGE_SLOTS
+               stores it at 56px because 56px is where it is drawn, and a
+               56-pixel flag offered to a search engine as the photograph of a
+               place of business is a worse answer than none at all.
+
+               A real photograph per office would be a different field at a
+               different width. Until there is one, each office carries the
+               card the rest of the site carries, which is at least accurate.
+
+               Set unconditionally, like 'email' and 'priceRange' above:
+               seo_graph() array_filter()s every node it assembles, so an empty
+               card drops the key rather than shipping "image": "". */
+            'image'              => $share['url'] ?? '',
         ];
 
-        $matched = array_values(array_filter(
-            $hours,
-            static fn(array $row): bool =>
-                $row['days'] !== []
-                && stripos((string)$row['label'], $name) !== false
-        ));
+        /* BOTH OR NEITHER. A GeoCoordinates node with one number in it is not
+           half a pin, it is a pin somewhere on a line of longitude through the
+           middle of the planet -- so a half-filled pair is dropped entirely
+           rather than published as far as it goes.
+
+           contact_coordinate() has already turned anything that is not a
+           coordinate into '', so this is the only test needed here. */
+        $lat = (string)($schema['latitude'] ?? '');
+        $lon = (string)($schema['longitude'] ?? '');
+
+        if ($lat !== '' && $lon !== '') {
+            $node['geo'] = [
+                '@type'     => 'GeoCoordinates',
+                'latitude'  => $lat,
+                'longitude' => $lon,
+            ];
+        }
+
+        /* The rule lives in the contract, because the editor asks it too --
+           it is what tells an operator which office has no hours attached. */
+        $matched = seo_hours_for_office($hours, $name);
 
         if ($matched !== []) {
             $node['openingHoursSpecification'] = array_map(

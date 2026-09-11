@@ -26,29 +26,83 @@ declare(strict_types=1);
 
 /* ------------------------------------------------------------------ config */
 
-const MAIL_TO      = 'info@tech4time.bd';
-const MAIL_SUBJECT = 'Website enquiry';
+/* WHERE ENQUIRIES GO IS EDITABLE, and these are what answers when the document
+   cannot be read at all. A company changing the address it is contacted on
+   should not need a deploy, so content/settings.json holds it — but this file
+   is the one place on the site where being wrong means losing a message
+   silently, so it keeps an answer of its own for the case where nothing else
+   can be loaded. */
+const MAIL_TO_SHIPPED      = 'info@tech4time.bd';
+const MAIL_SUBJECT_SHIPPED = 'Website enquiry';
 
-/* The From: address must be at the site's own domain or the message will fail
-   SPF and be filed as spam. The visitor's address goes in Reply-To instead, so
-   hitting reply still reaches them. */
-const MAIL_FROM = 'no-reply@tech4time.bd';
+/* The From: address is NOT editable and must not become so — see
+   SETTINGS_MAIL_FROM in lib/contract.php, which is where it is defined and why.
+   This is the same value again, as the answer when the contract cannot be
+   loaded at all, on the same reasoning as the two above:
+   tools/test_contact_handler.py asserts the two agree. */
+const MAIL_FROM_SHIPPED = 'no-reply@tech4time.bd';
 
 /* -------------------------------------------------------------- safety net */
 
 /* A blank 500 tells the visitor nothing and leaves us nothing to look at.
    Shared hosting is where unexplained fatals happen — an extension switched
    off in cPanel, a memory limit, a PHP version bump — so whatever goes wrong,
-   the visitor still ends up with an address they can write to. */
-register_shutdown_function(static function (): void {
+   the visitor still ends up with an address they can write to.
+
+   REGISTERED BEFORE THE DOCUMENT IS READ, and holding the address BY
+   REFERENCE. The order is the whole point: if loading the settings is itself
+   what goes wrong, this is already in place and answers with the shipped
+   address; if it succeeds, the reference means this answers with the edited
+   one. A handler registered after the read would have nothing to say about the
+   read failing, which is exactly the failure it exists for. */
+$mail_to      = MAIL_TO_SHIPPED;
+$mail_subject = MAIL_SUBJECT_SHIPPED;
+$mail_from    = MAIL_FROM_SHIPPED;
+
+register_shutdown_function(static function () use (&$mail_to): void {
     $fatal = error_get_last();
     $hard = E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR;
 
     if ($fatal && ($fatal['type'] & $hard) && !headers_sent()) {
         respond(false, 'We could not send your message just now. Please email '
-            . MAIL_TO . ' directly.', 500);
+            . $mail_to . ' directly.', 500);
     }
 });
+
+/* WHATEVER GOES WRONG HERE, THE FORM STILL WORKS. A contact form that stopped
+   working because a settings file was missing would be a worse failure than
+   the one it was meant to fix, and this is the one endpoint on the site where
+   being wrong means losing a message with nobody noticing.
+
+   THE catch COVERS A MISSING FILE, which is not the obvious guess: a failed
+   require in PHP 8 throws a catchable Error rather than the uncatchable
+   E_COMPILE_ERROR it was in earlier versions. Checked on this host's PHP 8.2
+   rather than assumed, after an earlier version of this comment asserted the
+   opposite. The is_file() in front of it is for the LOG: without it a host
+   with no lib/settings.php writes a warning on every single enquiry, and an
+   error log full of an expected condition is an error log nobody reads.
+
+   NEITHER IS COVERED BY A TEST, and tools/test_contact_handler.py says why
+   where it would have been: under `php -S` a file already loaded earlier in
+   the run keeps loading after it is deleted, so the check passed with both
+   guards removed. A parse error inside the file is still fatal and beyond
+   both, which is what the safety net above is for.
+
+   settings_normalise() already guarantees a real address; anything that is not
+   one falls back to the shipped value there. So there is nothing to validate
+   here, only to load. */
+if (is_file(__DIR__ . '/lib/settings.php')) {
+    try {
+        require_once __DIR__ . '/lib/settings.php';
+
+        $settings     = settings_load();
+        $mail_to      = (string)$settings['contact']['mail_to'];
+        $mail_subject = (string)$settings['contact']['mail_subject'];
+        $mail_from    = SETTINGS_MAIL_FROM;
+    } catch (Throwable) {
+        /* The shipped values, set above. */
+    }
+}
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -112,7 +166,7 @@ function respond(bool $ok, string $message, int $status = 200): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, follow">
 <title>{$title} | Tech4TIME</title>
-<link rel="icon" href="/assets/images/favicon/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/assets/css/base.css">
 <link rel="stylesheet" href="/assets/css/theme.css">
 <link rel="stylesheet" href="/assets/css/layout.css">
@@ -195,7 +249,7 @@ try {
     if ($wait > 0) {
         respond(false,
             'That is several messages in a short time. Please try again in '
-            . throttle_wait_text($wait) . ', or email ' . MAIL_TO . ' directly.',
+            . throttle_wait_text($wait) . ', or email ' . $mail_to . ' directly.',
             429);
     }
 } catch (Throwable) {
@@ -284,15 +338,15 @@ $body = "New enquiry from the Tech4TIME website\n"
    this rather than a person, which several filters score against — and it
    tells a stranger the PHP version the host is running. It buys nothing. */
 $headers = [
-    'From: Tech4TIME Website <' . MAIL_FROM . '>',
+    'From: Tech4TIME Website <' . $mail_from . '>',
     'Reply-To: ' . $safe_email,
     'Content-Type: text/plain; charset=utf-8',
     'MIME-Version: 1.0',
 ];
 
 $sent = @mail(
-    MAIL_TO,
-    MAIL_SUBJECT . ': ' . $safe_subject,
+    $mail_to,
+    $mail_subject . ': ' . $safe_subject,
     $body,
     implode("\r\n", $headers)
 );
@@ -300,7 +354,7 @@ $sent = @mail(
 if (!$sent) {
     /* mail() returning false means the local mailer would not accept it. The
        visitor cannot act on that, so give them the address instead. */
-    respond(false, 'We could not send your message just now. Please email ' . MAIL_TO . ' directly.', 500);
+    respond(false, 'We could not send your message just now. Please email ' . $mail_to . ' directly.', 500);
 }
 
 respond(true, 'Thank you — your message has been sent. We will get back to you soon!');

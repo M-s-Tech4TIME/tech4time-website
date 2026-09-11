@@ -74,9 +74,10 @@ the directory structure — every asset path is root-relative, so a flattened up
 **`content/` is uploaded this once**, to seed the two JSON files. Never again — from now on the
 host's copy is the real one.
 
-**`.htaccess` must be uploaded.** It carries the real security headers. `X-Frame-Options` and
-`X-Content-Type-Options` are ignored by browsers when set via `<meta>`, so the `.htaccess` copy is
-the one that counts.
+**`.htaccess` must be uploaded.** It carries the real security headers. `X-Frame-Options`,
+`X-Content-Type-Options` and CSP's `frame-ancestors` are all ignored by browsers when set via
+`<meta>`, so the `.htaccess` copy is the only one that counts — without it the site can be framed,
+whatever the page's own policy appears to say.
 
 ## 3. Check it serves
 

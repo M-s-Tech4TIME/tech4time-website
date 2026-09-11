@@ -156,6 +156,39 @@
 
     RewriteRule ^site\.webmanifest$ /manifest.php [L]
 
+    # /favicon.ico, which had no answer at all
+    # ----------------------------------------------------------------------
+    # A browser probes this address BLINDLY: before it has read a line of the
+    # page, before any <link>, and on requests that have no page. There was no
+    # file at the root and no rule, so every one of those probes was a 404 --
+    # an error in the log on every cold visit.
+    #
+    # It is generated now, because the mark is content: favicon.php assembles
+    # the container from the PNGs content/settings.json names, and falls back
+    # to the committed file. Same shape as the three above -- a 301 for anyone
+    # who asks for the .php by name, guarded on THE_REQUEST so the internal
+    # rewrite does not feed itself back into it, then the unconditional
+    # internal rewrite so a favicon.ico left at the root by an older deploy
+    # cannot shadow the generated one.
+    RewriteCond %{THE_REQUEST} \s/favicon\.php[\s?] [NC]
+    RewriteRule ^favicon\.php$ /favicon.ico [R=301,L]
+
+    RewriteRule ^favicon\.ico$ /favicon.php [L]
+
+    # /assets/css/brand.css, which is colours and not a file
+    # ----------------------------------------------------------------------
+    # The Content Security Policy is style-src 'self': no <style> block, no
+    # style= attribute. A colour somebody picked in the editor has to reach the
+    # page as a STYLESHEET or it does not reach the page at all. So it is
+    # generated, the same way the four above are, and served from the address
+    # every page's <link> already names.
+    #
+    # No 301 for the .php by name, unlike the four above: this one is under
+    # assets/, which section 2 already serves with a year-long cache, and a
+    # redirect there would be a second round trip on a render-blocking
+    # stylesheet. The internal rewrite alone is what is needed.
+    RewriteRule ^assets/css/brand\.css$ /assets/css/brand.css.php [L]
+
     # Send /pages/about -> /pages/about/  (only where the directory exists)
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteCond %{REQUEST_URI} !/$

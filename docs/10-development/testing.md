@@ -52,6 +52,35 @@ python3 tools/check_shared_lib.py --update    # re-record the digests
 # and bump CONTRACT_VERSION if the SHAPE of a document changed
 ```
 
+## When you touched the logo, or anything that draws it
+
+```bash
+python3 tools/test_settings.py         # one mark, every place it is drawn
+python3 tools/audit_pages.py           # and the pages still audit
+```
+
+The mark is in nine places across two repositories, and the whole point of
+`content/settings.json` is that they are one. `test_settings.py` changes it once and reads it back
+out of the header, the footer, the About lockup, `Organization.logo` and the job postings — plus the
+case a fresh clone is in, where the document is **missing** and the site still has a logo.
+
+## When you touched a picture, or how wide one is drawn
+
+```bash
+python3 tools/test_pictures.py         # what a ladder turns into on the page
+python3 tools/audit_pages.py           # and that no page ends up with one it cannot use
+```
+
+`test_pictures.py` puts a ladder into each document and reads the markup back, because
+`audit_pages.py` audits the documents *as they are* and none of them holds one yet — so the rule it
+enforces has nothing to enforce it on until somebody uploads a picture. Both halves matter and the
+second is the one that is easy to lose: **a `srcset` of widths with no `sizes=` beside it is a
+regression, not a missing improvement.** The browser is required to assume the picture fills the
+viewport, so it takes the widest rung on every screen.
+
+Changed a number in `CONTRACT_IMAGE_SLOTS`? **Measure it, do not estimate it** — "If you are
+measuring geometry" below has the technique, and two of the seven are not where anybody would guess.
+
 ## When you touched the header, the footer or the dock
 
 ```bash
@@ -63,7 +92,8 @@ python3 tools/check_shared_markup.py   # the emitter still carries the scripts' 
 `test_chrome.py` is the one that reads the **words**; `audit_pages.py` is the one that reads the
 **structure**, and neither is a substitute for the other. Run `check_responsive.py` too if you
 changed the markup rather than only the document — it measures the nav at the widest the picker
-can make it, which is a width no shipped document produces.
+can make it, and the logo at every shape somebody could upload, and neither is a width a shipped
+document produces.
 
 ## When you touched CSS, markup or motion
 
@@ -136,7 +166,7 @@ passes or fails, and against a private store in a throwaway directory under `/tm
 | `test_theme.py` | the theme switch honours an explicit choice, falls back to the OS preference, and survives a reload without a flash |
 | `check_hover.py` | every interactive element visibly responds to a real pointer |
 | `check_dark_mode.py` | every page in both themes, as painted — catching what a CSS reader cannot, like a token that resolves to the same colour as its background |
-| `check_responsive.py` | every page at 320, 360, 414, 640, 768, 1024 and 1440px: the document does not scroll sideways, no link, button or field is wider than the screen, and no tap target is under 24px. Each width is a frame, not a window — see [0015](../90-decisions/0015-narrow-widths-need-a-frame.md), because Firefox silently clamps a window at about 500px and a check written the obvious way reports widths it never tested. Then a **second pass**: two pages at the four narrow widths with `content/chrome.json` replaced by the widest document the picker can produce — every route in the nav, the links, the legal row and the dock panel, each drawing the page's own name, and the longest of those names in all four dock keys. An editable nav is the one thing here that can newly overflow, and no shipped document is as wide as what somebody is allowed to save |
+| `check_responsive.py` | every page at 320, 360, 414, 640, 768, 1024 and 1440px: the document does not scroll sideways, no link, button or field is wider than the screen, and no tap target is under 24px. Each width is a frame, not a window — see [0015](../90-decisions/0015-narrow-widths-need-a-frame.md), because Firefox silently clamps a window at about 500px and a check written the obvious way reports widths it never tested. Then a **second pass**: two pages at the four narrow widths with `content/chrome.json` replaced by the widest document the picker can produce — every route in the nav, the links, the legal row and the dock panel, each drawing the page's own name, and the longest of those names in all four dock keys. An editable nav is the one thing here that can newly overflow, and no shipped document is as wide as what somebody is allowed to save. Then a **third pass**: the same two pages with an uploaded logo at the top of its ladder, in six shapes from portrait through square to 24:1. The header sizes the mark by its HEIGHT and `.site-header__brand` is `flex-shrink: 0`, so the width it takes is height x aspect ratio and nothing downstream can take it back — measured before the cap in `layout.css`, 8:1 held at 320px and 10:1 pushed the page 56px sideways. The cap does not care what the ratio is, so what is asserted is that none of them overflows |
 | `check_focus.py` | every page tabbed one stop at a time, at desktop and mobile widths: each focused element has a visible ring (SC 2.4.7) and is not entirely covered by the sticky header or the fixed dock (SC 2.4.11). Runs with reduced motion so scrolling is instant, and **refuses to run** if that preference did not take effect — otherwise every position it reads is mid-scroll |
 
 They skip with a notice and exit 0 when Firefox or geckodriver is missing, rather than failing —
@@ -180,6 +210,37 @@ build step, and a dependency is a thing that has to be resurrected before a typo
 If your change makes a protection that could be removed without anything failing, add the check to
 `check_secrets.py` — and **prove the check works by deliberately breaking the thing it guards**
 before you trust it.
+
+### If you are measuring geometry
+
+`CONTRACT_IMAGE_SLOTS` holds the width every uploaded picture is actually drawn at. Those numbers
+decide how many files each upload writes and what goes in its `sizes=` attribute, so they are
+measured against a real browser rather than read off a stylesheet — a stylesheet says `width: 100%`
+and tells you nothing about what that resolves to.
+
+**Measure in an iframe, not a window.** Firefox will not make a window narrower than about 500px:
+ask for 320 and you measure 488, with no error. `check_responsive.py` explains this at length and is
+the model to copy. The frame's own scrollbar takes about 12px, so a frame asked for 1280 reports a
+`clientWidth` of 1268 — report the width you measured, never the one you asked for.
+
+**Force lazy images eager before measuring, and wait for them.** Two hours went into this twice
+over. `loading="lazy"` means an image below the fold has not loaded, and an unloaded `<img>` whose
+CSS width is a percentage of an indefinite box measures **zero** — the branding page's four previews
+looked like a live layout bug and were not. Scrolling one image into view does not help either: the
+ones between it and the fold stay unloaded, so "all complete" never arrives and every page times
+out. Set `loading = 'eager'` on all of them, return, then poll until `complete && naturalWidth`.
+
+**The widest point is often not the widest screen.** Two of the seven slots peak somewhere in the
+middle, because a breakpoint takes the picture out of a full-width column:
+
+| Slot | Widest at | And at 1440 |
+|---|---|---|
+| `about.story` | **693px @ 768** — the last single-column width | 534px |
+| `company.clients` | **249px @ 360** — the grid drops to one column | 126px |
+
+Sampling only 320 and 1440 would have missed both and shipped a picture too small on exactly the
+width that needed it most. Sample across the breakpoints, in both themes — a lockup hidden by
+`display: none` in one theme measures zero in it.
 
 ### If you are measuring time
 

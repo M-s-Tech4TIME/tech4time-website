@@ -5,6 +5,17 @@ Normalise the Tech4TIME master logo artwork into the web asset set.
 One-off build tool. NOT deployed to the web server (see tools/README.md).
 Run from the repo root:  python3 tools/build_logos.py
 
+THIS BUILDS THE SEED, NOT THE LIVE MARK, and the difference matters now that
+there is a difference. A company changing its logo uploads it at
+?s=settings&part=logo: the editor stores it under /uploads/ at the widths
+CONTRACT_IMAGE_SLOTS declares and sends it here, and every place the mark is
+drawn reads content/settings.json. Nothing about that goes through this file.
+
+What this still does is rebuild what a fresh install shows before anybody has
+uploaded anything — assets/images/logo/, which settings_defaults() names. That
+is a different input (master artwork under tools/masters/), a different output
+(committed files) and a different lifecycle (a developer, once), so it stays.
+
 Source naming note: in the master files, "Light"/"Dark" describe the background
 the logo is meant to sit on, not the ink colour.
   *_Light_Transparent.png  -> near-black ink   -> used in LIGHT mode

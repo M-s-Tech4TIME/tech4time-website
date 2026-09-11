@@ -39,22 +39,28 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
+require_once __DIR__ . '/settings.php';
 
 const ABOUT_FILE = __DIR__ . '/../content/about.json';
 
 /**
- * The lockup that ships with the site, used when a row has uploaded none.
+ * The two colour modes a logo row draws, and which class hides which.
  *
- * Two pictures, one for each colour mode, swapped by CSS rather than by script
- * so the right one is there at first paint.
+ * THE PICTURE ITSELF IS NO LONGER HERE. It was three constants naming
+ * /assets/images/logo/logo-{light,dark}-540 and its size, so a company that
+ * replaced its mark got a new header and this row went on showing the old one.
+ * It is read from content/settings.json now, like every other place the mark
+ * is drawn.
+ *
+ * The LARGEST rendition, because this row draws the mark at up to 693px --
+ * measured, at ten viewports; it is the biggest drawing of the mark anywhere
+ * on the site, and the header's is the smallest. Swapped by CSS rather than by
+ * script, so the right one is there at first paint.
  */
 const ABOUT_LOGO_LOCKUP = [
-    ['class' => 'theme-swap--light', 'stem' => '/assets/images/logo/logo-light-540'],
-    ['class' => 'theme-swap--dark',  'stem' => '/assets/images/logo/logo-dark-540'],
+    ['class' => 'theme-swap--light', 'mode' => 'light'],
+    ['class' => 'theme-swap--dark',  'mode' => 'dark'],
 ];
-
-const ABOUT_LOGO_WIDTH  = 540;
-const ABOUT_LOGO_HEIGHT = 192;
 
 /**
  * The about page as it should be rendered.
@@ -92,7 +98,15 @@ function about_picture(array $image, string $class, string $alt): string
               . ' height="' . (int)$image['height'] . '"';
     }
 
-    $img = '<img class="' . h($class) . '" src="' . h($src) . '"'
+    /* One picture at several widths, when this one was stored that way and
+       the slot says how wide it is drawn. Both halves or neither: see
+       contract_picture_ladder(). */
+    $ladder = contract_picture_ladder($image, 'about.story');
+    $rungs  = $ladder['srcset'] === '' ? ''
+            : ' srcset="' . h($ladder['srcset']) . '"'
+            . ' sizes="' . h($ladder['sizes']) . '"';
+
+    $img = '<img class="' . h($class) . '" src="' . h($src) . '"' . $rungs
          . ' alt="' . h($alt) . '"' . $size
          . ' loading="lazy" decoding="async">';
 
@@ -101,8 +115,12 @@ function about_picture(array $image, string $class, string $alt): string
         return $img;
     }
 
-    return '<picture><source srcset="' . h($webp) . '" type="image/webp">'
-         . $img . '</picture>';
+    $source = $ladder['webp_srcset'] === ''
+        ? '<source srcset="' . h($webp) . '" type="image/webp">'
+        : '<source srcset="' . h($ladder['webp_srcset']) . '"'
+        . ' sizes="' . h($ladder['sizes']) . '" type="image/webp">';
+
+    return '<picture>' . $source . $img . '</picture>';
 }
 
 /**
@@ -189,10 +207,15 @@ function about_logo_lockup(array $row, string $class): string
         $dark = $light;
     }
 
-    $halves = [
-        ['class' => 'theme-swap--light', 'image' => $light, 'stem' => ABOUT_LOGO_LOCKUP[0]['stem']],
-        ['class' => 'theme-swap--dark',  'image' => $dark,  'stem' => ABOUT_LOGO_LOCKUP[1]['stem']],
-    ];
+    $settings = settings_load();
+
+    $halves = [];
+    foreach (ABOUT_LOGO_LOCKUP as $i => $half) {
+        $halves[] = $half + [
+            'image' => $i === 0 ? $light : $dark,
+            'mark'  => settings_logo_largest($settings, $half['mode']),
+        ];
+    }
 
     $out = '';
     foreach ($halves as $half) {
@@ -209,11 +232,13 @@ function about_logo_lockup(array $row, string $class): string
             continue;
         }
 
+        $mark = $half['mark'];
+
         $out .= '<picture class="' . h($half['class']) . '">'
-              . '<source srcset="' . h($half['stem']) . '.webp" type="image/webp">'
-              . '<img class="' . h($class) . '" src="' . h($half['stem']) . '.png"'
+              . '<source srcset="' . h($mark['webp']) . '" type="image/webp">'
+              . '<img class="' . h($class) . '" src="' . h($mark['src']) . '"'
               . ' alt="' . h($alt) . '"'
-              . ' width="' . ABOUT_LOGO_WIDTH . '" height="' . ABOUT_LOGO_HEIGHT . '"'
+              . ' width="' . (int)$mark['width'] . '" height="' . (int)$mark['height'] . '"'
               . ' loading="lazy" decoding="async">'
               . '</picture>';
     }

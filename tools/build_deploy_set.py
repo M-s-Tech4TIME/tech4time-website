@@ -63,6 +63,12 @@ UPLOAD = [
     "robots.php",
     "sitemap.php",
     "manifest.php",
+    # THE FOURTH GENERATED FILE, AND THE ONE MOST EASILY FORGOTTEN. /favicon.ico
+    # is an internal rewrite onto this, and .htaccess ships whether or not it
+    # does -- so leaving it out does not remove a feature, it leaves a rewrite
+    # pointing at a file that is not there, at the one address every browser
+    # asks for before it has read a line of the page.
+    "favicon.php",
     "contact-handler.php",
     "api/",               # where the admin host pushes content in
     "pages/",
@@ -124,10 +130,19 @@ REQUIRED = [
     "sitemap.php",
     "robots.php",
     "manifest.php",
+    # AND THE TWO THIS SITE GREW WHEN THE IDENTITY BECAME CONTENT, both reached
+    # the same way and both absent from this list until a deploy was being
+    # prepared and somebody looked. /favicon.ico answers from the first; every
+    # page links the second, which is empty whenever nobody has changed a
+    # colour -- and an empty file and a missing one look identical until the
+    # day somebody does change one.
+    "favicon.php",
+    "assets/css/brand.css.php",
     # The head every page emits, and the record it emits from. Without either,
     # all seventeen pages are a fatal error rather than a page.
     "lib/head.php",
     "lib/seo.php",
+    "lib/settings.php",   # the mark, the icons, the colours: nine readers
     "api/publish.php",    # the only route content takes to the live site
 ]
 

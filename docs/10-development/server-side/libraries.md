@@ -27,6 +27,7 @@ store they read from is outside the document root entirely.
 | [`privacy.php`](#privacyphp) | the privacy policy | `contract`, `store`, `html` |
 | [`seo.php`](#seophp) | the site-wide SEO record, and what is derived from it | `contract`, `store`, `html`, `contact` |
 | [`chrome.php`](#chromephp) | the header, footer and dock every page carries | `contract`, `store`, `html`, `services`, `seo`, `sprite` |
+| [`settings.php`](#settingsphp) | the site's identity: the mark, the icons, the colours, the address | `contract`, `store` |
 | [`sprite.php`](#spritephp) *(frontend)* | the icon block a renderer writes for itself | — |
 | [`head.php`](#headphp) *(frontend)* | the `<head>` every page emits, and its structured data | `seo` |
 | [`body.php`](#bodyphp) *(frontend)* | the header, footer and dock every page emits | `chrome` |
@@ -134,6 +135,77 @@ Nothing edits them and nothing renders them, so both directions of
 `check_content_model.py` and the round trip in `test_careers_admin.py` exempt them, and all three
 read the one list. They did not, once: `revision` was added, the careers test treated it as a
 site-wide setting, posted it on its own, and blanked `cv_form_url` doing so.
+
+`CONTRACT_IMAGE_SLOTS` is the one place that knows how wide an uploaded picture is **drawn**, and it
+is here for the reason above: the uploader decides how many files to write from it and the renderer
+decides its `sizes=` attribute from it, so the two sides disagreeing would mean a browser choosing
+the wrong file for every picture on the site. `contract_slot_widths()` turns a row into a ladder —
+never upscaling, and never storing a rung nothing can draw from — and `contract_slot_sizes()` gives
+the attribute. `contract_srcset()` checks each candidate path the way `contract_safe_image_path()`
+checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
+more than one width.
+
+`SETTINGS_MAIL_FROM` is what enquiry mail is sent **as**, and it is deliberately **not** editable.
+A message has to come from an address at this site's own domain or it fails SPF — the DNS record
+saying which servers may send as `tech4time.bd` — and is filed as spam. That record lives with the
+domain and nothing in the editor can change it, so a field for it would let somebody make every
+enquiry disappear into a spam folder with nothing on the screen to say why. It is here rather than
+in the handler because **both halves need it**: the frontend sends with it, and the editor's screen
+has to be able to *say* what messages are sent as, or the one field somebody might look for is
+simply absent with no explanation.
+
+**The contrast pairs and the sums that judge them are here, and that is a correction.**
+`SETTINGS_CONTRAST_PAIRS` says which pairs have to be readable and at what ratio;
+`contract_contrast_ratio()` and `settings_contrast_faults()` do the arithmetic. `tools/check_contrast.py`
+held its own copy of both, under a note reading *"keep this in sync with assets/css/theme.css"* — fine
+while a colour could only be changed by editing a stylesheet, and not fine the moment a person can
+pick one from a screen and the editor has to judge it too.
+
+So the data lives once and **the arithmetic deliberately does not**: `check_contrast.py` reads the
+palette and the pairs from here and keeps its own Python sums, then compares all 38 answers against
+this file's. That is `publish_stub.py`'s rule applied to colour — each side checked against an
+independent implementation, never against its own counterpart. A shared list cannot drift; a shared
+bug could.
+
+`contract_ico_container()` writes a `.ico` by hand: a six-byte directory, a sixteen-byte entry per
+image, then the PNG payloads. **It is in the contract because it is assembled where it is served,
+not sent over the wire.** The asset channel carries what `getimagesizefromstring()` recognises — PNG,
+JPEG, WebP — and an `.ico` is none of them; widening that list so one file could travel would also
+widen what an editor can upload as page artwork. So the editor generates the PNGs and the public site
+builds the container from the three it already holds, which is why both halves need the same writer.
+Embedding PNG rather than the older BMP-with-mask has been valid since Windows Vista and is what the
+committed `favicon.ico` already contained — all three of its entries, checked before this was written.
+
+`contract_srcset_top()` answers the widest rung of a ladder, which is **not always the record's
+`src`.** For a picture the uploader stored it is — `upload_store()` names the top rung as `src`. For
+the logo the site *ships* with it is not: the header's `src` is the 360 px file and the ladder goes
+on to 540, because those files were built before the settings document existed and the seed
+reproduces them rather than tidying them. So the About page's big lockup, `Organization.logo` and
+every job posting's hiring-organisation logo ask for the largest rendition instead of assuming, and
+each still names the file it names today.
+
+`contract_image_paths()` answers the other half of the same question: **every** file a picture record
+names, srcset entries included. A ladder keeps most of its files inside `srcset` and nowhere else —
+only the top rung is also the `src` — so a caller reading `src` and `webp` alone sees two of six.
+The seven `*_images()` collectors all ask it rather than each carrying its own walk, which is what
+makes adding a field to a picture record one edit instead of seven.
+
+`about_picture()`, `home_picture()`, `company_picture()`, `branding_picture()` and
+`contact_flag_picture()` each ask it for their own slot. Four of them name the slot as a literal
+because they draw one picture; `company_picture()` takes it as an argument, because the company
+profile draws a client's logo, a journey photograph and a technology mark at three different widths
+through one function. Only the *uploaded* branch of `contact_flag_picture()` ladders — the slug
+branch names files that ship with this repository, one width each.
+
+`contract_picture_ladder()` answers what a renderer should put in `srcset` and `sizes` for one
+picture in one slot — **and returns nothing at all when the slot declares no `sizes=`.** That is not
+caution. A `srcset` of widths with no `sizes=` beside it does not mean "choose freely": the browser
+is required to assume the picture fills the viewport, so it takes the *widest* rung on every screen
+— a phone downloading the 3× file for a flag drawn at 56 px, which is worse than the single file it
+would otherwise get. The rule has to be the same on five pages that each write their own markup, so
+it lives here once and what comes back is three strings and no markup, which is what keeps this file
+shareable with a repository that renders nothing.
+
 
 `contract_sanitise()` runs every rich field back through `html.php`, driven off
 `CAREERS_RICH_FIELDS` / `CONTACT_RICH_FIELDS` rather than a list of its own — so a rich field added
@@ -513,6 +585,86 @@ The backend copy adds the two saves. `seo_edit()` writes `content/seo.json`; `se
 `seo_service_meta_edit()` write **one band of another document** under `store_edit()`'s lock,
 because the screen holds one band of a document whose other twenty were never in the form. A
 whole-document rebuild there would empty the page.
+
+### `settings.php`
+
+`settings_load()` · `settings_icon()` · `head_styles()` *(in `head.php`)*
+
+One document, `content/settings.json`, holding the four things every page depends on and no page
+owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
+from, and the address the contact form sends to. Until it existed none of them could be changed
+without a developer — the logo was twelve committed files and a Python script, the favicon another
+eight and another script, the colours were literals in a stylesheet, and the address was a constant
+in the handler.
+
+**One mark, nine consumers, and now one document.** The logo is read from `content/settings.json` by
+the header, the footer, the About page's lockup, `Organization.logo`, every job posting's hiring
+organisation, the branding kit, the favicon set and the admin's own rail. It used to be typed into
+`content/chrome.json` as eleven text fields per part — twice, for the header and the footer — while
+the other seven named committed files nobody could reach from any editor at all. **The SEO screen
+already had a working logo upload that was completely disconnected from the header**, so changing
+one left the other showing the old mark with nothing comparing them.
+
+What stays in the chrome is the **alt text**, which is genuinely the chrome's: the header's and the
+footer's are different sentences about the same picture. `identity.logo` on the SEO screen stays as
+an **override** — empty means the site's mark, filled wins — because Google renders
+`Organization.logo` in a near-square slot and this lockup is nearly three to one.
+
+**It is its own document because none of it belongs to a page.** The logo alone is drawn in the
+header, the footer and the About page, and named in `Organization.logo`, in
+`JobPosting.hiringOrganization.logo`, in the favicon set, in the branding kit and in the admin's own
+rail. Putting it in any one page's document would make the other eight consumers read a document
+about something else.
+
+**Reading the identity is in [`contract.php`](#contractphp), not here, and that is a correction.**
+`settings_logo()` (which mark for which theme, falling back to the light one), `settings_logo_largest()`,
+`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_logo_is_mismatched()`,
+`settings_icon_is_stale()`, `settings_share_is_stale()` and `settings_colours()` are pure
+functions of the document — none reads a file, emits markup or knows
+which host it is on — and **both halves render the mark**: the public site draws it in the header,
+the footer and the About row; the editor draws it in its own rail and on its sign-in page. Putting
+them on the renderer's side got `settings_logo_is_shared()` written out twice within the hour, which
+is the drift the shared file exists to prevent. What is left in each half is that half's own
+business: the file path and the read here, plus the save, the validation and the screens over there.
+
+**A missing file is not an error, and here that matters more than anywhere.** `settings_normalise()`
+fills from `settings_defaults()`, which is the site's own mark, icons and colours exactly as they
+ship — read off the files they replace rather than typed, so a host that has never received a
+publish renders what it renders today, byte for byte.
+
+`settings_logo_largest()` is for the three consumers that want **one** file rather than a ladder:
+the About page's lockup, which draws the mark at up to 693 px, and the two structured-data graphs,
+which are read by consumers that pick nothing from a candidate list. Its height is scaled from the
+record's, which is exact rather than approximate — every rung is the same picture, so 128 × 540 ÷ 360
+is 192 on the nose.
+
+`settings_logo()` returns the light mark when the dark half is empty, and `settings_logo_is_shared()`
+says when that is happening. **An empty dark half is an answer, not an omission**: plenty of marks
+are one colour and read on both grounds. What must never happen is the other reading — an empty
+half rendering as *nothing*, which would put a hole in the header of every page in dark mode. The
+editor carries a standing notice saying which case it is in, because only the person who drew the
+mark knows whether theirs reads on a dark ground.
+
+**Three more predicates report the ways an identity can be half-changed**, and all three are
+notices rather than refusals, because each is also what a correct half-finished edit looks like.
+
+`settings_logo_is_mismatched()` is the quiet one and the worst. One half replaced and the other
+still holding the *previous* mark renders two different logos, one per colour mode — and the person
+who uploaded it is in one mode and will never see the other. It is symmetric: replacing only the
+dark half is rarer and exactly as wrong. An **empty** half is excluded, because that is
+`settings_logo_is_shared()`'s condition and two notices about one field is noise.
+
+`settings_icon_is_stale()` says the logo was replaced and the tab icon was not. They are separate
+uploads on purpose — a wordmark three times as wide as it is tall becomes a smear at sixteen
+pixels — so changing one cannot change the other, and somebody who has just replaced their mark
+will expect it to have.
+
+`settings_share_is_stale()` says the same about the share card, and takes the **seo** document as
+an argument rather than reading it: this file is shared with a repository whose copy of `seo.json`
+is a replica and whose copy of this function is never called. Nothing generates that card —
+drawing it would mean reimplementing typography against a font stack the server does not have — so
+the only failure left is the logo moving and the card not, which nobody sees on the site itself.
+It is visible only in somebody else's chat window.
 
 ### `chrome.php`
 

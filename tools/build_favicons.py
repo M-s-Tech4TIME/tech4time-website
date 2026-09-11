@@ -5,6 +5,19 @@ Generate the Tech4TIME favicon set from the supplied 512px master.
 One-off build tool. NOT deployed to the web server (see tools/README.md).
 Run from the repo root:  python3 tools/build_favicons.py
 
+THIS BUILDS THE SEED, NOT THE LIVE ICON, and the difference matters now that
+there is a difference. A company changing its tab icon uploads a square master
+at ?s=settings&part=icon: the editor generates the whole set from it, sends
+each file here, and /favicon.ico is assembled on THIS host out of the PNGs that
+arrived -- see favicon.php. Nothing about that goes through this file.
+
+What this still does is rebuild what a fresh install shows before anybody has
+uploaded anything: assets/images/favicon/, which settings_defaults() falls back
+to and which favicon.php serves whole when a generated file is missing. A
+different input (master artwork under tools/masters/), a different output
+(committed files) and a different lifecycle (a developer, once), so it stays.
+The same reasoning as tools/build_logos.py. See ADR 0024.
+
 SOURCE
   tools/masters/favicon/tech4time-favicon-512.ico — the clock dial at 512x512.
   Every output size derives from this one file, so the mark is identical at

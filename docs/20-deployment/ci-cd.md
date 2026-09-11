@@ -108,13 +108,36 @@ parallel:
 | Job | What runs | Needs |
 |---|---|---|
 | `checks` | the static checks, `build_deploy_set.py --check` (which parses every shipped `.php` with the host's `short_open_tag`), and `check_cache_bust.py` against `origin/main` | python, php |
-| `php` | the three suites that drive a real PHP server, including the publish endpoint | php |
-| `firefox` | the eight browser suites, all of them, then a verdict | firefox, geckodriver, Pillow |
+| `php` | every suite that drives a real PHP server, including the publish endpoint, the generated files, the chrome and the site's identity | php |
+| `firefox` | the eight browser suites, all of them, then a verdict | firefox, geckodriver, Chrome, Pillow |
 
 It is deliberately the **same list** as the pre-commit set in
 [testing.md](../10-development/testing.md). What gates a merge and what gates a release are one set
 of checks, so that "it passed on my machine" and "it is safe to put on the server" stop being two
 different claims.
+
+### A suite on disk and not in that workflow is a suite that does not exist
+
+Two were: `test_settings.py` and `test_pictures.py` both shipped with the settings work and neither
+had ever been run by anything that cannot forget — 97 checks that passed on a laptop and were
+asserted nowhere. The backend had the same gap, three suites wide.
+
+Nothing catches this automatically. Adding a suite means adding it to `test.yml` in the same
+commit, for the same reason adding a tool means documenting it.
+
+### Chrome as well as Firefox, for the one measurement Firefox cannot make
+
+`check_style_budget.py` reads style-recalculation time out of Chrome's tracing, and it is
+the only thing in either repository that can see a page holding 60fps while burning a CPU
+core — which shipped on 2026-09-03 and was noticed by a person before any check. It was
+**not in this workflow at all** until the settings work was being prepared for deploy.
+
+It prints a notice and exits 0 with no Chrome on `PATH`. That is right on a laptop and is
+the silent-pass trap in CI, so the job asserts a Chrome binary first and fails loudly if
+there is none — the same bargain as `php-gd`, `php-xml` and `qrencode` in the other job.
+It relies on `google-chrome-stable` being in the runner image rather than installing it:
+Chrome is not in Ubuntu's archive, and `chromium` on 24.04 is the snap transitional
+package that the Firefox note below is about.
 
 ### All eight suites run before the job reports
 
@@ -178,11 +201,18 @@ now how any change to either is verified:
 
 ```bash
 rsync -a --delete --itemize-changes --dry-run SRC/ DST/ > plan.txt   # no filters
-grep -E '^\*deleting[[:space:]]+(content/|\.well-known/|cgi-bin/|error_log)' plan.txt
+grep -E '^\*deleting[[:space:]]+(content/|\.well-known/|cgi-bin/|([^[:space:]]*/)?error_log)' plan.txt
 ```
 
 If that prints nothing, the gate is broken. A gate that has never been seen to fail has not been
 tested.
+
+**`error_log` matches at any depth on purpose.** PHP writes its log beside the script that raised
+the error, so a rule anchored to the root protected one file and let every other one be deleted.
+Both halves were wrong until 2026-09-10; the backend's log lives at `public/error_log` and was
+being removed by every deploy. The fix was proved the way this section asks for — the pattern run
+against a plan carrying `error_log` at three depths, and the filter against a real
+`rsync --delete` into a tree holding them.
 
 ### Secrets
 

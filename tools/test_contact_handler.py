@@ -69,6 +69,9 @@ class Results:
             print(f"  FAIL  {case}" + (f"\n          {detail}" if detail else ""))
 
 
+SETTINGS = ROOT / "content" / "settings.json"
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -219,6 +222,89 @@ def check_form_matches_handler(r: Results):
     unread = on_page - wanted
     r.check("the page sends nothing the handler ignores", not unread,
             f"form sends but the handler never reads: {sorted(unread)}")
+
+
+def where_it_sends(port, maildir, r: Results):
+    """The address is content now, and the constant here is the last resort.
+
+    WHERE ENQUIRIES GO USED TO BE A CONSTANT in this file, so a company
+    changing the address it is contacted on needed a developer. It is
+    content/settings.json now — and this is the one endpoint on the site where
+    being wrong means losing a message with nobody noticing, so the constant
+    stays as the answer when the document cannot be read at all.
+    """
+    import json as _json
+    import subprocess as _sub
+
+    print("\nwhere it sends, which is content now")
+
+    # The two definitions of what mail is sent AS. One is in the contract,
+    # where the editor's screen can read it; one is in the handler, for the
+    # case where nothing can be loaded. They are the same address or the
+    # fallback is a lie.
+    out = _sub.run(["php", "-r",
+                    "require 'lib/contract.php';"
+                    "$h = file_get_contents('contact-handler.php');"
+                    "preg_match(\"/MAIL_FROM_SHIPPED\\s*=\\s*'([^']+)'/\", $h, $m);"
+                    "echo json_encode(['contract' => SETTINGS_MAIL_FROM,"
+                    " 'handler' => $m[1] ?? '']);"],
+                   cwd=ROOT, capture_output=True, text=True)
+    pair = _json.loads(out.stdout or "{}")
+    r.check("the handler's last-resort From address is the contract's",
+            pair.get("contract") and pair["contract"] == pair.get("handler"),
+            str(pair))
+
+    held = SETTINGS.read_bytes()
+    try:
+        doc = _json.loads(held)
+        doc["contact"] = {"mail_to": "elsewhere@example.org",
+                          "mail_subject": "A marked subject"}
+        SETTINGS.write_text(_json.dumps(doc, indent=4) + "\n")
+
+        drain(maildir)
+        status, _headers, body = post(port, VALID)
+        r.check("a message still sends", status == 200, f"{status} {body[:160]}")
+
+        got = mails(maildir)
+        if got:
+            raw = got[0].read_text("utf-8", "replace")
+            head = raw.partition("\n\n")[0]
+            r.check("and goes where the document says",
+                    "elsewhere@example.org" in head, head[:200])
+            r.check("with the subject line the document says",
+                    re.search(r"^Subject:\s*A marked subject:", head, re.M) is not None,
+                    head[:200])
+            r.check("and is still sent AS the site's own domain, which is not editable",
+                    re.search(r"^From:.*no-reply@tech4time\.bd", head, re.M | re.I)
+                    is not None, head[:200])
+
+        # NOTHING THAT CANNOT BE READ MAY STOP THE FORM. Losing enquiries
+        # because a settings file went missing would be a worse failure than
+        # the one this whole change was meant to fix.
+        SETTINGS.unlink()
+        drain(maildir)
+        status, _headers, body = post(port, VALID)
+        r.check("with the DOCUMENT gone, the form still works", status == 200,
+                f"{status} {body[:160]}")
+
+        got = mails(maildir)
+        if got:
+            head = got[0].read_text("utf-8", "replace").partition("\n\n")[0]
+            r.check("and falls back to the address that ships",
+                    "info@tech4time.bd" in head, head[:200])
+
+        # THE MISSING-LIBRARY CASE IS NOT CHECKED HERE, AND THAT IS DELIBERATE
+        # rather than an omission. contact-handler.php guards its require twice
+        # -- is_file() and catch (Throwable) -- and a check written for it
+        # passed with BOTH guards removed: under `php -S`, a file already
+        # loaded earlier in the run keeps loading after it is deleted. The same
+        # deletion against a freshly started server gives a 500, so the guards
+        # are doing something; this harness simply cannot see it. A check that
+        # passes whether or not the thing it checks exists is worse than no
+        # check, because it reads like coverage.
+    finally:
+        SETTINGS.write_bytes(held)
+        drain(maildir)
 
 
 def run(port, maildir, r: Results):
@@ -454,6 +540,7 @@ def main() -> None:
 
     try:
         run(port, maildir, results)
+        where_it_sends(port, maildir, results)
     finally:
         os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
         proc.wait(timeout=5)

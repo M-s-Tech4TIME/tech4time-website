@@ -72,6 +72,7 @@ BRANDING = ROOT / "content" / "branding.json"
 PRIVACY = ROOT / "content" / "privacy.json"
 SEO = ROOT / "content" / "seo.json"
 CHROME = ROOT / "content" / "chrome.json"
+SETTINGS = ROOT / "content" / "settings.json"
 
 MARK = "PUBLISHMARK"
 
@@ -387,6 +388,7 @@ def run(base: str, key: bytes, r: Results) -> None:
     privacy_round_trip(base, key, r)
     seo_round_trip(base, key, r)
     chrome_round_trip(base, key, r)
+    settings_round_trip(base, key, r)
 
 
 def contact_switches(base: str, key: bytes, r: Results) -> None:
@@ -1846,6 +1848,17 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
             bd.get("openingHoursSpecification", [{}])[0].get("opens") == "07:00",
             str(bd.get("openingHoursSpecification")))
 
+    # THE SHARE CARD, NOT THE OFFICE'S OWN PICTURE. That field is a flag,
+    # stored at 56px because 56px is where it is drawn; offering it to a search
+    # engine as the photograph of a place of business would be worse than
+    # offering nothing. Organization uses the card too, so the two agree.
+    r.check("  each carries an image, and it is the site's share card",
+            all(o.get("image", "").endswith("/assets/images/og/tech4time-og.png")
+                for o in offices),
+            str([o.get("image") for o in offices]))
+
+    offices_geo(base, key, r)
+
     print("  the three generated files")
     _s, robots = get(base, "/robots.txt")
     r.check(f"  robots.txt carries the extra rule", f"/{MARK}-disallowed" in robots)
@@ -1857,6 +1870,38 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
             app["name"] == f"{MARK}-sitename")
     r.check("  its short name from its own", app["short_name"] == f"{MARK}-shortname")
     r.check("  and its display mode", app["display"] == "minimal-ui")
+
+    # FOUR PAGE-LEVEL GRAPHS THAT USED TO CARRY THEIR OWN COPY OF THE NAME.
+    # The site name has been editable since the SEO screen shipped, and these
+    # four said 'Tech4TIME' in PHP -- so renaming the company left four schema
+    # blocks contradicting the Organization graph on the same pages. The
+    # founding date was the same fault: lib/company.php held a constant while
+    # lib/head.php read identity.founded, so one page carried two graphs that
+    # disagreed the moment anybody touched the field.
+    print("  and the page-level graphs, which used to hard-code the name")
+    for what, path, needle in (
+            ("the contact page's ContactPage", "/pages/contact/", "ContactPage"),
+            ("the company profile's AboutPage", "/pages/company-profile/", "AboutPage"),
+            ("a service page's Service", "/pages/services/cybersecurity/", "Service"),
+            ("the careers page's JobPosting", "/pages/careers/", "JobPosting")):
+        _s, page = get(base, path)
+        node = next((g for g in json_ld(page)
+                     if isinstance(g, dict) and g.get("@type") == needle), None)
+        r.check(f"  {what} is there", node is not None, f"no {needle} node")
+        if node is None:
+            continue
+        blob = json.dumps(node)
+        r.check(f"  {what} names the company the site band names",
+                f"{MARK}-sitename" in blob and "Tech4TIME" not in blob,
+                blob[:220])
+
+    _s, company = get(base, "/pages/company-profile/")
+    about_node = next((g for g in json_ld(company)
+                       if isinstance(g, dict) and g.get("@type") == "AboutPage"), None)
+    r.check("  and the founding date it publishes is the editable one",
+            (about_node or {}).get("about", {}).get("foundingDate")
+            == json.loads(SEO.read_text())["identity"]["founded"],
+            str((about_node or {}).get("about"))[:200])
 
     print("  the error page, whose record is in this document")
     _s, notfound = get(base, "/404.php")
@@ -1912,6 +1957,323 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
     _s, page = get(base, "/pages/about/")
     r.check("and says so in its own head",
             'name="robots" content="noindex, follow"' in page)
+
+def offices_geo(base: str, key: bytes, r: Results) -> None:
+    """A pin on an office, and every way one is not a pin.
+
+    Coordinates are the one pair in a contact document that is checked rather
+    than trimmed. Every other field there is a line of an address: whatever
+    somebody types is what that place is called. A latitude is a number with a
+    range that no person ever reads, printed into a graph a search engine acts
+    on -- so "near the airport" in one does not degrade to a vaguer pin, it is
+    a broken property in a graph that was otherwise fine.
+    """
+    print("  and an office's coordinates, which are checked rather than trimmed")
+
+    def publish_offices(schema_extra: dict) -> list:
+        data = json.loads(CONTACT.read_text())
+        data["revision"] = data.get("revision", 0) + 1
+        data["offices"]["items"][0]["schema"].update(schema_extra)
+        status, _ = publish(base, key, "contact", data)
+        if status != 200:
+            return []
+        _s, page = get(base, "/pages/contact/")
+        graph = next((g for g in json_ld(page)
+                      if isinstance(g, dict) and "@graph" in g), None)
+        return [n for n in (graph or {}).get("@graph", [])
+                if isinstance(n, dict) and n.get("@type") == "LocalBusiness"]
+
+    got = publish_offices({"latitude": "23.8103", "longitude": "90.4125"})
+    geo = got[0].get("geo", {}) if got else {}
+    r.check("  a real pair becomes a GeoCoordinates node",
+            geo.get("@type") == "GeoCoordinates"
+            and geo.get("latitude") == "23.8103"
+            and geo.get("longitude") == "90.4125", str(geo))
+
+    # BOTH OR NEITHER. One number is not half a pin; it is a pin somewhere on a
+    # line through the middle of the planet.
+    got = publish_offices({"latitude": "23.8103", "longitude": ""})
+    r.check("  half a pair is dropped entirely rather than published as far as it goes",
+            "geo" not in (got[0] if got else {}), str(got[0].get("geo") if got else None))
+
+    for what, lat, lon in (("out of range", "90.1", "90.4125"),
+                           ("not a number", "near the airport", "90.4125"),
+                           ("scientific notation", "1e5", "90.4125")):
+        got = publish_offices({"latitude": lat, "longitude": lon})
+        r.check(f"  a latitude that is {what} never reaches the graph",
+                "geo" not in (got[0] if got else {}),
+                str(got[0].get("geo") if got else None))
+
+    got = publish_offices({"latitude": "", "longitude": ""})
+    r.check("  and an office with no pin simply has no geo",
+            got and "geo" not in got[0], str(got[0].get("geo") if got else None))
+
+    # THE IMAGE IS SET ONLY WHEN THERE IS ONE, and this is the case that proves
+    # it: the shipped document always has a share card, so a node that emitted
+    # the key unconditionally looked correct in every other check here. An
+    # operator can clear that card, and "image": "" is a property claiming a
+    # picture exists and naming none -- worse than the property being absent.
+    seo = json.loads(SEO.read_text())
+    held = json.loads(json.dumps(seo["site"]["share"]))
+
+    seo["revision"] = seo.get("revision", 0) + 1
+    seo["site"]["share"] = {"src": "", "webp": "", "width": 0, "height": 0}
+    status, _ = publish(base, key, "seo", seo)
+    r.check("  a seo document with no share card is accepted", status == 200,
+            f"status {status}")
+
+    _s, page = get(base, "/pages/contact/")
+    graph = next((g for g in json_ld(page)
+                  if isinstance(g, dict) and "@graph" in g), None)
+    without = [n for n in (graph or {}).get("@graph", [])
+               if isinstance(n, dict) and n.get("@type") == "LocalBusiness"]
+    r.check("  and then an office has NO image key at all, not an empty one",
+            without and all("image" not in o for o in without),
+            str([o.get("image", "(absent)") for o in without]))
+
+    seo["revision"] += 1
+    seo["site"]["share"] = held
+    publish(base, key, "seo", seo)
+
+
+def settings_round_trip(base: str, key: bytes, r: Results) -> None:
+    """The site's identity travels the same road.
+
+    NOT A PAGE EITHER, and further from one than the chrome: nothing here is
+    words on a screen. It is a mark, a set of icons, twenty-eight colours and
+    the address the contact form posts to — every one of which is read by
+    several pages and owned by none.
+
+    THIS DOCUMENT IS THE ONE WHERE RE-NORMALISING ON RECEIPT EARNS ITS KEEP.
+    Its values do not become text on a page; they become an <img src>, a
+    <link rel="icon">, a CSS declaration and the To: line of an email. A
+    signature proves who sent a document and says nothing about what is inside
+    it, so each of those is given something hostile below and has to come back
+    safe — from THIS side, which is the side that would be serving it.
+
+    The road is proved first -- the name has a home, the bands survive it, and
+    the poison does not -- and then the walk: a legitimate document is published
+    and every band is looked for where a visitor would meet it. That second half
+    exists because every renderer now reads this document, and the failure it
+    guards against is the one this whole document was built to end: a mark
+    changing in one of the nine places it appears and not in the other eight.
+    """
+    print("\nthe site's identity travels the same road")
+
+    data = json.loads(SETTINGS.read_text()) if SETTINGS.is_file() else {}
+    data["revision"] = 90
+
+    # A mark on somebody else's server, and a ladder with one good rung and one
+    # that is not a path this site will ever serve.
+    data["logo"] = {
+        "light": {
+            "src": "https://evil.example/logo.png",
+            "webp": "/assets/images/logo/logo-light-360.webp",
+            "width": 360, "height": 128,
+            "srcset": "/assets/images/logo/logo-light-180.png 180w, "
+                      "https://evil.example/logo.png 540w",
+            "webp_srcset": "",
+        },
+        # Cleared on purpose. It must STAY cleared: filling it back in from the
+        # defaults would put the shipped lockup underneath somebody else's mark.
+        "dark": {"src": "", "webp": "", "width": 0, "height": 0,
+                 "srcset": "", "webp_srcset": ""},
+    }
+
+    data["icon"] = {
+        "master": {"src": "/uploads/00112233aabbccdd.png", "webp": "",
+                   "width": 512, "height": 512, "srcset": "", "webp_srcset": ""},
+        "generated": {"png96": "/uploads/44556677eeff0011.png",
+                      # Not under a root this site serves from.
+                      "png16": "../../etc/passwd",
+                      "png32": "/uploads/8899aabbccddeeff.png"},
+    }
+
+    # Six hex digits, and two things that are not: one that would close the
+    # declaration and start a new rule, and one that is simply not a colour.
+    data["colours"] = {
+        "light": {"bg-base": "#AABBCC",
+                  "text-primary": "red; } body { display: none"},
+        "dark": {"accent-text": "#123456", "focus-ring": "chartreuse"},
+    }
+
+    data["contact"] = {"mail_to": "attacker@evil.example\nBcc: everyone@evil.example",
+                       "mail_subject": f"{MARK}-subject"}
+
+    status, _ = publish(base, key, "settings", data)
+    r.check("the settings document is accepted", status == 200, f"status {status}")
+
+    stored = json.loads(SETTINGS.read_text())
+
+    print("  what arrived is what this host will serve")
+    r.check("a logo on another origin is dropped",
+            stored["logo"]["light"]["src"] == "", str(stored["logo"]["light"])[:200])
+    r.check("and the one good rung of its ladder is kept, the other dropped",
+            stored["logo"]["light"]["srcset"]
+            == "/assets/images/logo/logo-light-180.png 180w",
+            stored["logo"]["light"]["srcset"])
+    r.check("a dark half cleared on purpose stays cleared",
+            stored["logo"]["dark"]["src"] == "", str(stored["logo"]["dark"])[:200])
+
+    r.check("the icon master arrives", stored["icon"]["master"]["src"]
+            == "/uploads/00112233aabbccdd.png", str(stored["icon"]["master"])[:160])
+    r.check("a generated icon outside the served roots is dropped",
+            stored["icon"]["generated"]["png16"] == "",
+            str(stored["icon"]["generated"])[:200])
+    r.check("and the ones inside them are kept",
+            stored["icon"]["generated"]["png96"] == "/uploads/44556677eeff0011.png"
+            and stored["icon"]["generated"]["png32"] == "/uploads/8899aabbccddeeff.png",
+            str(stored["icon"]["generated"])[:200])
+    # No 'ico' among them: the asset channel carries what
+    # getimagesizefromstring() recognises and an .ico is not among them, so the
+    # public site assembles that one itself at /favicon.ico.
+    r.check("every icon slot the shape declares is present, and no .ico",
+            set(stored["icon"]["generated"]) == {"png16", "png32", "png48",
+                                                 "png96", "png192", "png512", "apple"},
+            str(sorted(stored["icon"]["generated"])))
+
+    r.check("a real colour arrives, lower-cased",
+            stored["colours"]["light"]["bg-base"] == "#aabbcc",
+            str(stored["colours"]["light"])[:160])
+    # This one ends up inside a generated stylesheet. "red; } body { display:
+    # none" is a valid CSS value right up until the moment it is not.
+    r.check("one that would close the declaration is refused for the shipped one",
+            stored["colours"]["light"]["text-primary"] == "#111113",
+            str(stored["colours"]["light"])[:200])
+    r.check("a colour name rather than a hex value is refused too",
+            stored["colours"]["dark"]["focus-ring"] == "#b8babe",
+            str(stored["colours"]["dark"])[:200])
+    r.check("and every token is present whether it was sent or not",
+            len(stored["colours"]["light"]) == len(stored["colours"]["dark"]) == 14,
+            f'{len(stored["colours"]["light"])} light, {len(stored["colours"]["dark"])} dark')
+
+    # An address with a newline in it is header injection into the mail the
+    # contact form sends, which is the one field here that becomes SMTP.
+    r.check("a mail address with a header break in it is refused",
+            stored["contact"]["mail_to"] == "info@tech4time.bd",
+            repr(stored["contact"]["mail_to"]))
+    r.check("and the subject line arrives", stored["contact"]["mail_subject"]
+            == f"{MARK}-subject", stored["contact"]["mail_subject"])
+
+    settings_walk(base, key, r)
+
+
+def settings_walk(base: str, key: bytes, r: Results) -> None:
+    """A marker in every band, looked for where a visitor meets it.
+
+    ONE MARK, NINE PLACES. The header, the footer, the About page's logo row,
+    Organization.logo, JobPosting.hiringOrganization.logo, the browser tab, the
+    web manifest, the stylesheet and the address the enquiry form posts to were
+    nine independent copies of the company's identity before this document
+    existed, and the SEO screen's logo upload had already drifted from the
+    header's with nothing comparing them. So the check is not "the logo
+    renders"; it is that ONE publish moves ALL of them, which is only provable
+    by publishing one and reading all of them.
+
+    Each band gets a marker no other band could have produced, so a failure
+    names itself rather than saying a page changed.
+    """
+    print("  and a visitor meets every band of it")
+
+    logo = f"/uploads/{MARK}-logo"
+    icon = f"/uploads/{MARK}-icon"
+
+    data = json.loads(SETTINGS.read_text())
+    data["revision"] = 91
+    data["logo"] = {
+        "light": {
+            "src": f"{logo}-180.png", "webp": "",
+            "width": 180, "height": 64,
+            "srcset": f"{logo}-180.png 180w, {logo}-540.png 540w",
+            "webp_srcset": "",
+        },
+        "dark": {"src": "", "webp": "", "width": 0, "height": 0,
+                 "srcset": "", "webp_srcset": ""},
+    }
+    data["icon"] = {
+        "master": {"src": f"{icon}-512.png", "webp": "", "width": 512,
+                   "height": 512, "srcset": "", "webp_srcset": ""},
+        "generated": {name: f"{icon}-{name}.png" for name in
+                      ("png16", "png32", "png48", "png96",
+                       "png192", "png512", "apple")},
+    }
+    # A token nothing else on the site could produce, so finding it in the
+    # stylesheet cannot be a coincidence.
+    data["colours"]["light"]["accent-text"] = "#a1b2c3"
+    data["contact"]["mail_to"] = f"{MARK}-walk@tech4time.bd"
+
+    status, _ = publish(base, key, "settings", data)
+    r.check("a legitimate settings document is accepted", status == 200,
+            f"status {status}")
+
+    _, home = get(base, "/")
+    _, about = get(base, "/pages/about/")
+    _, careers = get(base, "/pages/careers/")
+
+    # THREE LOCKUPS, LOOKED FOR ONE AT A TIME AND BY CLASS. Counting the
+    # marker in the whole page proves nothing: the header alone names it twice
+    # (a <source srcset> and an <img src>), so a footer that had stopped
+    # reading the document would still leave the count satisfied -- and the
+    # About page carries the header and the footer too, so "the marker is on
+    # the About page" is true even when the row itself is stale. Each of the
+    # three is read out of its own element.
+    head_marks = re.findall(r'<img\s+class="site-header__logo".*?>', home, re.S)
+    foot_marks = re.findall(r'<img class="site-footer__logo".*?>', home, re.S)
+    about_marks = re.findall(r'<img class="about-split__image about-split__image--contain".*?>',
+                             about, re.S)
+
+    r.check("the HEADER's lockup is drawn from the document",
+            len(head_marks) == 2 and all(f"{logo}-" in tag for tag in head_marks),
+            f"{len(head_marks)} header marks: " + str(head_marks)[:200])
+    r.check("the FOOTER's is too, and separately",
+            len(foot_marks) == 2 and all(f"{logo}-" in tag for tag in foot_marks),
+            f"{len(foot_marks)} footer marks: " + str(foot_marks)[:200])
+    r.check("and the About page's logo ROW, which is not the chrome",
+            len(about_marks) == 2 and all(f"{logo}-" in tag for tag in about_marks),
+            f"{len(about_marks)} About marks: " + str(about_marks)[:200])
+    r.check("at the widths the ladder declares, not one file",
+            f"{logo}-540.png 540w" in home, "the ladder did not arrive")
+
+    # Two graphs, one company. These disagreed before this document existed:
+    # Organization.logo named the 540 and JobPosting named the 360.
+    graph = next((g for g in json_ld(home)
+                  if isinstance(g, dict) and "@graph" in g), None)
+    nodes = {n.get("@type"): n for n in (graph or {}).get("@graph", [])}
+    org = nodes.get("Organization", {})
+    r.check("Organization.logo is the published mark",
+            f"{logo}-" in str(org.get("logo", "")), str(org.get("logo"))[:200])
+
+    hiring = re.findall(r'"hiringOrganization"\s*:\s*\{.*?\}', careers, re.S)
+    r.check("and the job post names the same file, not a second one",
+            hiring and all(f"{logo}-" in node for node in hiring),
+            str(hiring)[:200])
+
+    # The tab, and the thing an installed web app uses.
+    r.check("the browser tab's icons are the published ones",
+            f"{icon}-png32.png" in home and f"{icon}-apple.png" in home,
+            "the head kept the shipped icons")
+    _, manifest = get(base, "/site.webmanifest")
+    r.check("and so are the manifest's",
+            f"{icon}-png192.png" in manifest and f"{icon}-png512.png" in manifest,
+            manifest[:200])
+
+    # The colour reaches a stylesheet, which is the only route a colour has:
+    # the CSP forbids a style attribute, so there is no other way for it to be
+    # on the page at all.
+    _, brand = get(base, "/assets/css/brand.css")
+    r.check("the published colour reaches the generated stylesheet",
+            "#a1b2c3" in brand, brand[:200])
+    r.check("and the page asks for that stylesheet",
+            "/assets/css/brand.css" in home, "the link is not in the head")
+
+    # THE ONE BAND THAT MUST NOT APPEAR. Where the enquiry form sends is read
+    # by the handler and belongs in no page; an address in the markup is an
+    # address a harvester has.
+    r.check("where enquiries go is NOWHERE in the markup",
+            all(f"{MARK}-walk@tech4time.bd" not in page
+                for page in (home, about, careers)),
+            "the destination address was rendered into a page")
+
 
 def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
     """The header, footer and dock travel the same road.
@@ -1973,13 +2335,6 @@ def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
         for i in range(6)
     ]
 
-    # A logo pointing at somebody else's server, and a srcset with one good
-    # entry and one that is not a path this site will serve.
-    data["header"]["logo"]["light"]["src"] = "https://evil.example/logo.png"
-    data["header"]["logo"]["light"]["srcset"] = (
-        "/assets/images/logo/logo-light-360.png 360w, "
-        "https://evil.example/logo.png 540w")
-
     status, _ = publish(base, key, "chrome", data)
     r.check("the chrome document is accepted", status == 200, f"status {status}")
 
@@ -2022,13 +2377,15 @@ def chrome_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("  empty contact lines are dropped",
             stored["footer"]["contact"]["items"][0]["lines"] == [f"{MARK}-number"],
             repr(stored["footer"]["contact"]["items"][0]["lines"]))
-    r.check("  a logo pointing at another origin is refused",
-            stored["header"]["logo"]["light"]["src"] == "",
-            stored["header"]["logo"]["light"]["src"])
-    r.check("  and only the good half of a srcset survives",
-            stored["header"]["logo"]["light"]["srcset"]
-            == "/assets/images/logo/logo-light-360.png 360w",
-            stored["header"]["logo"]["light"]["srcset"])
+    # THE PICTURE IS NOT IN THIS DOCUMENT ANY MORE. It used to be, and the two
+    # checks here refused a logo on another origin and kept only the good half
+    # of a srcset. The mark moved to content/settings.json, read by the nine
+    # places that draw it, so both refusals moved with it — settings_round_trip()
+    # above sends exactly the same poison and asserts exactly the same outcome.
+    # What the chrome still says about the logo is the words:
+    r.check("  the chrome keeps the alt text and nothing else about the mark",
+            set(stored["header"]["logo"]) == {"alt"},
+            str(sorted(stored["header"]["logo"])))
     r.check("  the services column still stores no rows of its own",
             "items" not in stored["footer"]["services"])
 
@@ -2374,6 +2731,13 @@ def main() -> None:
             for path, backup in sorted(backups.items()):
                 if backup is not None:
                     path.write_text(backup)
+                elif path.is_file():
+                    # A document with no committed file — one whose editor
+                    # exists before anybody has saved it. Restoring "what was
+                    # there" means removing it, not leaving it: content/ is
+                    # committed in this repository, and a file this test wrote
+                    # is one a stray "git add -A" would publish as content.
+                    path.unlink()
                 bak = path.with_suffix(".json.bak")
                 if bak.is_file():
                     bak.unlink()

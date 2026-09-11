@@ -40,6 +40,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
+/* The site's name and origin, so the schema on this page says what every other
+   one says.
+
+   THIS IS ONE HALF OF A REQUIRE CYCLE, AND IT IS SAFE BECAUSE NEITHER FILE RUNS
+   ANYTHING AT LOAD TIME. lib/seo.php requires this file; require_once resolves
+   the loop by returning immediately for whichever is already in progress, so
+   the second file's functions are defined before the first file's body
+   continues. Both orders are exercised: a page loads lib/head.php, which loads
+   seo.php first, and tools/test_publish.py loads this file directly.
+
+   What would break it is top-level executable code -- a call, not a definition
+   -- at the top of either file, because that could run before the other half
+   is defined. There is none in either, and there must not be.
+
+   (lib/seo.php's own require of this file is vestigial: it calls no contact_*
+   function. It cannot simply be deleted, because six other files reach
+   contact.php THROUGH it. Untangling that is its own change.) */
+require_once __DIR__ . '/seo.php';
 
 const CONTACT_FILE = __DIR__ . '/../content/contact.json';
 const CONTACT_FLAG_DIR = __DIR__ . '/../assets/images/flags';
@@ -132,9 +150,25 @@ function contact_flag_picture(array $office): string
             ? ' width="' . (int)$image['width'] . '" height="' . (int)$image['height'] . '"'
             : '';
 
-        return '<picture class="office__flag-wrap">'
-             . ($webp !== '' ? '<source srcset="' . h($webp) . '" type="image/webp">' : '')
-             . '<img class="office__flag" src="' . h($src) . '"'
+        /* One flag at several widths, when this one was stored that way.
+           Only this branch: the slug below names files that ship with this
+           repository, one width each, and nothing here can make more of them.
+           See contract_picture_ladder() for why both halves or neither. */
+        $ladder = contract_picture_ladder($image, 'contact.offices');
+        $rungs  = $ladder['srcset'] === '' ? ''
+                : ' srcset="' . h($ladder['srcset']) . '"'
+                . ' sizes="' . h($ladder['sizes']) . '"';
+
+        $source = '';
+        if ($webp !== '') {
+            $source = $ladder['webp_srcset'] === ''
+                ? '<source srcset="' . h($webp) . '" type="image/webp">'
+                : '<source srcset="' . h($ladder['webp_srcset']) . '"'
+                . ' sizes="' . h($ladder['sizes']) . '" type="image/webp">';
+        }
+
+        return '<picture class="office__flag-wrap">' . $source
+             . '<img class="office__flag" src="' . h($src) . '"' . $rungs
              . ' alt="' . h($alt) . '"' . $size
              . ' loading="lazy" decoding="async"></picture>';
     }
@@ -272,8 +306,8 @@ function contact_page_schema(array $data): array
 {
     $entity = array_filter([
         '@type' => 'Organization',
-        'name'  => 'Tech4TIME',
-        'url'   => 'https://tech4time.bd/',
+        'name'  => seo_site()['name'],
+        'url'   => seo_url('/'),
         'email' => contact_email($data),
     ], static fn($v): bool => $v !== '');
 
@@ -289,8 +323,8 @@ function contact_page_schema(array $data): array
     return [
         '@context'   => 'https://schema.org',
         '@type'      => 'ContactPage',
-        'url'        => 'https://tech4time.bd/pages/contact/',
-        'name'       => 'Contact Tech4TIME',
+        'url'        => seo_url('/pages/contact/'),
+        'name'       => 'Contact ' . seo_site()['name'],
         'mainEntity' => $entity,
     ];
 }
