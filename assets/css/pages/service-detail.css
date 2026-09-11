@@ -333,39 +333,62 @@
   .soc-map--n23 { --n: 23; }
   .soc-map--n24 { --n: 24; }
 
-  /* Spokes: one hairline per node, masked to a ring so they neither cross the
-     hub nor run past the nodes. The gradient starts at twelve o'clock, which is
-     exactly where the --i: 0 node sits, so spokes and nodes stay in step at any
-     count. */
-  .soc-map::before {
-    content: "";
+  /* THE SPOKES AND THE RING, WHICH ARE REAL GEOMETRY NOW
+     They used to be a repeating-conic-gradient masked to a ring, plus a dashed
+     border on ::after. One idea, three faults, all of them the same fault --
+     a gradient is not a line:
+
+       - A conic wedge is an ANGLE, so its width in pixels grows with the
+         radius. Measured on the shipped page: 0.4deg came out 1.20px wide at
+         the nodes and 0.39px at the hub. Under a pixel a line does not thin,
+         it dissolves, so every spoke faded out before it reached the hub --
+         worst on the four cardinal ones, where a sub-pixel horizontal or
+         vertical line antialiases to almost nothing.
+       - A gradient is rasterised, so a 0.4deg wedge is a staircase, and the
+         diagonals read as jagged next to everything else on the page.
+       - Both pseudo-elements paint after the <li>s, so the dashed ring sat on
+         top of the icons.
+
+     lib/services.php emits an <svg> as the list's first child instead. The box
+     here is the RING, not the whole map, which is why that function needs to
+     know none of these sizes: inside it a node is always at radius 50 and the
+     ring is always the inscribed circle. */
+  .soc-map__wires-slot {
     position: absolute;
-    inset: 0;
-    /* Decoration only. Both pseudo-elements paint above the nodes, which are
-       ordinary in-flow content, and a pseudo-element hit-tests over its whole
-       box whatever it paints — the mask below hides most of this one but hides
-       none of it from the pointer. The ring in ::after covers the inner half
-       of every node, so a click aimed at a node's centre was landing on the
-       <ul>. tools/check_hover.py caught it by moving a real pointer. */
+    /* The ring the nodes sit on, exactly -- the same inset ::after used. */
+    inset: calc(var(--size) / 2 - var(--radius));
+    /* A pseudo-element hit-tested over its whole box whatever it painted, and
+       the ring covered the inner half of every node, so a click aimed at a
+       node's centre landed on the <ul>. tools/check_hover.py caught that by
+       moving a real pointer. This is a real element and still must not take
+       the pointer. */
     pointer-events: none;
-    border-radius: 50%;
-    background-image: repeating-conic-gradient(
-      from -0.2deg,
-      var(--border-strong) 0deg 0.4deg,
-      transparent 0.4deg calc(360deg / var(--n))
-    );
-    -webkit-mask-image: radial-gradient(closest-side, transparent 0 27%, #000 29% 80%, transparent 82%);
-    mask-image: radial-gradient(closest-side, transparent 0 27%, #000 29% 80%, transparent 82%);
   }
 
-  /* The ring the nodes sit on. */
-  .soc-map::after {
-    content: "";
-    position: absolute;
-    inset: calc(var(--size) / 2 - var(--radius));
-    pointer-events: none;             /* see ::before */
-    border: var(--border-width) dashed var(--border-subtle);
-    border-radius: 50%;
+  .soc-map__wires {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Exactly one device pixel at every ring size and every angle.
+     vector-effect is right here and would be wrong on the ring below: it moves
+     the stroke out of the drawing's coordinate space, which is what a hairline
+     wants and what a DASH PATTERN does not -- the dashes would then be
+     measured in device pixels too and come out as dots. */
+  .soc-map__spoke {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* The ring the nodes sit on. Its dashes are in the drawing's own units, so
+     they stay in proportion as the ring changes size. */
+  .soc-map__ring {
+    fill: none;
+    stroke: var(--border-subtle);
+    stroke-width: 0.3;
+    stroke-dasharray: 1 1;
   }
 
   /* Flex, not grid: two auto grid rows stretch to fill the circle and centre
@@ -415,31 +438,32 @@
       rotate(calc(var(--i) / var(--n) * -360deg));
   }
 
-  /* Child 1 is the hub, so the nodes start at child 2. */
-  .soc-map__slot:nth-child(2 ) { --i: 0 ; }
-  .soc-map__slot:nth-child(3 ) { --i: 1 ; }
-  .soc-map__slot:nth-child(4 ) { --i: 2 ; }
-  .soc-map__slot:nth-child(5 ) { --i: 3 ; }
-  .soc-map__slot:nth-child(6 ) { --i: 4 ; }
-  .soc-map__slot:nth-child(7 ) { --i: 5 ; }
-  .soc-map__slot:nth-child(8 ) { --i: 6 ; }
-  .soc-map__slot:nth-child(9 ) { --i: 7 ; }
-  .soc-map__slot:nth-child(10) { --i: 8 ; }
-  .soc-map__slot:nth-child(11) { --i: 9 ; }
-  .soc-map__slot:nth-child(12) { --i: 10; }
-  .soc-map__slot:nth-child(13) { --i: 11; }
-  .soc-map__slot:nth-child(14) { --i: 12; }
-  .soc-map__slot:nth-child(15) { --i: 13; }
-  .soc-map__slot:nth-child(16) { --i: 14; }
-  .soc-map__slot:nth-child(17) { --i: 15; }
-  .soc-map__slot:nth-child(18) { --i: 16; }
-  .soc-map__slot:nth-child(19) { --i: 17; }
-  .soc-map__slot:nth-child(20) { --i: 18; }
-  .soc-map__slot:nth-child(21) { --i: 19; }
-  .soc-map__slot:nth-child(22) { --i: 20; }
-  .soc-map__slot:nth-child(23) { --i: 21; }
-  .soc-map__slot:nth-child(24) { --i: 22; }
-  .soc-map__slot:nth-child(25) { --i: 23; }
+  /* Child 1 is the spokes and the ring, child 2 the hub, so the nodes start
+     at child 3. */
+  .soc-map__slot:nth-child(3) { --i: 0 ; }
+  .soc-map__slot:nth-child(4) { --i: 1 ; }
+  .soc-map__slot:nth-child(5) { --i: 2 ; }
+  .soc-map__slot:nth-child(6) { --i: 3 ; }
+  .soc-map__slot:nth-child(7) { --i: 4 ; }
+  .soc-map__slot:nth-child(8) { --i: 5 ; }
+  .soc-map__slot:nth-child(9) { --i: 6 ; }
+  .soc-map__slot:nth-child(10) { --i: 7 ; }
+  .soc-map__slot:nth-child(11) { --i: 8 ; }
+  .soc-map__slot:nth-child(12) { --i: 9 ; }
+  .soc-map__slot:nth-child(13) { --i: 10; }
+  .soc-map__slot:nth-child(14) { --i: 11; }
+  .soc-map__slot:nth-child(15) { --i: 12; }
+  .soc-map__slot:nth-child(16) { --i: 13; }
+  .soc-map__slot:nth-child(17) { --i: 14; }
+  .soc-map__slot:nth-child(18) { --i: 15; }
+  .soc-map__slot:nth-child(19) { --i: 16; }
+  .soc-map__slot:nth-child(20) { --i: 17; }
+  .soc-map__slot:nth-child(21) { --i: 18; }
+  .soc-map__slot:nth-child(22) { --i: 19; }
+  .soc-map__slot:nth-child(23) { --i: 20; }
+  .soc-map__slot:nth-child(24) { --i: 21; }
+  .soc-map__slot:nth-child(25) { --i: 22; }
+  .soc-map__slot:nth-child(26) { --i: 23; }
 
   /* The node itself is a button, so it carries the interactive states. */
   .soc-map__node {

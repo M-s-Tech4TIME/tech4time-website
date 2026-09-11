@@ -366,6 +366,25 @@ with the cards they describe:
 All three were verified against the shipped markup at the migration: 24 layers, 24 rings, no
 exceptions.
 
+**The spokes and the ring are drawn too, as SVG, by `services_map_wires()`.** They used to be a
+`repeating-conic-gradient` masked to a ring plus a dashed border, which is one idea with three
+faults and they are all the same fault — a gradient is not a line:
+
+- a conic wedge is an **angle**, so its width in pixels grows with the radius. Measured on the
+  shipped page, `0.4deg` came out 1.20px wide at the nodes and **0.39px at the hub**. Under a pixel
+  a line does not thin, it dissolves — so every spoke faded out before it reached the hub, worst on
+  the four cardinal ones, where a sub-pixel horizontal or vertical line antialiases to almost
+  nothing;
+- a gradient is **rasterised**, so a `0.4deg` wedge is a staircase and the diagonals read as jagged;
+- both pseudo-elements paint after the `<li>`s that are the nodes, so the dashed ring sat **on top
+  of the icons**.
+
+The function needs to know none of the ring's sizes, and that is deliberate: the stylesheet sizes
+the `<svg>` to **the ring**, so inside it a node is always at radius 50 and the ring is always the
+inscribed circle. `--size`, `--radius` and `--node` stay in one file. A spoke runs from the centre
+to its node's own centre, so it cannot fall short whatever size the ring is — the inner half is
+covered by the hub, which is opaque and painted after it.
+
 **A solution card's id is stored, never minted from its name.** Sixty-three of the 137 cards carry
 an id that does not follow from the card's title — `sol-cloud-design-private-cloud` on a card
 called *"Private Cloud Design & Implementation"*. They were written by hand, and they are the

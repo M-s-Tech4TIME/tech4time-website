@@ -42,7 +42,7 @@ if ($service === null || $service['status'] === 'hidden') {
 <!DOCTYPE html>
 <html lang="<?= h(seo_lang()) ?>">
 <head>
-<?php seo_head('/pages/services/cybersecurity/', $service['meta'], ['pages/service-detail.css'], $data['updated']); ?>
+<?php seo_head('/pages/services/cybersecurity/', $service['meta'], ['pages/service-detail.css?v=2'], $data['updated']); ?>
 <?php seo_jsonld('/pages/services/cybersecurity/', $service['meta'], $data['updated']); ?>
 
 <script type="application/ld+json">

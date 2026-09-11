@@ -80,7 +80,7 @@ if (str_contains($_SERVER['REQUEST_URI'] ?? '', 'detail.php')) {
 <!DOCTYPE html>
 <html lang="<?= h(seo_lang()) ?>">
 <head>
-<?php seo_head('/pages/services/' . $slug . '/', $service['meta'], ['pages/service-detail.css'], $data['updated']); ?>
+<?php seo_head('/pages/services/' . $slug . '/', $service['meta'], ['pages/service-detail.css?v=2'], $data['updated']); ?>
 <?php seo_jsonld('/pages/services/' . $slug . '/', $service['meta'], $data['updated']); ?>
 
 <script type="application/ld+json">
