@@ -34,6 +34,7 @@ which has its own copy of this documentation covering that half. Entries below t
 | Behaviour in the browser | [10-development/frontend/javascript.md](10-development/frontend/javascript.md) |
 | Animation, sliders, the reveal | [10-development/frontend/motion.md](10-development/frontend/motion.md) |
 | Icons | [10-development/frontend/icons.md](10-development/frontend/icons.md) |
+| The logo, the tab icon, the brand colours, the enquiry address | all four are edited at `/?s=settings` and read at render time — one document, nine consumers. Why: [90-decisions/0024-one-mark-many-renditions.md](90-decisions/0024-one-mark-many-renditions.md) |
 | The header, footer or dock | [10-development/frontend/shared-markup.md](10-development/frontend/shared-markup.md) — but their **words and links** are edited at `?s=chrome`, not in a file |
 | Add a whole new page | [10-development/frontend/adding-a-page.md](10-development/frontend/adding-a-page.md) |
 | Server-side code | [10-development/server-side/libraries.md](10-development/server-side/libraries.md) |

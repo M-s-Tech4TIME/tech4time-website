@@ -129,6 +129,20 @@ jobs:
       # including the case a fresh clone is in, where content/chrome.json does
       # not exist yet and the defaults have to carry the whole site.
       - run: python3 tools/test_chrome.py
+      # The site's identity: the mark, the icons, the colours and where the
+      # enquiry form sends. One document that nine places read, which is the
+      # point of it -- so the failure this catches is one of the nine drifting
+      # away from the other eight, which is the defect it was built to end.
+      # Includes the case a fresh clone is in, where the document is missing
+      # and the site still has a logo.
+      - run: python3 tools/test_settings.py
+      # Every renderer that draws an uploaded picture, and the ladder of widths
+      # behind it. A width in CONTRACT_IMAGE_SLOTS is measured rather than
+      # estimated, and a srcset shipped without a sizes= beside it is a
+      # REGRESSION rather than a missing improvement: without it the browser
+      # assumes the picture fills the viewport and takes the widest rung on
+      # every screen.
+      - run: python3 tools/test_pictures.py
 
   browser:
     name: firefox

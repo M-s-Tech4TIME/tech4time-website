@@ -108,13 +108,22 @@ parallel:
 | Job | What runs | Needs |
 |---|---|---|
 | `checks` | the static checks, `build_deploy_set.py --check` (which parses every shipped `.php` with the host's `short_open_tag`), and `check_cache_bust.py` against `origin/main` | python, php |
-| `php` | the three suites that drive a real PHP server, including the publish endpoint | php |
+| `php` | every suite that drives a real PHP server, including the publish endpoint, the generated files, the chrome and the site's identity | php |
 | `firefox` | the eight browser suites, all of them, then a verdict | firefox, geckodriver, Pillow |
 
 It is deliberately the **same list** as the pre-commit set in
 [testing.md](../10-development/testing.md). What gates a merge and what gates a release are one set
 of checks, so that "it passed on my machine" and "it is safe to put on the server" stop being two
 different claims.
+
+### A suite on disk and not in that workflow is a suite that does not exist
+
+Two were: `test_settings.py` and `test_pictures.py` both shipped with the settings work and neither
+had ever been run by anything that cannot forget — 97 checks that passed on a laptop and were
+asserted nowhere. The backend had the same gap, three suites wide.
+
+Nothing catches this automatically. Adding a suite means adding it to `test.yml` in the same
+commit, for the same reason adding a tool means documenting it.
 
 ### All eight suites run before the job reports
 
