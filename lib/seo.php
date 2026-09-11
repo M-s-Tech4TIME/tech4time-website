@@ -39,6 +39,14 @@ require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/html.php';
+/* VESTIGIAL HERE AND LOAD-BEARING ELSEWHERE. Nothing in this file calls a
+   contact_* function. Six other files reach contact.php through this line
+   instead of requiring it themselves, so removing it breaks them rather than
+   tidying anything -- it is a require-hygiene change of its own.
+
+   It also makes a cycle with contact.php, which requires this file for
+   seo_site(). require_once resolves that safely PROVIDED neither file runs
+   anything at load time. Neither does. Keep it that way. */
 require_once __DIR__ . '/contact.php';
 
 const SEO_FILE = __DIR__ . '/../content/seo.json';

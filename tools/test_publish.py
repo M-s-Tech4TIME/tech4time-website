@@ -1860,6 +1860,38 @@ def seo_round_trip(base: str, key: bytes, r: Results) -> None:
     r.check("  its short name from its own", app["short_name"] == f"{MARK}-shortname")
     r.check("  and its display mode", app["display"] == "minimal-ui")
 
+    # FOUR PAGE-LEVEL GRAPHS THAT USED TO CARRY THEIR OWN COPY OF THE NAME.
+    # The site name has been editable since the SEO screen shipped, and these
+    # four said 'Tech4TIME' in PHP -- so renaming the company left four schema
+    # blocks contradicting the Organization graph on the same pages. The
+    # founding date was the same fault: lib/company.php held a constant while
+    # lib/head.php read identity.founded, so one page carried two graphs that
+    # disagreed the moment anybody touched the field.
+    print("  and the page-level graphs, which used to hard-code the name")
+    for what, path, needle in (
+            ("the contact page's ContactPage", "/pages/contact/", "ContactPage"),
+            ("the company profile's AboutPage", "/pages/company-profile/", "AboutPage"),
+            ("a service page's Service", "/pages/services/cybersecurity/", "Service"),
+            ("the careers page's JobPosting", "/pages/careers/", "JobPosting")):
+        _s, page = get(base, path)
+        node = next((g for g in json_ld(page)
+                     if isinstance(g, dict) and g.get("@type") == needle), None)
+        r.check(f"  {what} is there", node is not None, f"no {needle} node")
+        if node is None:
+            continue
+        blob = json.dumps(node)
+        r.check(f"  {what} names the company the site band names",
+                f"{MARK}-sitename" in blob and "Tech4TIME" not in blob,
+                blob[:220])
+
+    _s, company = get(base, "/pages/company-profile/")
+    about_node = next((g for g in json_ld(company)
+                       if isinstance(g, dict) and g.get("@type") == "AboutPage"), None)
+    r.check("  and the founding date it publishes is the editable one",
+            (about_node or {}).get("about", {}).get("foundingDate")
+            == json.loads(SEO.read_text())["identity"]["founded"],
+            str((about_node or {}).get("about"))[:200])
+
     print("  the error page, whose record is in this document")
     _s, notfound = get(base, "/404.php")
     r.check(f"  its title arrives", f"<title>{MARK}-notfoundtitle</title>" in notfound)
@@ -1930,10 +1962,12 @@ def settings_round_trip(base: str, key: bytes, r: Results) -> None:
     it, so each of those is given something hostile below and has to come back
     safe — from THIS side, which is the side that would be serving it.
 
-    There is no "and a visitor sees it" group yet, because no renderer reads
-    this document until the stage that converts them. What is proved here is
-    the road: the name has a home, the bands survive it, and the poison does
-    not.
+    The road is proved first -- the name has a home, the bands survive it, and
+    the poison does not -- and then the walk: a legitimate document is published
+    and every band is looked for where a visitor would meet it. That second half
+    exists because every renderer now reads this document, and the failure it
+    guards against is the one this whole document was built to end: a mark
+    changing in one of the nine places it appears and not in the other eight.
     """
     print("\nthe site's identity travels the same road")
 
@@ -2031,6 +2065,125 @@ def settings_round_trip(base: str, key: bytes, r: Results) -> None:
             repr(stored["contact"]["mail_to"]))
     r.check("and the subject line arrives", stored["contact"]["mail_subject"]
             == f"{MARK}-subject", stored["contact"]["mail_subject"])
+
+    settings_walk(base, key, r)
+
+
+def settings_walk(base: str, key: bytes, r: Results) -> None:
+    """A marker in every band, looked for where a visitor meets it.
+
+    ONE MARK, NINE PLACES. The header, the footer, the About page's logo row,
+    Organization.logo, JobPosting.hiringOrganization.logo, the browser tab, the
+    web manifest, the stylesheet and the address the enquiry form posts to were
+    nine independent copies of the company's identity before this document
+    existed, and the SEO screen's logo upload had already drifted from the
+    header's with nothing comparing them. So the check is not "the logo
+    renders"; it is that ONE publish moves ALL of them, which is only provable
+    by publishing one and reading all of them.
+
+    Each band gets a marker no other band could have produced, so a failure
+    names itself rather than saying a page changed.
+    """
+    print("  and a visitor meets every band of it")
+
+    logo = f"/uploads/{MARK}-logo"
+    icon = f"/uploads/{MARK}-icon"
+
+    data = json.loads(SETTINGS.read_text())
+    data["revision"] = 91
+    data["logo"] = {
+        "light": {
+            "src": f"{logo}-180.png", "webp": "",
+            "width": 180, "height": 64,
+            "srcset": f"{logo}-180.png 180w, {logo}-540.png 540w",
+            "webp_srcset": "",
+        },
+        "dark": {"src": "", "webp": "", "width": 0, "height": 0,
+                 "srcset": "", "webp_srcset": ""},
+    }
+    data["icon"] = {
+        "master": {"src": f"{icon}-512.png", "webp": "", "width": 512,
+                   "height": 512, "srcset": "", "webp_srcset": ""},
+        "generated": {name: f"{icon}-{name}.png" for name in
+                      ("png16", "png32", "png48", "png96",
+                       "png192", "png512", "apple")},
+    }
+    # A token nothing else on the site could produce, so finding it in the
+    # stylesheet cannot be a coincidence.
+    data["colours"]["light"]["accent-text"] = "#a1b2c3"
+    data["contact"]["mail_to"] = f"{MARK}-walk@tech4time.bd"
+
+    status, _ = publish(base, key, "settings", data)
+    r.check("a legitimate settings document is accepted", status == 200,
+            f"status {status}")
+
+    _, home = get(base, "/")
+    _, about = get(base, "/pages/about/")
+    _, careers = get(base, "/pages/careers/")
+
+    # THREE LOCKUPS, LOOKED FOR ONE AT A TIME AND BY CLASS. Counting the
+    # marker in the whole page proves nothing: the header alone names it twice
+    # (a <source srcset> and an <img src>), so a footer that had stopped
+    # reading the document would still leave the count satisfied -- and the
+    # About page carries the header and the footer too, so "the marker is on
+    # the About page" is true even when the row itself is stale. Each of the
+    # three is read out of its own element.
+    head_marks = re.findall(r'<img\s+class="site-header__logo".*?>', home, re.S)
+    foot_marks = re.findall(r'<img class="site-footer__logo".*?>', home, re.S)
+    about_marks = re.findall(r'<img class="about-split__image about-split__image--contain".*?>',
+                             about, re.S)
+
+    r.check("the HEADER's lockup is drawn from the document",
+            len(head_marks) == 2 and all(f"{logo}-" in tag for tag in head_marks),
+            f"{len(head_marks)} header marks: " + str(head_marks)[:200])
+    r.check("the FOOTER's is too, and separately",
+            len(foot_marks) == 2 and all(f"{logo}-" in tag for tag in foot_marks),
+            f"{len(foot_marks)} footer marks: " + str(foot_marks)[:200])
+    r.check("and the About page's logo ROW, which is not the chrome",
+            len(about_marks) == 2 and all(f"{logo}-" in tag for tag in about_marks),
+            f"{len(about_marks)} About marks: " + str(about_marks)[:200])
+    r.check("at the widths the ladder declares, not one file",
+            f"{logo}-540.png 540w" in home, "the ladder did not arrive")
+
+    # Two graphs, one company. These disagreed before this document existed:
+    # Organization.logo named the 540 and JobPosting named the 360.
+    graph = next((g for g in json_ld(home)
+                  if isinstance(g, dict) and "@graph" in g), None)
+    nodes = {n.get("@type"): n for n in (graph or {}).get("@graph", [])}
+    org = nodes.get("Organization", {})
+    r.check("Organization.logo is the published mark",
+            f"{logo}-" in str(org.get("logo", "")), str(org.get("logo"))[:200])
+
+    hiring = re.findall(r'"hiringOrganization"\s*:\s*\{.*?\}', careers, re.S)
+    r.check("and the job post names the same file, not a second one",
+            hiring and all(f"{logo}-" in node for node in hiring),
+            str(hiring)[:200])
+
+    # The tab, and the thing an installed web app uses.
+    r.check("the browser tab's icons are the published ones",
+            f"{icon}-png32.png" in home and f"{icon}-apple.png" in home,
+            "the head kept the shipped icons")
+    _, manifest = get(base, "/site.webmanifest")
+    r.check("and so are the manifest's",
+            f"{icon}-png192.png" in manifest and f"{icon}-png512.png" in manifest,
+            manifest[:200])
+
+    # The colour reaches a stylesheet, which is the only route a colour has:
+    # the CSP forbids a style attribute, so there is no other way for it to be
+    # on the page at all.
+    _, brand = get(base, "/assets/css/brand.css")
+    r.check("the published colour reaches the generated stylesheet",
+            "#a1b2c3" in brand, brand[:200])
+    r.check("and the page asks for that stylesheet",
+            "/assets/css/brand.css" in home, "the link is not in the head")
+
+    # THE ONE BAND THAT MUST NOT APPEAR. Where the enquiry form sends is read
+    # by the handler and belongs in no page; an address in the markup is an
+    # address a harvester has.
+    r.check("where enquiries go is NOWHERE in the markup",
+            all(f"{MARK}-walk@tech4time.bd" not in page
+                for page in (home, about, careers)),
+            "the destination address was rendered into a page")
 
 
 def chrome_round_trip(base: str, key: bytes, r: Results) -> None:

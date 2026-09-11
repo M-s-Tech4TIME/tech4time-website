@@ -64,6 +64,24 @@ a label is a free text field, so there is no upper bound on its length, and a
 check that failed on a 500-character nav link would be failing on a state
 nobody has ever created.
 
+AND A THIRD PASS, WITH A LOGO OF A SHAPE NOBODY HAS UPLOADED YET
+The mark became an upload too, and the header sizes it by HEIGHT -- so the
+width it occupies is height x aspect ratio, and .site-header__brand is
+flex-shrink: 0, so nothing downstream can take that width back. While the logo
+was three committed files at 2.81:1 there was nothing to check. Now there is.
+
+This pass was written by measuring rather than arguing. Before the cap in
+layout.css, at 320px: 8:1 held, 10:1 pushed the page 56px sideways and 16:1
+pushed it 221px. The fix is a max-width on the mark with object-fit: contain,
+which bounds the width without squashing the artwork -- and what is asserted
+here is the thing that fix claims, which is that NO aspect ratio overflows.
+That is a claim a check can make honestly, because the cap does not care what
+the ratio is.
+
+The shapes are real PNGs written into uploads/ and taken away again. They have
+to be real: a broken <img> renders its alt text, which is not the geometry the
+page would actually get.
+
 FINDING THE CULPRIT
 When the document overflows, the offending element is reported. Elements
 inside something that clips them are skipped: a slider's off-screen slides
@@ -121,6 +139,20 @@ PAGES = [
 # and the about page has one, which is the only difference above the fold.
 STRESS_PAGES = ["/", "/pages/about/"]
 STRESS_WIDTHS = [320, 360, 414, 640]
+
+# THE THIRD PASS. Aspect ratios, not pixel sizes: the mark is stored at the top
+# rung of its ladder either way, and what the header's geometry depends on is
+# the SHAPE. A square emblem and a portrait mark are ordinary company logos; a
+# 16:1 banner is a long wordmark with a tagline beside it, and 24:1 is past
+# anything anybody would draw -- which is the point, because the cap that makes
+# it safe does not care and a check that stopped at the plausible would not say
+# so.
+LOGO_SHAPES = [(0.5, "portrait"), (1, "square"), (2.81, "as it ships"),
+               (8, "a long lockup"), (16, "a banner"), (24, "absurd")]
+LOGO_PAGES = ["/", "/pages/about/"]
+LOGO_WIDTHS = [320, 360, 414]
+SETTINGS = ROOT / "content" / "settings.json"
+UPLOADS = ROOT / "uploads"
 
 # Builds the widest document the picker can produce, and prints it.
 #
@@ -410,6 +442,12 @@ class Browser:
 
 
 def run(b: Browser, origin: str, r: Results) -> None:
+    # Held here as well as in main(): the passes below put the documents back
+    # BETWEEN themselves, so the stress logo is not measured against the widest
+    # navigation as well. Two worst cases at once is a third worst case, and a
+    # failure in it would not say which half caused it.
+    chrome_held = CHROME.read_bytes() if CHROME.is_file() else None
+
     # The frame needs a page around it, and the window has to stay wide enough
     # that the widest frame is not itself clamped.
     b.size(max(WIDTHS) + 120, 1000)
@@ -426,6 +464,22 @@ def run(b: Browser, origin: str, r: Results) -> None:
 
     CHROME.write_text(widest_chrome())
     measure_pages(b, origin, r, STRESS_PAGES, STRESS_WIDTHS, note="  (widest nav)")
+    if chrome_held is not None:
+        CHROME.write_bytes(chrome_held)
+
+    # ------------------------------------------------- and with a stress logo
+    print("\n\nand again with a mark of every shape, at the top of its ladder")
+
+    # The top rung is read from the contract, not written down here. A number
+    # in two places is a number that will disagree with itself.
+    top = max(contract_rungs())
+
+    for ratio, what in LOGO_SHAPES:
+        height = max(1, round(top / ratio))
+        stem = stress_logo(ratio)
+        SETTINGS.write_text(logo_document(stem, top, height))
+        measure_pages(b, origin, r, LOGO_PAGES, LOGO_WIDTHS,
+                      note=f"  ({top}x{height}, {ratio}:1 — {what})")
 
 
 def measure_pages(b: Browser, origin: str, r: Results, pages: list[str],
@@ -474,6 +528,62 @@ def measure_pages(b: Browser, origin: str, r: Results, pages: list[str],
                         f"clamped, so nothing checked at this width can be believed")
 
 
+def stress_logo(ratio: float) -> str:
+    """Three real PNGs — one per rung — in the shape asked for. Returns the stem.
+
+    REAL BYTES, NOT A PATH. An <img> whose source 404s renders its alt text,
+    which is a run of words about 12px tall and tells you nothing about what a
+    540px picture would have done to the header.
+    """
+    stem = "check-responsive-" + str(ratio).replace(".", "_")
+    for rung in contract_rungs():
+        height = max(1, round(rung / ratio))
+        out = subprocess.run(
+            ["php", "-r", f"""
+            $im = imagecreatetruecolor({rung}, {height});
+            $g  = imagecolorallocate($im, 110, 112, 117);
+            imagefilledrectangle($im, 0, 0, {rung} - 1, {height} - 1, $g);
+            imagepng($im, '{UPLOADS}/{stem}-{rung}.png');
+            """], cwd=str(ROOT), capture_output=True, text=True)
+        if out.returncode != 0:
+            raise SystemExit("could not draw the stress logo:\n"
+                             + out.stderr.strip()[:400])
+    return stem
+
+
+def contract_rungs() -> list[int]:
+    """The ladder the contract declares for the logo, from the contract."""
+    out = subprocess.run(
+        # Source and ceiling are the ladder's own top rung rather than the
+        # uploader's UPLOAD_MAX_DIMENSION, which lives in the backend and is
+        # not on this host at all. Unclamped either way: the point is the
+        # widths the slot declares, not what a particular upload allowed.
+        ["php", "-r", "require 'lib/contract.php';"
+                      "$w = CONTRACT_IMAGE_SLOTS['settings.logo']['width'];"
+                      "$top = $w * max(CONTRACT_IMAGE_DPR);"
+                      "echo json_encode(contract_slot_widths('settings.logo',"
+                      " $top, $top));"],
+        cwd=str(ROOT), capture_output=True, text=True)
+    try:
+        return [int(w) for w in json.loads(out.stdout.strip())]
+    except ValueError:
+        raise SystemExit("could not read the logo's ladder from the contract:\n"
+                         + (out.stderr or out.stdout).strip()[:400])
+
+
+def logo_document(stem: str, width: int, height: int) -> str:
+    """content/settings.json with that mark on both halves."""
+    rungs = contract_rungs()
+    srcset = ", ".join(f"/uploads/{stem}-{rung}.png {rung}w" for rung in rungs)
+    half = {"src": f"/uploads/{stem}-{max(rungs)}.png", "webp": "",
+            "width": width, "height": height,
+            "srcset": srcset, "webp_srcset": ""}
+
+    data = json.loads(SETTINGS.read_text()) if SETTINGS.is_file() else {}
+    data["logo"] = {"light": half, "dark": dict(half)}
+    return json.dumps(data, indent=4)
+
+
 def widest_chrome() -> str:
     """content/chrome.json with every band as full as the picker can make it."""
     out = subprocess.run(["php", "-r", STRESS_PHP],
@@ -510,13 +620,23 @@ def main() -> None:
     results = Results()
     browser = None
     chrome_backup = CHROME.read_bytes() if CHROME.is_file() else None
+    settings_backup = SETTINGS.read_bytes() if SETTINGS.is_file() else None
+    # uploads/ is ignored by git, so a stray file left here is invisible rather
+    # than caught by a dirty tree. Named before the run, removed after it.
+    UPLOADS.mkdir(parents=True, exist_ok=True)
+    uploads_before = {f.name for f in UPLOADS.iterdir() if f.is_file()}
     try:
         browser = Browser(drv_port)
         run(browser, f"http://127.0.0.1:{web_port}", results)
     finally:
         if chrome_backup is not None:
             CHROME.write_bytes(chrome_backup)
-            print("\ncontent/chrome.json restored")
+        if settings_backup is not None:
+            SETTINGS.write_bytes(settings_backup)
+        for stray in UPLOADS.iterdir():
+            if stray.is_file() and stray.name not in uploads_before:
+                stray.unlink()
+        print("\ncontent/ and uploads/ restored")
         if browser:
             browser.quit()
         for proc in (drv, php):

@@ -618,8 +618,9 @@ about something else.
 
 **Reading the identity is in [`contract.php`](#contractphp), not here, and that is a correction.**
 `settings_logo()` (which mark for which theme, falling back to the light one), `settings_logo_largest()`,
-`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_icon_is_stale()` and
-`settings_colours()` are pure functions of the document — none reads a file, emits markup or knows
+`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_logo_is_mismatched()`,
+`settings_icon_is_stale()`, `settings_share_is_stale()` and `settings_colours()` are pure
+functions of the document — none reads a file, emits markup or knows
 which host it is on — and **both halves render the mark**: the public site draws it in the header,
 the footer and the About row; the editor draws it in its own rail and on its sign-in page. Putting
 them on the renderer's side got `settings_logo_is_shared()` written out twice within the hour, which
@@ -643,6 +644,27 @@ are one colour and read on both grounds. What must never happen is the other rea
 half rendering as *nothing*, which would put a hole in the header of every page in dark mode. The
 editor carries a standing notice saying which case it is in, because only the person who drew the
 mark knows whether theirs reads on a dark ground.
+
+**Three more predicates report the ways an identity can be half-changed**, and all three are
+notices rather than refusals, because each is also what a correct half-finished edit looks like.
+
+`settings_logo_is_mismatched()` is the quiet one and the worst. One half replaced and the other
+still holding the *previous* mark renders two different logos, one per colour mode — and the person
+who uploaded it is in one mode and will never see the other. It is symmetric: replacing only the
+dark half is rarer and exactly as wrong. An **empty** half is excluded, because that is
+`settings_logo_is_shared()`'s condition and two notices about one field is noise.
+
+`settings_icon_is_stale()` says the logo was replaced and the tab icon was not. They are separate
+uploads on purpose — a wordmark three times as wide as it is tall becomes a smear at sixteen
+pixels — so changing one cannot change the other, and somebody who has just replaced their mark
+will expect it to have.
+
+`settings_share_is_stale()` says the same about the share card, and takes the **seo** document as
+an argument rather than reading it: this file is shared with a repository whose copy of `seo.json`
+is a replica and whose copy of this function is never called. Nothing generates that card —
+drawing it would mean reimplementing typography against a font stack the server does not have — so
+the only failure left is the logo moving and the card not, which nobody sees on the site itself.
+It is visible only in somebody else's chat window.
 
 ### `chrome.php`
 

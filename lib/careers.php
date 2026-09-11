@@ -102,7 +102,7 @@ function careers_job_posting(array $job): array
         'description' => implode('', $description),
         'identifier' => [
             '@type' => 'PropertyValue',
-            'name' => 'Tech4TIME',
+            'name' => seo_site()['name'],
             'value' => (string)($job['id'] ?? ''),
         ],
         /* THE MARK IS READ, NOT TYPED. This was an absolute URL to one
@@ -112,8 +112,8 @@ function careers_job_posting(array $job): array
            data takes the one URL it is given. */
         'hiringOrganization' => [
             '@type' => 'Organization',
-            'name' => 'Tech4TIME',
-            'sameAs' => 'https://tech4time.bd',
+            'name' => seo_site()['name'],
+            'sameAs' => SEO_ORIGIN,
             'logo' => seo_url((string)settings_logo_largest(settings_load())['src']),
         ],
         'jobLocation' => [

@@ -138,6 +138,14 @@ the two apart.
 
 **No hex outside `theme.css`.**
 
+**Anything an operator can upload gets a bound.** The header sizes the logo by its HEIGHT, so the
+width it occupies is height x aspect ratio, and `.site-header__brand` is `flex-shrink: 0` — nothing
+downstream can take that width back. That was safe while the mark was three committed files at
+2.81:1 and stopped being safe when it became something somebody uploads: measured at 320px, 8:1
+held and 10:1 pushed the page 56px sideways. Both lockups now carry a `max-width` with
+`object-fit: contain`, which bounds the width without squashing the artwork. The third pass of
+`check_responsive.py` is what keeps it bounded.
+
 ---
 
 ## Cache busting

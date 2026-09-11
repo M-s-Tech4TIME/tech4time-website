@@ -202,9 +202,27 @@
   line-height: 0;
 }
 
+/* HEIGHT DRIVES THE SIZE, AND max-width IS THE GUARD ON WHAT THAT MULTIPLIES.
+   The mark is sized by its height so lockups of different proportions all sit
+   on the same baseline. That means the WIDTH it occupies is height x aspect
+   ratio, and .site-header__brand above is flex-shrink: 0, so nothing downstream
+   can take that width back.
+
+   Which was fine while the logo was three committed files at 2.81:1, and
+   stopped being fine when it became something an operator uploads. Measured
+   with tools/check_responsive.py: at 320px the header holds a mark up to about
+   8:1 and a 10:1 one pushes the page 56px sideways. A long wordmark with a
+   tagline set beside it reaches that.
+
+   So the width is capped and the picture is contained inside the cap rather
+   than squashed to fit it. Today's mark is drawn at 79-113px, far inside the
+   cap, so this changes nothing that ships and bounds everything that does not. */
 .site-header__logo {
   width: auto;
   height: clamp(1.75rem, 1.4rem + 1.7vw, 2.5rem);
+  max-width: min(45vw, 11.25rem);
+  object-fit: contain;
+  object-position: left center;
 }
 
 /* Mode-aware artwork. Two variants ship; CSS shows the one that reads against
@@ -313,9 +331,14 @@
   max-width: 24rem;
 }
 
+/* Capped for the reason the header's is, and against the same upload. The
+   footer's column is narrower than the page, so 100% of it is the bound. */
 .site-footer__logo {
   width: auto;
   height: 2.25rem;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left center;
   margin-block-end: var(--space-sm);
 }
 

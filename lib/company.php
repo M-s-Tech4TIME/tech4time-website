@@ -39,14 +39,21 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
+/* The site's name, origin and founding date. The schema on this page must say
+   what the Organization graph on the same page says, and that one reads the
+   document -- so this must too, rather than keeping its own copy. */
+require_once __DIR__ . '/seo.php';
 
 const COMPANY_FILE = __DIR__ . '/../content/company.json';
 
-/* The date the AboutPage graph publishes as foundingDate. A fact about the
-   company rather than copy about it, so it is not in the editor: nobody is
-   going to found the company again, and a field that can only ever be wrong
-   is a field worth not having. */
-const COMPANY_FOUNDED = '2018-05-15';
+/* THE FOUNDING DATE IS NOT HERE, AND THE ARGUMENT FOR PUTTING IT HERE WAS
+   WRONG. It read: a fact about the company rather than copy about it, so it is
+   not in the editor. It IS in the editor -- ?s=seo&site=identity, as
+   identity.founded -- and has been since that screen shipped. So this file
+   held a second copy of an editable fact, and the Organization graph in
+   lib/head.php read the editable one while the AboutPage graph on this page
+   read the constant. Two graphs on one page, disagreeing the moment anybody
+   touched the field. seo_identity()['founded'] is what both read now. */
 
 /**
  * The company profile as it should be rendered.
@@ -136,14 +143,14 @@ function company_page_schema(array $data): array
     $graph = [
         '@context' => 'https://schema.org',
         '@type'    => 'AboutPage',
-        'url'      => 'https://tech4time.bd/pages/company-profile/',
+        'url'      => seo_url('/pages/company-profile/'),
         'name'     => (string)$data['hero']['title'],
         'description' => rt_plain((string)$data['meta']['description']),
         'about'    => [
             '@type' => 'Organization',
-            'name'  => 'Tech4TIME',
-            'url'   => 'https://tech4time.bd/',
-            'foundingDate' => COMPANY_FOUNDED,
+            'name'  => seo_site()['name'],
+            'url'   => seo_url('/'),
+            'foundingDate' => seo_identity()['founded'],
         ],
     ];
 

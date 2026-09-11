@@ -74,6 +74,10 @@ require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/html.php';
 require_once __DIR__ . '/sprite.php';
+/* The site's name. The Service graph on this page names the provider, and the
+   Organization graph on the same page reads that name out of the document --
+   so this must too, rather than keeping a second copy of it. */
+require_once __DIR__ . '/seo.php';
 
 const SERVICES_FILE = __DIR__ . '/../content/services.json';
 
@@ -632,7 +636,7 @@ function services_schema(array $service, string $origin): array
         'url'         => $url,
         'provider'    => [
             '@type' => 'Organization',
-            'name'  => 'Tech4TIME',
+            'name'  => seo_site()['name'],
             'url'   => rtrim($origin, '/') . '/',
         ],
         'areaServed'  => ['BD', 'MY', 'BE'],
