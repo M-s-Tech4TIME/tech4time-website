@@ -203,6 +203,11 @@ centre tile only: tiling animated elements is what cost a CPU core in 2026-09. *
 the canvas to each layer's box** — the `<svg>` crops `slice`'s overflow and the canvas does not, so
 without it charges paint straight through the channels.
 
+**Above 1280px the clusters are sized by the viewport, not the row**, so they do not shrink to
+specks on a wide screen — 2.5% of the width at 3840 otherwise, against the artwork's 11.15%. They
+then reach past their row and close **D** alone; A, B and C are untouched. The ceiling is the
+banner's height: two clusters stacked down one edge must still fit, which caps them near 154px.
+
 `hero_circuit()` measures eight viewports (its probe takes a **height** as well as a width — a media
 query inside an iframe reads the iframe), and `hero_gaps()` photographs the banner and measures all
 four channels **in pixels**, because boxes cannot see whether the ink stops.

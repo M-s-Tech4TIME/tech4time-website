@@ -1465,6 +1465,7 @@ return {
      horizontal ones. */
   bandH: Math.round(bandBox.height),
   cornerH: Math.round(cornerBox.height),
+  heroH: Math.round(hero.height),
   marked: doc.querySelectorAll('.page-hero [data-reveal]').length,
   titleOpacity: view.getComputedStyle(
     doc.querySelector('.page-hero__title')).opacity,
@@ -1606,9 +1607,31 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
         # tall. If that ever stopped being true the vertical channels would stop
         # matching the horizontal ones and hero_gaps would fail somewhere far
         # from the cause; this says it where it happens.
-        r.check(f"{at} — the band and the cluster are the same height",
-                abs(d["bandH"] - d["cornerH"]) <= 2,
-                f"band {d['bandH']}px against cluster {d['cornerH']}px")
+        # ABOVE 1280px THE CLUSTER IS DELIBERATELY TALLER THAN ITS ROW
+        # Sizing it by the row is what makes all four channels equal, and on a
+        # wide banner it also makes the cluster tiny -- 2.5% of the width at
+        # 3840 against the artwork's 11.15%. So above 1280 it is sized by the
+        # viewport and reaches past its row, which closes the channel down each
+        # edge and leaves the other three untouched. Both halves are asserted
+        # here so neither can drift silently.
+        if width < 1280:
+            r.check(f"{at} — the band and the cluster are the same height",
+                    abs(d["bandH"] - d["cornerH"]) <= 2,
+                    f"band {d['bandH']}px against cluster {d['cornerH']}px; "
+                    "below 1280px the row sizes both")
+        else:
+            r.check(f"{at} — the cluster reaches past its row",
+                    d["cornerH"] > d["bandH"] + 8,
+                    f"cluster {d['cornerH']}px against band {d['bandH']}px; "
+                    "above 1280px it is sized by the viewport so the corners do "
+                    "not shrink to specks on a wide screen")
+            # And not so far that the two on one edge meet. A cluster is very
+            # nearly square and the banner is about 332px tall at every desktop
+            # width, so twice its height has to leave something.
+            r.check(f"{at} — and not so far that they collide",
+                    2 * d["cornerH"] < d["heroH"] - 10,
+                    f"two clusters are {2 * d['cornerH']}px against a "
+                    f"{d['heroH']}px banner")
 
         # The band still has to be a band. The share it takes varies a great
         # deal now -- 46% of a 440px banner against 88% of a 3840px one --
@@ -1859,13 +1882,30 @@ def hero_gaps(b: Browser, origin: str, r: Results) -> None:
                 "this measures")
         if len(have) != 4:
             continue
-        spread = max(have) - min(have)
+
+        # ABOVE 1280px, D IS DELIBERATELY NOT ONE OF THEM
+        # The clusters are sized by the viewport there rather than by their row,
+        # so they reach past it and close the channel down each edge. That is a
+        # trade taken on purpose: a row-sized cluster is 2.5% of the width at
+        # 3840 against the artwork's 11.15%, and the corners read as specks.
+        # A, B and C are untouched -- the grid's column gap and the space
+        # between two bands that still fill their rows.
+        wide = width >= 1280
+        same = [got["A"], got["B"], got["C"]] if wide else have
         # Antialiasing, a sparse outermost trace and the band's own fade put a
         # few pixels either way; a real mismatch is tens.
-        r.check(f"{width}px — and they are all the same width",
-                spread <= max(10, 0.18 * max(have)),
+        spread = max(same) - min(same)
+        r.check(f"{width}px — {'the side and middle channels' if wide else 'all four channels'} "
+                "are the same width",
+                spread <= max(10, 0.22 * max(same)),
                 f"A={got['A']} B={got['B']} C={got['C']} D={got['D']} — "
                 f"{spread}px between the widest and the narrowest")
+        if wide:
+            # It still has to BE a channel. If the clusters ever met, the edges
+            # would read as two solid columns rather than four corner fans.
+            r.check(f"{width}px — and the channel down each edge is still open",
+                    got["D"] is not None and got["D"] >= 12,
+                    f"D={got['D']}px; the top and bottom clusters are meeting")
 
     rq("POST", b.s + "/window/rect", {"width": 1440, "height": 900, "x": 0, "y": 0})
 

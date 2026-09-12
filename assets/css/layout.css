@@ -709,6 +709,61 @@
   mask-image: radial-gradient(130% 130% at 0% 0%, #000 40%, transparent 96%);
 }
 
+/* THE CLUSTERS GROW ON A LARGE SCREEN, AND D IS WHAT PAYS FOR IT
+   Sizing a cluster by the row is what makes the vertical channels equal the
+   horizontal ones, and on a wide banner it also makes the cluster small: its
+   share of the WIDTH follows the banner's shape rather than the artwork's, so
+   it falls from 11.4% at 1024px -- which is the artwork's own proportion -- to
+   7.0% at 1440 and 2.5% at 3840. The band ends up carrying the composition
+   alone and the corners read as specks.
+
+   So above 1280px the cluster is sized by the VIEWPORT instead, and is allowed
+   to reach past its row. Three of the four channels are untouched: A and B are
+   still the grid's column gap, and C is still the gap between the two bands,
+   because the bands still fill their rows. Only D -- the channel down each
+   edge, between the top cluster and the bottom one -- closes up. That is a
+   deliberate trade and it is the artwork's own shape: there the clusters very
+   nearly meet down the sides.
+
+   1280px and not 1024px because at 1024 the row-sized cluster is already 11.4%
+   of the width. Starting lower would make it SMALLER, which is the opposite of
+   the point.
+
+   THE CEILING IS THE BANNER'S HEIGHT, NOT TASTE.
+   A cluster is very nearly square and the banner is about 332px tall at every
+   desktop width, so two of them stacked down one edge cannot exceed that: above
+   about 154px they meet in the middle. The 9rem cap leaves D at 22px. */
+@media (min-width: 80rem) {
+  .hero-circuit__layer--corner-tl,
+  .hero-circuit__layer--corner-tr,
+  .hero-circuit__layer--corner-bl,
+  .hero-circuit__layer--corner-br {
+    width: clamp(7rem, 9vw, 9rem);
+    /* WITHOUT THIS THE CLUSTER GETS WIDER AND NOT TALLER
+       .hero-circuit__layer sets height: 100%, which pins a grid item to its
+       row and overrides the height aspect-ratio would otherwise derive. The box
+       then grows sideways while the drawing inside it, fitted by "meet", stays
+       the height of the row -- so the cluster is UNCHANGED and gains a strip of
+       empty box on its inner edge. Measured: the horizontal channel read 145px
+       against a 115px gap, which is the slack, and the vertical one never
+       moved. */
+    height: auto;
+  }
+
+  /* Sized by the viewport now rather than stretched to the row, so each has to
+     be told which edge of its row to hug -- otherwise they would centre in it
+     and drift away from the corner they grow out of. */
+  .hero-circuit__layer--corner-tl,
+  .hero-circuit__layer--corner-tr {
+    align-self: start;
+  }
+
+  .hero-circuit__layer--corner-bl,
+  .hero-circuit__layer--corner-br {
+    align-self: end;
+  }
+}
+
 /* The mirrors are unchanged: each cluster is turned to face its own corner, and
    that carries the masks and the emerge clip round with it. */
 .hero-circuit__layer--corner-tl { grid-area: 1 / 1; }

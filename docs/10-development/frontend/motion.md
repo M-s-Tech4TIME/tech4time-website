@@ -218,12 +218,24 @@ step at one pixel of viewport, and the reason a person said they could not see t
   definition, which is the exact fault this exists to prevent. Falsified: setting it to `8%` fails
   the gap check at every width.
 
-**What it costs, stated plainly.** A cluster is sized by the banner's *height* now, so its share of
-the *width* follows the banner's shape rather than the artwork's — about 19% of a 440px banner and
-2.5% of a 3840px one, against the artwork's 11.15%. On a wide screen the clusters are small marks at
-the edges and the band carries the composition. That is forced rather than chosen: the artwork's
-cluster is half its height, and a banner proportionally wider than 2.95 : 1 has no room for one that
-size *and* two equal channels.
+**What it costs, and where that is paid.** A cluster sized by the banner's *height* takes its share
+of the *width* from the banner's shape rather than the artwork's: 19% of a 440px banner, 11.4% at
+1024px — the artwork's own proportion — but **7.0% at 1440 and 2.5% at 3840**. On a wide screen the
+corners read as specks and the band carries the composition alone.
+
+**So above 1280px the cluster is sized by the viewport instead**, and is allowed to reach past its
+row. Three of the four channels are untouched — A and B are still the grid's column gap, and C is
+still the space between two bands that still fill their rows. Only **D**, down each edge, closes up:
+116/116/101/**53** at 1440 and 128/128/132/**22** at 1920. That is a deliberate trade, and it is the
+artwork's own shape, where the clusters very nearly meet down the sides.
+
+1280px and not 1024px because at 1024 a row-sized cluster is *already* 11.4%; starting lower would
+make it smaller, which is the opposite of the point.
+
+**The ceiling is the banner's height, not taste.** A cluster is very nearly square and the banner is
+about 332px tall at every desktop width, so two stacked down one edge cannot exceed that — above
+about 154px they meet. `hero_circuit()` asserts both ends: that the cluster reaches past its row, and
+that twice its height still fits the banner. Falsified both ways.
 
 **The band's column has no floor**, deliberately. A floor there is paid for by the clusters — the
 column takes their width, their height stays the row's, and `meet` then letterboxes the drawing in a
