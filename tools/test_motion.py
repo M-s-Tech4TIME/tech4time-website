@@ -1227,18 +1227,29 @@ def hero_mesh(b: Browser, origin: str, r: Results) -> None:
             "colour tokens, and no other check here would notice")
 
 
-# The circuit is measured inside an <iframe> of the width being tested: the
-# artwork now renders at every width, including below the ~500px Firefox refuses
-# to make a window (ADR 0015), and the phone tier is the new part.
+# The circuit is measured inside an <iframe> of the width AND HEIGHT being
+# tested, below the ~500px Firefox refuses to make a window (ADR 0015).
+#
+# THE HEIGHT IS A PARAMETER, AND IT HAS TO BE
+# It was pinned at 900px. A media query inside a same-origin iframe evaluates
+# against the IFRAME, not the window, so layout.css's `(max-height: 30rem)` --
+# the condition that takes the bands off a phone held sideways -- read as 900px
+# here and would never once have fired. The landscape branch would have shipped
+# with nothing watching it while every check in this file stayed green. That is
+# the same shape of blindness as a suite sitting on disk and not in the
+# workflow.
+#
+# The mesh probe above keeps its fixed 900px on purpose: it measures
+# .hero-neural on the home page, which has no circuit and nothing that reads
+# the viewport's height.
 CIRCUIT_PROBE = r"""
-var width = arguments[0], url = arguments[1];
+var width = arguments[0], url = arguments[1], height = arguments[2] || 900;
 
 var frame = document.getElementById('circuit-probe');
 if (!frame) {
   frame = document.createElement('iframe');
   frame.id = 'circuit-probe';
   frame.style.border = '0';
-  frame.style.height = '900px';
   /* Pinned to the top-left of the real viewport, not merely appended. An
      IntersectionObserver inside a same-origin iframe measures against the
      TOP-LEVEL viewport, so an iframe sitting below the host page's fold makes
@@ -1253,8 +1264,9 @@ if (!frame) {
   document.body.appendChild(frame);
 }
 frame.style.width = width + 'px';
+frame.style.height = height + 'px';
 
-var want = url + '#' + width;
+var want = url + '#' + width + 'x' + height;
 if (frame.getAttribute('data-showing') !== want) {
   frame.setAttribute('data-showing', want);
   frame.src = url;
@@ -1474,67 +1486,92 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
     print("\nthe circuit around the page title")
     b.go(origin + "/404.php")          # a host for the frame; it has no band
 
-    for width in (1440, 768, 390):
+    # WIDTH AND HEIGHT, BECAUSE ROTATION IS A SECOND AXIS
+    # The last two are the same phone: upright, and turned over. A rotated
+    # phone is WIDER than the 768px breakpoint, so a width-only rule would put
+    # the bands back onto a banner half the height -- which is why layout.css
+    # carries a (max-height: 30rem) condition beside the width one, and why
+    # this suite has to be able to see it. 1024x768 is a tablet on its side and
+    # is here to prove the rule does NOT fire there: turning a tablet over must
+    # change nothing.
+    for width, height in ((1440, 900), (1024, 768), (768, 900), (390, 844), (800, 360)):
+        # EXACTLY what layout.css decides, boundaries included: its condition
+        # is (max-width: 47.999em), which is 767.98px, so a 768px viewport
+        # keeps its bands -- and (max-height: 30rem), which is 480px, so a
+        # 480px-tall one loses them. Writing `width > 768` here put this one
+        # pixel out and failed at 768 against a stylesheet that was right.
+        bands = width >= 768 and height > 480
+        shape = "landscape" if width > height else "portrait"
         d = {"loading": True}
         for _ in range(40):
-            d = b.js(CIRCUIT_PROBE, [width, origin + "/pages/about/"])
+            d = b.js(CIRCUIT_PROBE, [width, origin + "/pages/about/", height])
             if not d.get("loading"):
                 break
             time.sleep(0.25)
 
+        at = f"{width}x{height}"
+        last_w, last_h = width, height
         if not d.get("found"):
-            r.check(f"{width}px — the circuit is in the band", False,
+            r.check(f"{at} — the circuit is in the band", False,
                     "no .hero-circuit element in the page hero")
             continue
 
-        print(f"    {width:>4}px: {d['layersDrawn']}/{d['layers']} layers drawn, "
+        print(f"    {at:>9} {shape:<9} "
+              f"{d['layersDrawn']}/{d['layers']} layers drawn, "
               f"{d['running']}/{d['charges']} charges running, "
               f"{d['nodesRunning']}/{d['nodes']} nodes")
 
-        # Six layers: two bands and four corners. The artwork now renders at
-        # every width, so a missing layer at 390px is a real regression rather
-        # than the old deliberate hiding.
-        r.check(f"{width}px — all six layers are drawn",
-                d["layers"] == 6 and d["layersDrawn"] == 6,
-                f"{d['layersDrawn']} of {d['layers']} layers painted")
-        r.check(f"{width}px — nothing overflows sideways",
+        # SIX LAYERS WHERE THE BAND CAN DRAW, FOUR WHERE IT CANNOT
+        # This asserted six at every width, with a comment calling a missing
+        # layer at 390px "a real regression rather than the old deliberate
+        # hiding". That has been reversed deliberately, and the reason is not
+        # the band's SIZE but its DENSITY: it holds 52 traces however wide it
+        # is, and preserveAspectRatio="none" squashes a 1440-unit viewBox into
+        # the width it gets. On a 360px phone that is a 7.5px pitch with a
+        # 2.4-unit stroke rendering 0.65px across and 1.18px down -- sub-pixel
+        # one way and nearly double the other. It was reported from a phone as
+        # a grey smear, which is what it was.
+        #
+        # So the assertion inverts rather than relaxes. Below the rule the
+        # bands must be GONE, not merely allowed to be: four layers exactly, so
+        # a band that comes back reads as the regression it would be.
+        want = 6 if bands else 4
+        r.check(f"{at} — {'all six layers are drawn' if bands else 'the bands stand down, four layers drawn'}",
+                d["layers"] == 6 and d["layersDrawn"] == want,
+                f"{d['layersDrawn']} of {d['layers']} layers painted, wanted {want}")
+        r.check(f"{at} — nothing overflows sideways",
                 not d["overflows"],
                 "the document scrolls horizontally with the circuit in place")
 
-        # The artwork's own proportion, held to a point either side. The band
-        # is the one the whole composition hangs off, so it is the tight one.
-        r.check(f"{width}px — the band keeps its share of the banner",
-                28.0 <= d["bandPctH"] <= 34.0,
-                f"the band is {d['bandPctH']}% of the banner's height; the "
-                "artwork composes it at 30.8%")
+        # EVERY BAND FIGURE BELOW IS GUARDED, AND NOT OUT OF TIDINESS
+        # penOf() and the bandBox reads return 0 rather than raising when the
+        # layer is display:none, so an unguarded assertion here would fail with
+        # "the band is 0% of the banner" -- a true number and a misleading
+        # message, pointing at the artwork instead of at the rule that removed
+        # it on purpose.
+        if bands:
+            # The artwork's own proportion, held to a point either side. The
+            # band is the one the whole composition hangs off, so it is the
+            # tight one.
+            r.check(f"{at} — the band keeps its share of the banner",
+                    28.0 <= d["bandPctH"] <= 34.0,
+                    f"the band is {d['bandPctH']}% of the banner's height; the "
+                    "artwork composes it at 30.8%")
 
-        # A cluster is 11.9% of the width in the artwork and is held at a floor
-        # on a phone, where 11.9% would be 43px and eighteen traces cannot
-        # resolve in that. Both are legitimate; a cluster back at 20vw is not.
-        r.check(f"{width}px — the corner cluster is not oversized",
-                10.0 <= d["cornerPctW"] <= 22.0,
-                f"a cluster is {d['cornerPctW']}% of the banner's width; the "
-                "artwork composes it at 11.9%, and the phone floor takes it to "
-                "about 21% at 360px")
+            # The band must also still have room to draw 52 traces in.
+            r.check(f"{at} — the band has room to be a band",
+                    d["bandPctW"] >= 55.0,
+                    f"the band is {d['bandPctW']}% of the banner's width; below "
+                    "about 55% its traces land under four pixels apart")
 
-        # The band must also still have room to draw 52 traces in.
-        r.check(f"{width}px — the band has room to be a band",
-                d["bandPctW"] >= 55.0,
-                f"the band is {d['bandPctW']}% of the banner's width; below "
-                "about 55% its traces land under four pixels apart")
-
-        # AND IT HAS TO STOP, WHICH IS THE OTHER HALF AND WAS MISSED
-        # The band ran the full width underneath the clusters before this
-        # artwork, and with clusters at their drawn size that reads as one
-        # undifferentiated field rather than as corners and a band. Asserting
-        # only the lower bound above let a band restored to full width pass
-        # every check in this section -- which is exactly what it did, until
-        # this was added. Below about 605px the inset closes on purpose,
-        # because the cluster is held at a floor there and the band would
-        # otherwise have nothing left, so the gap is only required where the
-        # artwork's own composition governs.
-        if width >= 768:
-            r.check(f"{width}px — the band stops short of the clusters",
+            # AND IT HAS TO STOP, WHICH IS THE OTHER HALF AND WAS MISSED
+            # The band ran the full width underneath the clusters before this
+            # artwork, and with clusters at their drawn size that reads as one
+            # undifferentiated field rather than as corners and a band.
+            # Asserting only the lower bound above let a band restored to full
+            # width pass every check in this section -- which is exactly what
+            # it did, until this was added.
+            r.check(f"{at} — the band stops short of the clusters",
                     d["gapPct"] > 0 and d["bandPctW"] <= 75.0,
                     f"the band is {d['bandPctW']}% of the width with a "
                     f"{d['gapPct']}% gap before the cluster; the artwork "
@@ -1542,12 +1579,39 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
                     "the full width under the clusters is the arrangement this "
                     "artwork replaced")
 
-        for part, pen in (("band", d["bandPen"]), ("corner", d["cornerPen"])):
-            r.check(f"{width}px — the {part}'s pen lands between one and two "
+            r.check(f"{at} — the band's pen lands between one and two "
                     "device pixels",
-                    0.8 <= pen <= 2.4,
-                    f"a {part} line renders at {pen}px: under one and it is "
-                    "haze, over two and it is a fence in front of the title")
+                    0.8 <= d["bandPen"] <= 2.4,
+                    f"a band line renders at {d['bandPen']}px: under one and it "
+                    "is haze, over two and it is a fence in front of the title")
+
+        # A cluster is 11.9% of the width in the artwork. Where the bands draw
+        # it stays near that; where they stand down it takes the room they left,
+        # which is the whole point of the rule and has to be asserted or the
+        # clusters could quietly stay at their old floor and leave the banner
+        # nearly empty.
+        # Measured, not guessed: 108/348 = 31% on a 360px phone and 117/378 =
+        # 31% at 390, falling to 22.3% at 800px where the 11rem cap binds. The
+        # floor is 20 rather than 26 because that cap is doing its job there.
+        lo, hi = (10.0, 22.0) if bands else (20.0, 40.0)
+        r.check(f"{at} — the cluster is sized for the composition it is in",
+                lo <= d["cornerPctW"] <= hi,
+                f"a cluster is {d['cornerPctW']}% of the banner's width; wanted "
+                f"{lo}-{hi}% with the bands "
+                f"{'drawn' if bands else 'stood down'}")
+
+        # THE ONE FIGURE THAT HOLDS AT EVERY SIZE
+        # An SVG stroke scales with its drawing, and a line under a device pixel
+        # does not disappear -- it turns to haze. The stylesheet answers that
+        # with a ladder of pens that widen as the drawing shrinks, so this has
+        # to be checked at both ends: growing the cluster without bringing that
+        # ladder back down rendered the corner at 2.46px on a phone held
+        # sideways, which is the other failure mode -- a fence, not a haze.
+        r.check(f"{at} — the corner's pen lands between one and two "
+                "device pixels",
+                0.8 <= d["cornerPen"] <= 2.4,
+                f"a corner line renders at {d['cornerPen']}px: under one and it "
+                "is haze, over two and it is a fence in front of the title")
 
     # WITH SCRIPTING, THE CANVAS IS THE ONE THAT MOVES
     # circuit.js paints a charge on every one of the 216 drawn traces and then
@@ -1579,12 +1643,27 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
 
     # A still canvas is a canvas that has stopped, and it would pass everything
     # above. Two reads a moment apart is the only way to tell.
+    #
+    # THE SECOND READ MUST BE THE SAME VIEWPORT AS THE FIRST
+    # The probe caches on width AND height now, so asking for a different size
+    # here reloads the frame and answers {loading: true} -- canvasInk 0, which
+    # differs from `first` and passes this check for the worst possible reason:
+    # a blank canvas reading as a moving one. It is spelt out because the bug
+    # is invisible, the check goes green, and the thing it exists to catch is
+    # precisely a canvas that has stopped.
     first = d["canvasInk"]
     time.sleep(0.6)
-    again = b.js(CIRCUIT_PROBE, [390, origin + "/pages/about/"])
+    again = {"loading": True}
+    for _ in range(20):
+        again = b.js(CIRCUIT_PROBE, [last_w, origin + "/pages/about/", last_h])
+        if not again.get("loading"):
+            break
+        time.sleep(0.25)
     r.check("and the charges on it are moving",
-            again.get("canvasInk", 0) != first,
-            f"the same {first} lit samples on two reads 0.6s apart")
+            not again.get("loading") and again.get("canvasInk", 0) != first,
+            f"the same {first} lit samples on two reads 0.6s apart"
+            if not again.get("loading") else
+            "the second read never finished loading, so nothing was compared")
 
     # Constraint that check_focus only catches second-hand, one page at a time.
     r.check("the circuit cannot be clicked or hovered",
@@ -1865,6 +1944,50 @@ def scripting_off(drv_port: int, origin: str, r: Results) -> None:
                         "value": ".hero-circuit canvas"})["value"],
                 "a canvas exists with scripting disabled, which is impossible "
                 "unless it is in the markup rather than built by the module")
+
+        # AND THE SAME PAGE NARROW, WHERE THE COMPOSITION IS A DIFFERENT ONE
+        # Everything above is read at 1440px, where all six layers draw. Below
+        # 768px the bands stand down and the four clusters are the whole
+        # drawing -- so this is the width at which "works without JavaScript"
+        # could quietly stop being true, and until this was added nothing read
+        # it. circuit.js skips a zero-sized layer by itself, so the scripted
+        # page looks right either way and the fallback is the half that can
+        # rot unseen.
+        #
+        # 520px, not 390: Firefox refuses a window below about 500px (ADR 0015)
+        # and there is no script engine here to build an iframe in. 520 is
+        # under the breakpoint, which is all this needs.
+        rq("POST", b.s + "/window/rect",
+           {"width": 520, "height": 760, "x": 0, "y": 0})
+        b.go(origin + "/pages/about/")
+
+        def one(sel):
+            found = rq("POST", b.s + "/elements",
+                       {"using": "css selector", "value": sel})["value"]
+            return found[0][W3C] if found else None
+
+        bands = [one(f".hero-circuit__layer--band-{e}") for e in ("top", "bottom")]
+        r.check("narrow and unscripted, the bands are the ones that stand down",
+                all(i and css(i, "display") == "none" for i in bands),
+                "a band is still drawn under 768px with scripting off")
+
+        corner_charges = [e[W3C] for e in rq(
+            "POST", b.s + "/elements",
+            {"using": "css selector",
+             "value": ".hero-circuit__layer--corner-tl .hero-circuit__charge, "
+                      ".hero-circuit__layer--corner-tr .hero-circuit__charge, "
+                      ".hero-circuit__layer--corner-bl .hero-circuit__charge, "
+                      ".hero-circuit__layer--corner-br .hero-circuit__charge"})["value"]]
+        alive = [i for i in corner_charges
+                 if css(i, "display") != "none"
+                 and css(i, "animation-name") == "hero-charge"]
+        r.check("and the four clusters are still a live drawing on their own",
+                len(alive) == len(corner_charges) == 12,
+                f"{len(alive)} of {len(corner_charges)} cluster charges are "
+                "drawn and animated; the clusters are all a visitor has here")
+
+        rq("POST", b.s + "/window/rect",
+           {"width": 1440, "height": 900, "x": 0, "y": 0})
 
         for path in ("/", "/pages/about/", "/pages/services/"):
             b.go(origin + path)

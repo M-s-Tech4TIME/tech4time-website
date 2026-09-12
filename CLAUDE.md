@@ -188,6 +188,14 @@ needs no browser; only `--resolve`, which re-reads the SVG, wants Chrome. The ge
 stylesheet are one drawing — `circuit.js` reads both the ink and the pen out of `layout.css` — so
 changing a viewBox means changing `LAYERS` there too.
 
+**It is not one composition.** Below 768px wide *or* 480px tall — a phone either way up — the two
+bands stand down and the four clusters grow to carry the banner alone, because a band holds 52
+traces however narrow it is. Both conditions are needed: width alone puts the bands back the moment
+a phone is rotated. The pen is retuned there too, in a tier that must stay **after** the others in
+`layout.css` to win the cascade. `hero_circuit()` measures five viewports, and its probe takes a
+**height** as well as a width — a media query inside an iframe reads the iframe, so a fixed frame
+height silently tests the wrong branch.
+
 Touched CSS, markup or motion? Also `test_motion.py`, `test_nav.py`, `test_theme.py`,
 `check_hover.py`, `check_dark_mode.py`, `check_responsive.py`, `check_focus.py` — these need
 Firefox and geckodriver, and leave processes behind if interrupted (`pkill firefox geckodriver`).

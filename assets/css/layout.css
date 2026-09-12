@@ -530,8 +530,14 @@
      this plus the gap, and stating the width twice is how those two would
      drift apart. The floor is the phone: 11.9% of a 390px screen is a 46px
      box, and eighteen traces and seven vias in 46 pixels is a smudge rather
-     than a circuit. 4.5rem holds it at about 18% there instead; the band gives
-     up its inset rather than its width to pay for that, below. */
+     than a circuit.
+
+     The floor used to be 4.5rem, which held the cluster at about 18% of a
+     phone -- legible, because the pen ladder at the foot of this section is
+     already widening the stroke to hold it there, but small. It was set that
+     low because the band needed the rest of the room. Where the band stands
+     down the cluster takes what it leaves, and the ladder needs a tier of its
+     own to stop over-widening a pen for a drawing that stopped shrinking. */
   --hc-corner: clamp(4.5rem, 11.9vw, 15rem);
   /* And where a band starts: the cluster, plus the artwork's 5.9% gap -- but
      never so far in that the band is left under 24rem to draw in.
@@ -549,7 +555,18 @@
 
      min() and max() are what make that give way SMOOTHLY. A media query would
      step the band from 64% to full width at one pixel of viewport, and the step
-     would be the most visible thing in the banner on a tablet held sideways. */
+     would be the most visible thing in the banner on a tablet held sideways.
+
+     ALL OF WHICH WAS THE RIGHT TRADE WHILE THE BAND WAS STILL DRAWN.
+     It was not enough. Closing the inset buys the band its width back and
+     cannot buy it the only thing it needed, which is room BETWEEN its traces:
+     52 of them across a 360px phone is a 7.5px pitch, and preserveAspectRatio
+     ="none" is squashing a 1440-unit viewBox into that at the same time, so a
+     2.4-unit stroke lands at 0.65px across and 1.18px down. Sub-pixel one way,
+     nearly double the other. It was reported from a phone as congested and
+     cluttered, which is exactly what it was. The rule at the foot of this
+     section is the answer; everything above still governs every width where
+     the band is drawn at all. */
   --hc-band-inset: max(0px, min(calc(var(--hc-corner) + 5.9%), calc(50% - 12rem)));
   /* Inherited, so it covers every shape inside. Without it the artwork sits in
      front of the title for hit-testing and check_focus.py reports the focus
@@ -684,6 +701,66 @@
 .hero-circuit__layer--corner-tr { top: 0; right: 0; transform: scaleX(-1); }
 .hero-circuit__layer--corner-bl { bottom: 0; left: 0; transform: scaleY(-1); }
 .hero-circuit__layer--corner-br { bottom: 0; right: 0; transform: scale(-1, -1); }
+
+/* --- where the bands stand down and the clusters take the banner ---------- */
+
+/* A BAND NEEDS ROOM BETWEEN ITS TRACES, AND ON A PHONE THERE IS NONE
+   Everything above this is fluid on purpose -- clamp() and min() rather than
+   breakpoints, so nothing steps while a tablet is turned over. This is the one
+   place that could not be solved by resizing, because what fails is not the
+   band's size but its density. It holds 52 traces however wide it is, and
+   preserveAspectRatio="none" squashes a 1440-unit viewBox into the width it
+   gets, so on a 360px phone the traces land 7.5px apart with a 2.4-unit stroke
+   rendering 0.65px across and 1.18px down. That is not a circuit any more; it
+   is a grey field, and it was reported as one.
+
+   So below this the two bands are not drawn, and the four clusters grow into
+   what they leave. Each cluster is a 45 degree fan radiating along BOTH edges
+   it touches, so four of them still put circuitry on all four sides -- the
+   banner reads as a frame around the title rather than as a field above and
+   below it.
+
+   TWO CONDITIONS, AND NEITHER WORKS ALONE, BECAUSE ROTATION IS A SECOND AXIS
+   Width alone would restore the bands the instant a phone is turned sideways:
+   800x360 is wider than 768, onto a banner roughly half as tall, where two
+   bands fill most of it. Height alone would take them off a tablet stood
+   upright. Together they split on device rather than on the act of rotating:
+
+     phone      360x800 caught by width   800x360 caught by height   off, both
+     8" tablet  600x960 caught by width   960x600 caught by neither  off / on
+     iPad       768x1024 caught by neither 1024x768 caught by neither on, both
+     desktop    any window                                           on
+
+   30rem sits deliberately between a phone on its side (360-430px tall) and a
+   tablet on its side (768px and up).
+
+   The smoothness argument above does not apply here. It was about the band's
+   inset stepping from 64% to full width WHILE VISIBLE, on a tablet being
+   turned. Nobody drags a phone across 768px, and on the devices this does
+   catch, the step happens during a rotation that is already redrawing the
+   whole page.
+
+   circuit.js needs nothing for this: measure() skips a layer whose box is
+   zero, so display:none takes the bands off the canvas as well as out of the
+   SVG, and the ResizeObserver there re-measures when the box changes. */
+@media (max-width: 47.999em), (max-height: 30rem) {
+  .hero-circuit__layer--band-top,
+  .hero-circuit__layer--band-bottom {
+    display: none;
+  }
+
+  /* The room the bands gave up. 30vw puts a cluster at 108px on a 360px phone
+     against 72px at the old floor -- half again as large, which is what makes
+     eighteen traces and seven vias read as a board rather than as a corner
+     ornament. The cap stops a tablet in landscape from turning one cluster
+     into the whole banner: at 800px it binds at 176px, 22% of the width.
+
+     The pen for this size is at the foot of this section, with the other pens,
+     and the two conditions must stay identical. */
+  .hero-circuit {
+    --hc-corner: clamp(6.5rem, 30vw, 11rem);
+  }
+}
 
 /* --- the three static layers --------------------------------------------- */
 
@@ -936,8 +1013,16 @@
          1440px       914      0.63         171x184   0.86
          1024px       646      0.45         122x131   0.61
           768px       481      0.33          91x98    0.46
-          414px       384      0.27          72x77    0.36
-          360px       345      0.24          72x77    0.36
+
+   The two rows that used to follow -- 414px and 360px, both with a 72x77
+   cluster -- are gone, because below 768px the band is no longer drawn and the
+   cluster is no longer that size. Re-measured there, with the composition the
+   rule further up puts on a phone:
+
+          414px   (no band)                 124x133   0.62
+          390px   (no band)                 117x126   0.59
+          360px   (no band)                 108x116   0.54
+        800x360   (no band)                 176x189   0.88
 
    Left alone at one weight, every line here falls under a pixel below about
    1024px and the whole drawing turns to haze -- which is exactly what the first
@@ -1006,8 +1091,13 @@
   }
 }
 
-/* Below about 520px the corner stops shrinking — its clamp has bottomed out at
-   6.5rem — so one tier covers everything from here down for the clusters. */
+/* The corner's clamp bottoms out at its floor and stops shrinking, so one tier
+   covers everything from there down for the clusters.
+   NOTE that below 768px the tier that actually governs a cluster is the one
+   AFTER this block, not this one: the rule further up grows the cluster there
+   and this pen is tuned for the size it used to be. The band's pens below are
+   unaffected -- it is not drawn under 768px at all, so these two band rules now
+   only reach a short landscape window wider than that. */
 @media (max-width: 47.999em) {
   .hero-circuit__layer--band-top .hero-circuit__wires,
   .hero-circuit__layer--band-bottom .hero-circuit__wires {
@@ -1043,6 +1133,48 @@
   .hero-circuit__layer--corner-bl .hero-circuit__charge,
   .hero-circuit__layer--corner-br .hero-circuit__charge {
     stroke-width: 5.4;
+  }
+}
+
+/* AND WHERE THE CLUSTER GREW, THE LADDER HAS TO COME BACK DOWN
+   Every tier above widens the pen because the drawing is SHRINKING. Where the
+   bands stand down the cluster does the opposite -- it goes from 11.9vw held at
+   a 4.5rem floor to 30vw held at 6.5rem, which is 72px to 108px on a 360px
+   phone -- so the tiers above are widening a pen for a drawing that is no
+   longer small. Measured: at 800x360 the 63.999em tier's 2.8 over a cluster at
+   0.88 scale renders 2.46px, past the two-pixel line this section exists to
+   stay under, and it reads as a fence rather than a circuit.
+
+   These hold the rendered weight at 1.19px on a 360px phone -- the same ink the
+   old 3.4-over-0.36 gave, on a drawing half again as large -- rising to 1.94px
+   where the 11rem cap binds. The condition is the one at the cluster rule
+   further up, and the two must stay in step: this is the pen for that size.
+
+   It comes AFTER the tiers rather than beside that rule because the selectors
+   are the same specificity, so the later one wins. Moved up, it would be
+   silently overridden by the very tiers it is correcting. */
+@media (max-width: 47.999em), (max-height: 30rem) {
+  .hero-circuit__layer--corner-tl .hero-circuit__wires,
+  .hero-circuit__layer--corner-tr .hero-circuit__wires,
+  .hero-circuit__layer--corner-bl .hero-circuit__wires,
+  .hero-circuit__layer--corner-br .hero-circuit__wires {
+    stroke-width: 2.2;
+  }
+
+  .hero-circuit__layer--corner-tl .hero-circuit__rings,
+  .hero-circuit__layer--corner-tr .hero-circuit__rings,
+  .hero-circuit__layer--corner-bl .hero-circuit__rings,
+  .hero-circuit__layer--corner-br .hero-circuit__rings {
+    stroke-width: 2;
+  }
+
+  /* The SVG charge is the no-scripting fallback; circuit.js reads the wires'
+     pen above and derives its own. */
+  .hero-circuit__layer--corner-tl .hero-circuit__charge,
+  .hero-circuit__layer--corner-tr .hero-circuit__charge,
+  .hero-circuit__layer--corner-bl .hero-circuit__charge,
+  .hero-circuit__layer--corner-br .hero-circuit__charge {
+    stroke-width: 3.5;
   }
 }
 

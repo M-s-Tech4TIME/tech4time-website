@@ -44,10 +44,35 @@
      finer than the elbows buys nothing and costs a lineTo per point per frame
      for as long as the page is open. */
   var SAMPLE = 12;
-  /* This is decoration behind a title, drawn in thin strokes of a single
-     colour. Rasterising it at two or three device pixels per CSS pixel buys
-     nothing anybody can see here and costs in direct proportion. */
-  var MAX_DPR = 1;
+  /* THE CANVAS DRAWS AT THE SCREEN'S RESOLUTION, AND IT DID NOT USED TO
+     This was 1, on the reasoning that thin strokes of a single colour behind a
+     title cannot show the difference and cost in direct proportion. That was
+     decided at a desk, where the choice is between one device pixel and two.
+     On a phone it is between one and three, and the layer it applies to is the
+     brightest thing in the banner -- the charges, in the accent colour, moving,
+     over traces that are SVG and therefore always drawn at the full resolution
+     of the screen. The result was a sharp drawing with a soft glow crawling
+     over it, and it was reported from a phone as the whole banner looking
+     pixelated. It was the only part of it that was.
+
+     So: the device's own ratio, capped at 3 because nothing above that is a
+     real screen. Every width set after the transform below -- ctx.lineWidth,
+     CHARGE_MIN/MAX, the dot radii -- is in CSS pixels, so this sharpens the
+     layer and changes no weight.
+
+     It is not free: fill rate goes with the square of the ratio, so a 2x
+     desktop is four times the pixels of this at 1x. Measured at 182ms of
+     main-thread task time per second against 139 before, on /pages/about/ at
+     2x -- the realistic worst case, since a desktop is 1x or 2x and never 3x.
+     At 1x it is 137 against 135, which is to say nothing at all, and on a
+     phone 208 against 195, because the bands standing down there pay for most
+     of the extra resolution.
+
+     NOT measured with tools/check_style_budget.py, which cannot see it:
+     that reads RecalcStyleDuration + LayoutDuration, and rasterising a canvas
+     is neither, so it reports the same figure whatever this is set to. The
+     table and the method are in docs/10-development/frontend/motion.md. */
+  var MAX_DPR = 3;
   /* And it does not need sixty frames a second. A charge crossing a trace over
      four seconds is not made smoother by drawing it twice as often; halving
      the rate halves the cost of the whole layer, which is the difference
@@ -450,10 +475,34 @@
       this.start();
     }
 
-    global.addEventListener("resize", this.onResize);
-    this.watchers.push(function () {
-      global.removeEventListener("resize", self.onResize);
-    });
+    /* THE ELEMENT IS WATCHED, NOT THE WINDOW, AND ROTATION IS WHY
+       This was a resize listener, which is enough for a dragged desktop window
+       and not enough for a phone being turned over: on mobile the resize can
+       arrive before layout has settled, so measure() reads the box the banner
+       had in the OLD orientation and every trace position, every scale and the
+       canvas backing store are computed from it. One stale read is the whole
+       layer wrong, and it stays wrong until something else moves.
+
+       A ResizeObserver fires when .hero-circuit's own box changes, after
+       layout, which is exactly the question measure() asks. It also covers two
+       things the listener never did: the reflow when a mobile address bar
+       collapses, and the reflow when the webfont lands and the title rewraps
+       to a different number of lines. Both change the banner's height without
+       changing the window's.
+
+       The listener stays as the fallback. Nothing in this file needs a
+       polyfill; a browser without ResizeObserver still gets the old
+       behaviour rather than none. */
+    if (global.ResizeObserver) {
+      var ro = new global.ResizeObserver(this.onResize);
+      ro.observe(this.root);
+      this.watchers.push(function () { ro.disconnect(); });
+    } else {
+      global.addEventListener("resize", this.onResize);
+      this.watchers.push(function () {
+        global.removeEventListener("resize", self.onResize);
+      });
+    }
     doc.addEventListener("visibilitychange", this.onVisibility);
     this.watchers.push(function () {
       doc.removeEventListener("visibilitychange", self.onVisibility);

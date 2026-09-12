@@ -196,9 +196,35 @@ coordinate edited by hand.
 height and stops 17.4% in from each edge with a 5.9% gap before the cluster; a cluster is 11.9% of
 the width. The banner itself is **not** reshaped to the artwork's 2.95 : 1 — an edge-anchored
 composition stretches gracefully, and at 1920px the banner already sat on those proportions while
-being 6.15 : 1. Two of them give way on a phone, and `layout.css` says which and why: a cluster is
-held at a 72px floor, below which eighteen traces cannot resolve, and the band's inset closes
-smoothly to nothing rather than stepping at a breakpoint.
+being 6.15 : 1.
+
+**On a phone the bands stand down and the clusters take the banner.** Everything else here is
+fluid on purpose — `clamp()` and `min()` rather than breakpoints, so nothing steps while a tablet
+is being turned over. This is the one thing that could not be solved by resizing, because what
+fails is not the band's size but its **density**: it carries 52 traces however wide it is, and
+`preserveAspectRatio="none"` squashes a 1440-unit viewBox into whatever width it gets. On a 360px
+phone that is a 7.5px pitch with a 2.4-unit stroke rendering **0.65px across and 1.18px down** —
+sub-pixel one way and nearly double the other. It was reported from a phone as a congested grey
+smear, which is what it was. The clusters then grow from a 72px floor to 30vw, so four 45-degree
+fans put circuitry on all four edges and the banner reads as a frame rather than a field.
+
+**Two conditions decide it, and neither works alone, because rotation is a second axis.** Width
+alone would restore the bands the instant a phone is turned sideways — 800×360 is wider than 768px,
+onto a banner half the height. Height alone would take them off a tablet stood upright. Together
+they split on device class rather than on the act of rotating:
+
+| | portrait | landscape | bands |
+|---|---|---|---|
+| Phone | 360×800, caught by width | 800×360, caught by height | **off in both** |
+| 8" tablet | 600×960, caught by width | 960×600, caught by neither | off / on |
+| iPad | 768×1024, caught by neither | 1024×768, caught by neither | **on in both** |
+| Desktop | any window | | on |
+
+`30rem` sits deliberately between a phone on its side (360–430px tall) and a tablet on its side
+(768px and up). `hero_circuit()` measures all five of those viewports, which is why its probe takes
+a **height** as well as a width: a media query inside a same-origin iframe evaluates against the
+**iframe**, so with the frame pinned at 900px the landscape condition would never once have fired
+and the branch would have shipped unwatched.
 
 **Pure inline SVG animated in CSS.** The charges move to a canvas when there is scripting; without
 it the SVG's own run, so there is no page that needs JavaScript for this, and the reduced-motion
@@ -253,12 +279,60 @@ on screen and **less** overall, because CSS animations keep running when scrolle
 canvas stops — measured 187 ms/s against 126 with the band visible, and 135 against 175 once
 scrolled below it.
 
+**And it draws at the screen's resolution, which it did not used to.** `MAX_DPR` was **1**, on the
+reasoning that thin strokes of one colour behind a title cannot show the difference and cost in
+direct proportion. That was decided at a desk, where the choice is between one device pixel and
+two. On a phone it is between one and three, and the layer it applies to is the brightest thing in
+the banner — the charges, in the accent colour, moving, over traces that are SVG and therefore
+always drawn at the screen's full resolution. A sharp drawing with a soft glow crawling over it was
+reported from a phone as the *whole banner* looking pixelated. It was the only part of it that was.
+
+**`check_style_budget.py` cannot see this change, and adding a flag to it would not help.** It
+measures `RecalcStyleDuration + LayoutDuration`. Canvas rasterisation is neither, so it reports the
+same figure whatever `MAX_DPR` is — a check that proves nothing while reporting success, which is
+the trap the rest of this file is shaped around. The cost lives in **main-thread task time**, and
+it has to be measured against the *same* device scale factor on both sides: forcing Chrome to 3×
+scales the whole page, so comparing an old 1× run against a new 3× one measures mostly the page.
+
+Measured on `/pages/about/`, headless Chrome, milliseconds of task time per second:
+
+| 1440×900, bands drawn | 1× | 2× | 3× |
+|---|---|---|---|
+| before (`MAX_DPR = 1`) | 135 | 139 | 137 |
+| after (`MAX_DPR = 3`) | 137 | **182** | **242** |
+
+| 390×844, bands stood down | 1× | 2× | 3× |
+|---|---|---|---|
+| before | 201 | 195 | 200 |
+| after | 197 | 208 | 221 |
+
+The before rows are flat because the canvas was pinned regardless of the screen. Run-to-run noise
+is about ±25, so read the 1× column as *unchanged* — which it is by construction:
+`Math.min(devicePixelRatio, 3)` is still 1 on a non-retina screen, and such a machine pays nothing
+for this at all.
+
+**A desktop is 1× or 2×, never 3×**, so the real worst case is the 2× desktop column: 182 against
+139, about +31%. The phone — the case this was reported from — is nearly free at +7%, because the
+bands standing down pays for most of the extra resolution. These are software-rasterised figures
+from headless Chrome; a real browser composites a canvas on the GPU, so treat them as an upper
+bound rather than as what a visitor's machine does.
+
+**The box is watched with a `ResizeObserver`, not a `resize` listener.** `measure()` computes every
+trace position, every scale and the canvas backing store in one pass, so one stale read is the
+whole layer wrong until something else moves it. A `resize` event on mobile can arrive *before*
+layout has settled after a rotation, which is exactly when the box has changed most. A
+`ResizeObserver` on `.hero-circuit` fires when that element's own box changes, after layout. It
+also covers two reflows the window listener never saw: a mobile address bar collapsing, and the
+webfont landing and rewrapping the title to a different number of lines. The listener remains as
+the fallback.
+
 Three things that were needed to make it pay, none of them optional:
 
 - **The junction dots moved onto the canvas too.** Left in the SVG they were the only thing still
   animating there, which kept the whole document rendering at 60 fps whatever the canvas did.
-- **30 frames a second at 1× device pixels.** A charge crossing a trace over four seconds is not
-  made smoother by drawing it twice as often, and this halves the cost of the layer.
+- **30 frames a second.** A charge crossing a trace over four seconds is not made smoother by
+  drawing it twice as often, and this halves the cost of the layer. It was *also* 1× device
+  pixels, and that half is gone — see below.
 - **It stops when the band is off screen**, and when the tab is hidden. Note that an
   `IntersectionObserver` measures against the *top-level* viewport, so inside an off-screen iframe
   it correctly stops — which reads as a blank canvas if you are testing through one.
