@@ -76,7 +76,34 @@ BAND_GROUP = "g482"       # the top band
 # ratio (0.93:1) so that "meet" never leaves a margin; the band's half takes
 # the run's (6.31:1), and the full box is two of those mirrored.
 CORNER_VIEW = (200, 215)
+# ONE TILE OF THE BAND, NOT THE WHOLE VIEWBOX
+# The drawing fills the left half and the right half is its mirror, so this is
+# the width the mirror is taken about and the box the artwork is fitted into.
+# The viewBox emitted below is BAND_TILES of it.
 BAND_VIEW = (1440, 114)
+# HOW MANY TIMES THE MOTIF REPEATS ACROSS THE VIEWBOX
+# The band used to be ONE copy of the drawing stretched to whatever width it
+# got -- preserveAspectRatio="none" -- so its horizontal and vertical scales
+# agreed at exactly one viewport, 1920px, and disagreed everywhere else: 2.6x
+# squashed at 768, 1.4x at 1440, 2.2x stretched at 3840 and 10x at a 4K screen
+# zoomed out to 25%. It was reported as looking stretched and old, and it was.
+#
+# So the band is now "xMidYMid slice" over a viewBox this many tiles wide.
+# slice takes the LARGER of the two ratios, so as long as the viewBox is wider
+# than (band width / the height's own scale) the HEIGHT decides the scale and
+# the width never does -- one constant scale, one constant trace pitch, at
+# every viewport and every zoom level.
+#
+# Fifteen covers a 5K display at Chrome's minimum 25% zoom, which needs 13.5.
+# Being wrong about this number is safe in a way the old arrangement never was:
+# slice is uniform by definition, so if the width ever does govern, the drawing
+# MAGNIFIES. It cannot distort again. That property is what this buys, not the
+# number.
+#
+# ODD ON PURPOSE. Each tile mirrors about its own centre, so with an odd count
+# the viewBox's centre line is a mirror axis and the composition's "two halves
+# meet in the middle" survives.
+BAND_TILES = 15
 
 # Three traces per corner and three per band half, which is 24 charges once the
 # mirrors are counted. That number is a budget, not a coincidence: a charge
@@ -455,19 +482,34 @@ HEADER = """<!--hero-circuit:start-->
          mirrored in CSS. That is not tidiness - a duplicate id is a hard
          failure in audit_pages.py, so four corners cannot each carry a copy.
 
-         The bands use preserveAspectRatio="none" because they run a fixed
-         height across a box whose width is the screen\'s, and stretching a
-         horizontal run just makes it a longer run. The corners use xMinYMin
-         meet instead: a fan of 45 degree elbows must not shear, and it has to
-         stay pinned to its own corner.
+         THE BAND TILES; IT IS NOT STRETCHED. IT USED TO BE.
+         The bands used preserveAspectRatio="none", on the reasoning that a
+         band runs a fixed height across a box whose width is the screen\'s and
+         stretching a horizontal run just makes it a longer run. That is true
+         of a run and false of the drawing around it: pads turn to ovals, vias
+         to ellipses, and every vertical trace thins while every horizontal one
+         thickens. Measured, the two scales agreed at exactly ONE viewport --
+         1920px, which is what the artwork was composed for -- and disagreed
+         everywhere else: 2.6x squashed at 768, 1.4x at 1440, 2.2x stretched at
+         3840, 10x on a 4K screen at 25% zoom. It was reported from a browser
+         zoomed out as looking stretched and old.
 
-         THE BAND IS A HALF, MIRRORED
+         So the viewBox is now BAND_TILES tiles wide and the fit is xMidYMid
+         slice, which scales UNIFORMLY and crops rather than distorting. The
+         height decides the scale, the width never does, and the trace pitch is
+         the same at 768px as at 4K. The corners have always used xMinYMin
+         meet, for the same reason turned the other way: a fan of 45 degree
+         elbows must not shear, and it must stay pinned to its own corner.
+
+         THE BAND IS A HALF, MIRRORED -- AND THAT IS WHAT A TILE IS
          The reference\'s band is one run about six times as wide as it is tall.
-         The banner is up to fifteen. So the run fills the left half and the
-         right half is its reflection: every pad stays circular and every mark
-         keeps its drawn size, which stretching one run across the whole box
-         would not. hero-circuit__charge--mirrored puts the two halves back in
-         step, and circuit.js places each band trace twice for the same reason.
+         So the run fills the left half of a 1440-unit tile and the right half
+         is its reflection: every pad stays circular and every mark keeps its
+         drawn size. Each tile therefore mirrors about its own centre, and
+         BAND_TILES is ODD so that the viewBox\'s centre line is a mirror axis
+         too -- the banner\'s middle is still where the two halves meet.
+         hero-circuit__charge--mirrored puts them back in step, and circuit.js
+         places each band trace twice per visible tile for the same reason.
 
          A CHARGE IS ONE <use>, AND NEVER A GROUP OF THEM
          This layer once carried the charge on a <g> wrapping a <use> of a
@@ -645,24 +687,48 @@ def emit(geometry: dict) -> str:
         f'{" hero-circuit__charge--back" if n == 1 else ""}" href="#hc-c{i}"/>'
         for n, i in enumerate(corner_lit))
 
+    # The tiled static drawing: one <use> of each group per tile, referencing
+    # defs declared once. No id is duplicated, which audit_pages.py refuses.
+    def tiled(group: str) -> str:
+        return "".join(
+            f'<use href="#{group}"/>' if k == 0 else
+            f'<use href="#{group}" transform="translate({k * BAND_VIEW[0]},0)"/>'
+            for k in range(BAND_TILES))
+
+    # THE CHARGES AND THE NODES ARE NOT TILED, AND THAT IS DELIBERATE
+    # Fifteen copies would be ninety animated elements per band reached through
+    # a <use> of a group -- exactly the shape that put style recalculation at
+    # 895ms per second on 2026-09-03 and had the site reported as struggling.
+    # stroke-dashoffset is inherited, so animating it under a <use>d group
+    # makes the browser push the value down through every shadow tree beneath
+    # it, every frame. They are emitted once, on the centre tile.
+    #
+    # Without scripting on a wide screen that means charges in the middle of
+    # the band only. That is the fallback and it reads correctly; with
+    # scripting, circuit.js paints a charge on every visible tile.
+    centre = (BAND_TILES // 2) * BAND_VIEW[0]
+
     for which in ("band-top", "band-bottom"):
         first = which == "band-top"
         out.append(
             f'      <svg class="hero-circuit__layer hero-circuit__layer--{which}" '
-            f'viewBox="0 0 {BAND_VIEW[0]} {BAND_VIEW[1]}" preserveAspectRatio="none" '
+            f'viewBox="0 0 {BAND_VIEW[0] * BAND_TILES} {BAND_VIEW[1]}" '
+            f'preserveAspectRatio="xMidYMid slice" '
             f'focusable="false">')
         if first:
             out.append("        <defs>")
             out.extend("        " + line for line in defs)
             out.append("        </defs>")
-        out.append('        <g class="hero-circuit__wires"><use href="#hc-band-wires"/></g>')
-        out.append('        <g class="hero-circuit__pads"><use href="#hc-band-pads"/></g>')
-        out.append('        <g class="hero-circuit__rings"><use href="#hc-band-rings"/></g>')
-        out.append('        <g class="hero-circuit__charges">' + band_charges)
+        out.append('        <g class="hero-circuit__wires">' + tiled("hc-band-wires") + "</g>")
+        out.append('        <g class="hero-circuit__pads">' + tiled("hc-band-pads") + "</g>")
+        out.append('        <g class="hero-circuit__rings">' + tiled("hc-band-rings") + "</g>")
+        out.append(f'        <g class="hero-circuit__charges" transform="translate({centre},0)">'
+                   + band_charges)
         out.append(f'          <g {mirror}>' + band_mirrored)
         out.append("          </g>")
         out.append("        </g>")
-        out.append('        <g class="hero-circuit__nodes">' + nodes(band_nodes))
+        out.append(f'        <g class="hero-circuit__nodes" transform="translate({centre},0)">'
+                   + nodes(band_nodes))
         out.append("        </g>")
         out.append("      </svg>")
 

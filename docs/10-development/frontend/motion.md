@@ -199,14 +199,20 @@ composition stretches gracefully, and at 1920px the banner already sat on those 
 being 6.15 : 1.
 
 **On a phone the bands stand down and the clusters take the banner.** Everything else here is
-fluid on purpose — `clamp()` and `min()` rather than breakpoints, so nothing steps while a tablet
-is being turned over. This is the one thing that could not be solved by resizing, because what
-fails is not the band's size but its **density**: it carries 52 traces however wide it is, and
-`preserveAspectRatio="none"` squashes a 1440-unit viewBox into whatever width it gets. On a 360px
-phone that is a 7.5px pitch with a 2.4-unit stroke rendering **0.65px across and 1.18px down** —
-sub-pixel one way and nearly double the other. It was reported from a phone as a congested grey
-smear, which is what it was. The clusters then grow from a 72px floor to 30vw, so four 45-degree
-fans put circuitry on all four edges and the banner reads as a frame rather than a field.
+fluid on purpose — `clamp()` and `min()` rather than breakpoints, so nothing steps while a tablet is
+being turned over. This steps, because it changes the composition rather than the size.
+
+It began as a fix. The band carries 52 traces however wide it is, and `preserveAspectRatio="none"`
+squashed a 1440-unit viewBox into whatever width it got: on a 360px phone a 7.5px pitch with a
+2.4-unit stroke rendering **0.65px across and 1.18px down**. A congested grey smear, and reported as
+one. **That particular fault is now fixed elsewhere** — with the band tiling, it would draw at an
+18px pitch and a 1.57px pen on the same phone.
+
+**The rule stays anyway, and it is worth being straight about why:** the composition it makes is the
+one that was wanted. The clusters grow from a 72px floor to 30vw, four 45-degree fans put circuitry
+on all four edges, and the banner reads as a frame around a clear title rather than as a field above
+and below it. If that is ever revisited, the bands can come back to a phone without anything else
+changing.
 
 **Two conditions decide it, and neither works alone, because rotation is a second axis.** Width
 alone would restore the bands the instant a phone is turned sideways — 800×360 is wider than 768px,
@@ -221,7 +227,29 @@ they split on device class rather than on the act of rotating:
 | Desktop | any window | | on |
 
 `30rem` sits deliberately between a phone on its side (360–430px tall) and a tablet on its side
-(768px and up). `hero_circuit()` measures all five of those viewports, which is why its probe takes
+(768px and up).
+
+**The middle of the banner is cleared explicitly.** With the clusters at 30vw the radial fade — which
+is a *diagonal* one, anchored at each cluster's own corner — had only reached about 34% transparent
+by the inner edge, so the ink thinned rather than stopping and the clusters crowded the title. A
+second mask is intersected with it: the radial decides how a cluster fades toward the middle, and the
+column decides where it stops. Both are kept because tuning the radial alone to clear the centre
+would pull the cluster off its own corner, which is the shape the artwork is.
+
+One gradient does all four, because a mask is applied in the element's own space **before** the
+mirroring transforms — so the gap is equal by construction rather than by four numbers kept in step.
+The whole rule sits behind `@supports (mask-composite: intersect)`, and that guard is load-bearing
+rather than politeness: without `mask-composite` the default is `add`, the **union**, and an
+unsupporting browser would paint *more* than before, not less.
+
+`circuit.js` reads `--hc-clear-from` / `--hc-clear-to` off the layer so the charges stop where the
+traces do — one source, as with `--charge-ink` and the wires' `stroke-width`.
+
+`hero_gap()` in `tools/test_motion.py` measures the result **in pixels**, by photographing the
+banner and scanning the strip above the title for the widest ink-free run: **57% of the width,
+centred 1% off the middle**, against 38% before. It is a photograph and not arithmetic on purpose —
+if the `@supports` guard ever stopped matching, every geometric assertion in that file would still
+pass, because the boxes do not move. Only the ink does. `hero_circuit()` measures all five of those viewports, which is why its probe takes
 a **height** as well as a width: a media query inside a same-origin iframe evaluates against the
 **iframe**, so with the frame pinned at 900px the landscape condition would never once have fired
 and the branch would have shipped unwatched.
@@ -229,6 +257,50 @@ and the branch would have shipped unwatched.
 **Pure inline SVG animated in CSS.** The charges move to a canvas when there is scripting; without
 it the SVG's own run, so there is no page that needs JavaScript for this, and the reduced-motion
 block in `base.css` freezes either.
+
+### The band tiles; it is not stretched, and it used to be
+
+The bands were `preserveAspectRatio="none"` — one copy of a 1440 × 114 drawing stretched across
+whatever width the band got. The reasoning was that a band runs a fixed height across a box whose
+width is the screen's, and stretching a horizontal run only makes it a longer run. That is true of a
+run and false of everything around it: pads become ovals, vias ellipses, and every vertical trace
+thins while every horizontal one thickens. Measured, the two scales agreed at **exactly one
+viewport**:
+
+| viewport | horizontal | vertical | |
+|---|---|---|---|
+| 768 | 0.34 | 0.90 | 2.6× squashed |
+| 1440 | 0.64 | 0.90 | 1.4× squashed |
+| **1920** | 0.86 | 0.90 | **1.05× — the width it was composed for** |
+| 3840 | 2.02 | 0.90 | 2.2× stretched |
+| 15360 (4K at 25% zoom) | 9.07 | 0.90 | **10× stretched** |
+
+A person reported it from a browser zoomed out, as looking stretched and old. Nothing had ever
+measured it, which is how a drawing correct at one width shipped to every width.
+
+**Now: `xMidYMid slice` over a viewBox fifteen tiles wide.** `slice` scales **uniformly** and crops
+rather than distorting, and with a viewBox that wide the band's **height** decides the scale and its
+width never does — one scale, one trace pitch (about 25px), at every viewport and every zoom level.
+`BAND_TILES` in `tools/build_hero_circuit.py` and `circuit.js` must agree.
+
+Three things follow that are worth knowing:
+
+- **The tile count is a comfort margin, not a correctness condition.** Fifteen covers a 5K display
+  at Chrome's minimum 25% zoom, which needs 13.5. Past that the width starts to govern and the
+  drawing **magnifies** — `slice` is uniform by definition, so it cannot distort again.
+- **It is odd on purpose.** Each tile mirrors about its own centre, so an odd count puts a mirror
+  axis on the viewBox's centre line and the banner's middle is still where the two halves meet.
+- **The charges and nodes are not tiled.** Fifteen copies would be ninety animated elements per
+  band reached through a `<use>` of a group — the exact shape that cost a CPU core in 2026-09. They
+  are emitted once on the centre tile, so with scripting off on a wide screen the charges run in the
+  middle of the band only. `circuit.js` paints them on every visible tile, and places **only the
+  visible tiles**: at 1440px the band shows about 6% of the drawing, and placing all fifteen would
+  put roughly 1,200 polylines in the frame loop instead of 176.
+
+**And the band's three pen tiers are gone.** They existed only to compensate for the stretch. At a
+constant scale one pen covers every width — 2.4 renders 1.6px to 2.2px, inside the
+one-to-two-device-pixel rule everywhere. The cluster's tiers stay, because a cluster really does
+shrink with the viewport.
 
 **One set of geometry.** Everything is declared once, in the first layer's `<defs>`, and the other
 five reference it and are mirrored in CSS. That is not tidiness: a duplicate `id` is a hard

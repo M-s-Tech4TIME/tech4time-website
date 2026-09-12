@@ -557,16 +557,22 @@
      step the band from 64% to full width at one pixel of viewport, and the step
      would be the most visible thing in the banner on a tablet held sideways.
 
-     ALL OF WHICH WAS THE RIGHT TRADE WHILE THE BAND WAS STILL DRAWN.
-     It was not enough. Closing the inset buys the band its width back and
-     cannot buy it the only thing it needed, which is room BETWEEN its traces:
-     52 of them across a 360px phone is a 7.5px pitch, and preserveAspectRatio
-     ="none" is squashing a 1440-unit viewBox into that at the same time, so a
-     2.4-unit stroke lands at 0.65px across and 1.18px down. Sub-pixel one way,
-     nearly double the other. It was reported from a phone as congested and
-     cluttered, which is exactly what it was. The rule at the foot of this
-     section is the answer; everything above still governs every width where
-     the band is drawn at all. */
+     ALL OF WHICH WAS THE RIGHT TRADE WHILE THE BAND WAS STILL STRETCHED.
+     It was not enough on its own. Closing the inset buys the band its width
+     back and could not buy it room BETWEEN its traces: 52 of them across a
+     360px phone is a 7.5px pitch, and preserveAspectRatio="none" was squashing
+     a 1440-unit viewBox into that at the same time, so a 2.4-unit stroke landed
+     at 0.65px across and 1.18px down. It was reported from a phone as congested
+     and cluttered, which is exactly what it was.
+
+     THAT PARTICULAR FAULT IS NOW FIXED ELSEWHERE, AND THE BANDS STILL GO.
+     The band tiles under "slice" rather than stretching, so on a 360px phone it
+     would now draw at an 18px pitch with a 1.57px pen -- legible, measured, no
+     longer the problem this was written about. The bands stand down there
+     anyway, and it is worth being straight about why: it is the COMPOSITION
+     that was chosen, four clusters framing a clear title, not a drawing that
+     cannot resolve. If that composition is ever revisited the bands can come
+     back to a phone without anything else changing. */
   --hc-band-inset: max(0px, min(calc(var(--hc-corner) + 5.9%), calc(50% - 12rem)));
   /* Inherited, so it covers every shape inside. Without it the artwork sits in
      front of the title for hit-testing and check_focus.py reports the focus
@@ -706,16 +712,17 @@
 
 /* A BAND NEEDS ROOM BETWEEN ITS TRACES, AND ON A PHONE THERE IS NONE
    Everything above this is fluid on purpose -- clamp() and min() rather than
-   breakpoints, so nothing steps while a tablet is turned over. This is the one
-   place that could not be solved by resizing, because what fails is not the
-   band's size but its density. It holds 52 traces however wide it is, and
-   preserveAspectRatio="none" squashes a 1440-unit viewBox into the width it
-   gets, so on a 360px phone the traces land 7.5px apart with a 2.4-unit stroke
-   rendering 0.65px across and 1.18px down. That is not a circuit any more; it
-   is a grey field, and it was reported as one.
+   breakpoints, so nothing steps while a tablet is turned over. This steps,
+   because it is a change of composition rather than of size.
 
-   So below this the two bands are not drawn, and the four clusters grow into
-   what they leave. Each cluster is a 45 degree fan radiating along BOTH edges
+   It began as a fix: the band held 52 traces however wide it was, and
+   preserveAspectRatio="none" squashed a 1440-unit viewBox into the width it
+   got, so on a 360px phone the traces landed 7.5px apart with a 2.4-unit
+   stroke rendering 0.65px across and 1.18px down. A grey field, and reported
+   as one. The band tiles now and that fault is gone -- it would draw at an
+   18px pitch here. This rule stays because the composition it makes is the one
+   that was wanted: below it the two bands are not drawn, and the four clusters
+   grow into what they leave. Each cluster is a 45 degree fan radiating along BOTH edges
    it touches, so four of them still put circuitry on all four sides -- the
    banner reads as a frame around the title rather than as a field above and
    below it.
@@ -759,6 +766,66 @@
      and the two conditions must stay identical. */
   .hero-circuit {
     --hc-corner: clamp(6.5rem, 30vw, 11rem);
+  }
+
+  /* AND THE MIDDLE IS CLEARED, BECAUSE FOUR BIGGER CLUSTERS CROWD THE TITLE
+     The radial fade above is a DIAGONAL one, anchored at each cluster's own
+     corner, and at the inner edge of a 30vw box it has only reached about 34%
+     transparent. So the ink does not stop there, it thins -- which read as
+     clutter around the title rather than as a frame around it, and was
+     reported that way. The clear centre was about 38% of the banner.
+
+     This is a second mask intersected with that one: the diagonal decides how
+     the cluster fades toward the middle of the banner, and this decides where
+     it stops altogether. Both are kept because they do different jobs -- tuning
+     the radial alone to clear the centre would pull the cluster off its own
+     corner, which is the shape the artwork is.
+
+     THE MIRRORS MAKE IT SYMMETRICAL FOR FREE, WHICH IS WHY IT IS ONE GRADIENT
+     A mask is applied in the element's own space, BEFORE the scaleX(-1) and
+     scaleY(-1) that turn each cluster to its corner. So one gradient running
+     to the right is the inner edge of all four, and the gap is equal by
+     construction rather than by four numbers that have to be kept in step.
+
+     Measured: about 55% of the banner clear at 360px and at 440px, and 67% in
+     landscape, against 38% before.
+
+     circuit.js reads these two so the charges stop where the traces do.
+     Outside this query they are 1 and nothing happens -- the breakpoint is
+     here and only here. */
+  .hero-circuit__layer--corner-tl,
+  .hero-circuit__layer--corner-tr,
+  .hero-circuit__layer--corner-bl,
+  .hero-circuit__layer--corner-br {
+    --hc-clear-from: 0.52;
+    --hc-clear-to: 0.73;
+  }
+}
+
+/* THE GUARD IS LOAD-BEARING, AND NOT THE USUAL PROGRESSIVE-ENHANCEMENT KIND
+   Without mask-composite the default is `add`, which is the UNION of the two
+   layers -- and the column layer is opaque across the outer half, so a browser
+   that ignored the composite would paint MORE than it does today, not less.
+   That is a regression dressed as a fallback. Guarded, such a browser keeps the
+   single radial mask declared above and looks exactly as it does now.
+
+   @supports is already used in this stylesheet for the same reason at the
+   colour-mix fallback near the top. */
+@supports (mask-composite: intersect) or (-webkit-mask-composite: source-in) {
+  @media (max-width: 47.999em), (max-height: 30rem) {
+    .hero-circuit__layer--corner-tl,
+    .hero-circuit__layer--corner-tr,
+    .hero-circuit__layer--corner-bl,
+    .hero-circuit__layer--corner-br {
+      -webkit-mask-image:
+        radial-gradient(130% 130% at 0% 0%, #000 40%, transparent 96%),
+        linear-gradient(to right, #000 0 52%, transparent 73%);
+      mask-image:
+        radial-gradient(130% 130% at 0% 0%, #000 40%, transparent 96%),
+        linear-gradient(to right, #000 0 52%, transparent 73%);
+      -webkit-mask-composite: source-in;
+      mask-composite: intersect;
+    }
   }
 }
 
@@ -850,14 +917,12 @@
   }
 }
 
-/* preserveAspectRatio="none" squashes the band's 120-unit box to about 76
-   pixels, and a stroke is squashed with it: a horizontal run comes out at
-   roughly six tenths of its stated width. The bands ask for more so that both
-   halves of the drawing carry the same weight on screen. */
-.hero-circuit__layer--band-top .hero-circuit__charge,
-.hero-circuit__layer--band-bottom .hero-circuit__charge {
-  stroke-width: 3.6;
-}
+/* The band's charge used to ask for 3.6 against the base 3, because
+   preserveAspectRatio="none" squashed its box and a horizontal run came out at
+   roughly six tenths of its stated width -- so the two halves of the drawing
+   needed different pens to carry the same weight on screen. The band is scaled
+   uniformly now, exactly as the clusters always were, so one pen is correct for
+   both and the override is gone. */
 
 /* Three durations, shared by all four clusters — and that sharing is measured,
    not lazy. Giving the twelve corner charges twelve distinct durations gives
@@ -1005,52 +1070,44 @@
 
 /* --- the pen, against the scale it is drawn at --------------------------- */
 
-/* An SVG stroke is scaled with its drawing, and these two drawings shrink at
-   very different rates. Measured, with the composition above:
+/* An SVG stroke is scaled with its drawing, and only ONE of these two drawings
+   changes scale with the viewport now.
 
-       viewport   band box   scale     cluster box   scale
-         1920px      1223      0.85         228x246   1.14
-         1440px       914      0.63         171x184   0.86
-         1024px       646      0.45         122x131   0.61
-          768px       481      0.33          91x98    0.46
+   THE BAND NO LONGER NEEDS A LADDER, AND ITS THREE TIERS ARE GONE
+   It used to: one copy of a 1440-unit drawing stretched across whatever width
+   the band got, so its scale ran from 0.85 at 1920px down to 0.33 at 768px and
+   up past 4 on a zoomed-out desktop -- and the pen had to be widened at each
+   step to stop the traces turning to haze. That was three tiers of band rules
+   compensating for a distortion, and it never fixed the distortion itself.
 
-   The two rows that used to follow -- 414px and 360px, both with a 72x77
-   cluster -- are gone, because below 768px the band is no longer drawn and the
-   cluster is no longer that size. Re-measured there, with the composition the
-   rule further up puts on a phone:
+   The band now tiles under "xMidYMid slice", so its HEIGHT alone decides the
+   scale: clamp(3.5rem, 31%, 6.5rem) over 114 units, which is 0.68 to 0.91 in
+   practice. One pen covers that -- 2.4 renders 1.6px to 2.2px, inside the
+   one-to-two-device-pixel rule at every viewport and every zoom level. Nothing
+   below sets a band pen; the base value is the only one.
 
-          414px   (no band)                 124x133   0.62
-          390px   (no band)                 117x126   0.59
-          360px   (no band)                 108x116   0.54
-        800x360   (no band)                 176x189   0.88
+   THE CLUSTER STILL SHRINKS, SO ITS LADDER STAYS. Measured:
 
-   Left alone at one weight, every line here falls under a pixel below about
-   1024px and the whole drawing turns to haze -- which is exactly what the first
-   measurement of this artwork showed: at 768px the band's traces rendered at
-   0.74px and all a visitor could see was the charges running over them.
+       viewport   cluster box   scale
+         1920px       228x246   1.14
+         1440px       171x184   0.86
+         1024px       122x131   0.61
+          768px        91x98    0.46
+          414px   (no band)     124x133   0.62
+          390px   (no band)     117x126   0.59
+          360px   (no band)     108x116   0.54
+        800x360   (no band)     176x189   0.88
 
-   So the pen is widened as the drawing shrinks, to hold the rendered weight
-   between roughly one and two device pixels throughout. The numbers are that
-   arithmetic, not taste, and they were read off a browser rather than derived
-   on paper. tools/check_responsive.py and the measurement in
-   docs/10-development/frontend/motion.md are how to redo them. */
+   Left alone at one weight a cluster line falls under a pixel below about
+   1024px and turns to haze -- which is what the first measurement of this
+   artwork showed. So the cluster's pen is widened as it shrinks, and brought
+   back DOWN in the tier at the foot of this section where the bands stand down
+   and the cluster grows instead. The numbers are that arithmetic, not taste,
+   and they were read off a browser. tools/check_responsive.py and the
+   measurement in docs/10-development/frontend/motion.md are how to redo
+   them. */
 
 @media (max-width: 63.999em) {
-  .hero-circuit__layer--band-top .hero-circuit__wires,
-  .hero-circuit__layer--band-bottom .hero-circuit__wires {
-    stroke-width: 4.4;
-  }
-
-  .hero-circuit__layer--band-top .hero-circuit__rings,
-  .hero-circuit__layer--band-bottom .hero-circuit__rings {
-    stroke-width: 3.4;
-  }
-
-  .hero-circuit__layer--band-top .hero-circuit__charge,
-  .hero-circuit__layer--band-bottom .hero-circuit__charge {
-    stroke-width: 5;
-  }
-
   .hero-circuit__layer--corner-tl .hero-circuit__wires,
   .hero-circuit__layer--corner-tr .hero-circuit__wires,
   .hero-circuit__layer--corner-bl .hero-circuit__wires,
@@ -1092,28 +1149,11 @@
 }
 
 /* The corner's clamp bottoms out at its floor and stops shrinking, so one tier
-   covers everything from there down for the clusters.
+   covers everything from there down.
    NOTE that below 768px the tier that actually governs a cluster is the one
-   AFTER this block, not this one: the rule further up grows the cluster there
-   and this pen is tuned for the size it used to be. The band's pens below are
-   unaffected -- it is not drawn under 768px at all, so these two band rules now
-   only reach a short landscape window wider than that. */
+   AFTER this block, not this one: the rule further up grows the cluster there,
+   and this pen is tuned for the size it used to be. */
 @media (max-width: 47.999em) {
-  .hero-circuit__layer--band-top .hero-circuit__wires,
-  .hero-circuit__layer--band-bottom .hero-circuit__wires {
-    stroke-width: 2.9;
-  }
-
-  .hero-circuit__layer--band-top .hero-circuit__rings,
-  .hero-circuit__layer--band-bottom .hero-circuit__rings {
-    stroke-width: 2.5;
-  }
-
-  .hero-circuit__layer--band-top .hero-circuit__charge,
-  .hero-circuit__layer--band-bottom .hero-circuit__charge {
-    stroke-width: 6.6;
-  }
-
   .hero-circuit__layer--corner-tl .hero-circuit__wires,
   .hero-circuit__layer--corner-tr .hero-circuit__wires,
   .hero-circuit__layer--corner-bl .hero-circuit__wires,
@@ -1178,21 +1218,3 @@
   }
 }
 
-/* The band alone goes on shrinking: it is the viewport wide however narrow that
-   is, so at 320px it is drawing 1440 units into 320 pixels. */
-@media (max-width: 29.999em) {
-  .hero-circuit__layer--band-top .hero-circuit__wires,
-  .hero-circuit__layer--band-bottom .hero-circuit__wires {
-    stroke-width: 3.6;
-  }
-
-  .hero-circuit__layer--band-top .hero-circuit__rings,
-  .hero-circuit__layer--band-bottom .hero-circuit__rings {
-    stroke-width: 3.2;
-  }
-
-  .hero-circuit__layer--band-top .hero-circuit__charge,
-  .hero-circuit__layer--band-bottom .hero-circuit__charge {
-    stroke-width: 8;
-  }
-}

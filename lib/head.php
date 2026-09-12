@@ -75,7 +75,7 @@ const HEAD_STYLES = [
        anything -- so head_styles() appends the settings document's own
        revision, which contract_next_revision() already makes monotonic. */
     'brand.css',
-    'layout.css?v=7',
+    'layout.css?v=8',
     'components.css',
     'animations.css',
 ];

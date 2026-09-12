@@ -53,6 +53,7 @@ from top to bottom, and require every marked element to be fully opaque. If
 that holds on every page, the reveal cannot be hiding anything from anyone.
 """
 
+import base64
 import json
 import os
 import re
@@ -1302,14 +1303,31 @@ function drawn(el) {
 var hero = doc.querySelector('.page-hero').getBoundingClientRect();
 var bandLayer = doc.querySelector('.hero-circuit__layer--band-top');
 var cornerLayer = doc.querySelector('.hero-circuit__layer--corner-tl');
-/* The smaller of the two scales, for both: a cluster is fitted with "meet" so
-   they are equal anyway, and a band is stretched, so the smaller is the one
-   that decides whether its lines survive. */
-function penOf(layer, vw, vh) {
-  var lb = layer.getBoundingClientRect();
+/* THE SCALE EACH LAYER IS ACTUALLY DRAWN AT, WHICH IS NOT THE SAME FORMULA
+   A cluster is "xMinYMin meet" -- the SMALLER ratio, fitted inside its box. The
+   band is "xMidYMid slice" -- the LARGER, covering its box and cropped. It was
+   "none", where the two ratios were independent and the smaller decided whether
+   the lines survived; reading it that way now reports a pen the browser is not
+   drawing. The viewBox is read off the element rather than passed in, so this
+   cannot drift from the template again. */
+function fitOf(layer) {
+  /* ASK THE BROWSER WHAT SCALE IT IS DRAWING AT; DO NOT WORK IT OUT AGAIN.
+     getScreenCTM on a group inside the layer returns the matrix that actually
+     maps user units to screen pixels -- viewBox, preserveAspectRatio, the CSS
+     mirror transforms and all. Recomputing it here from the viewBox and the box
+     would be restating this file's own idea of the rule, which is exactly the
+     thing that cannot catch the rule being wrong: the first version of this
+     divided a uniform scale by itself and could only ever answer 1.
+     abs() because four of the six layers are mirrored. */
+  var g = layer.querySelector('.hero-circuit__wires');
+  var m = g.getScreenCTM();
+  return {sx: Math.abs(m.a), sy: Math.abs(m.d)};
+}
+
+function penOf(layer) {
   var pen = parseFloat(view.getComputedStyle(
     layer.querySelector('.hero-circuit__wires')).strokeWidth);
-  return Math.round(pen * Math.min(lb.width / vw, lb.height / vh) * 100) / 100;
+  return Math.round(pen * fitOf(layer).sx * 100) / 100;
 }
 var bandBox = bandLayer.getBoundingClientRect();
 var cornerBox = cornerLayer.getBoundingClientRect();
@@ -1432,8 +1450,19 @@ return {
   bandPctW: Math.round(1000 * bandBox.width / hero.width) / 10,
   cornerPctW: Math.round(1000 * cornerBox.width / hero.width) / 10,
   gapPct: Math.round(1000 * (bandBox.left - cornerBox.right) / hero.width) / 10,
-  bandPen: penOf(bandLayer, 1440, 114),
-  cornerPen: penOf(cornerLayer, 200, 215),
+  bandPen: penOf(bandLayer),
+  cornerPen: penOf(cornerLayer),
+  /* THE POINT OF THE WHOLE CHANGE, STATED AS A NUMBER
+     How far the band's horizontal scale differs from its vertical one. Under
+     "slice" both come from one uniform scale, so this is exactly 1 at every
+     width; under the old "none" it ran from 0.38 at 768px to over 4 zoomed
+     out, and nothing anywhere measured it. */
+  bandView: bandLayer.viewBox.baseVal.width,
+  bandSlice: (bandLayer.getAttribute('preserveAspectRatio') || ''),
+  bandAniso: Math.round(1000 * fitOf(bandLayer).sx / fitOf(bandLayer).sy) / 1000,
+  bandScale: Math.round(1000 * fitOf(bandLayer).sx) / 1000,
+  cornerAniso: Math.round(1000 * fitOf(cornerLayer).sx / fitOf(cornerLayer).sy) / 1000,
+  bandPitch: Math.round(10 * 1440 * fitOf(bandLayer).sx / 52) / 10,
   marked: doc.querySelectorAll('.page-hero [data-reveal]').length,
   titleOpacity: view.getComputedStyle(
     doc.querySelector('.page-hero__title')).opacity,
@@ -1494,7 +1523,11 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
     # this suite has to be able to see it. 1024x768 is a tablet on its side and
     # is here to prove the rule does NOT fire there: turning a tablet over must
     # change nothing.
-    for width, height in ((1440, 900), (1024, 768), (768, 900), (390, 844), (800, 360)):
+    # 3840 and 7680 stand in for a desktop zoomed out, which is where the band
+    # was reported as stretched and which no suite could reach before: an
+    # iframe can be any width, and a browser window cannot.
+    for width, height in ((7680, 900), (3840, 900), (1920, 900), (1440, 900),
+                          (1024, 768), (768, 900), (390, 844), (800, 360)):
         # EXACTLY what layout.css decides, boundaries included: its condition
         # is (max-width: 47.999em), which is 767.98px, so a 768px viewport
         # keeps its bands -- and (max-height: 30rem), which is 480px, so a
@@ -1543,6 +1576,40 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
                 not d["overflows"],
                 "the document scrolls horizontally with the circuit in place")
 
+        # THE DRAWING IS NEVER DISTORTED, WHICH IS THE WHOLE POINT
+        # Both layers are scaled uniformly: the clusters have always been
+        # "meet", and the band is "xMidYMid slice" over a viewBox fifteen tiles
+        # wide, so its HEIGHT decides the scale and its width never does.
+        #
+        # It was "none" -- one copy of the drawing stretched across whatever
+        # width the band got. The two scales then agreed at exactly ONE
+        # viewport, 1920px, and disagreed everywhere else: 0.38 at 768px, 0.71
+        # at 1440, 2.2 at 3840, over 10 on a 4K screen zoomed out to 25%. Pads
+        # became ovals and vias ellipses. Nothing measured it, which is how a
+        # drawing correct at one width shipped to every width.
+        #
+        # Read off getScreenCTM, so this is the browser's own answer.
+        if bands:
+            r.check(f"{at} — the band is drawn at its true ratio",
+                    0.98 <= d["bandAniso"] <= 1.02,
+                    f"the band's horizontal scale is {d['bandAniso']}x its "
+                    f"vertical one ({d['bandSlice']}, viewBox {d['bandView']}); "
+                    "anything but 1 is the drawing being stretched or squashed")
+            # And the same scale at every width, not merely an undistorted one:
+            # slice with too narrow a viewBox would be uniform AND magnified.
+            r.check(f"{at} — and at the same scale as everywhere else",
+                    0.60 <= d["bandScale"] <= 0.95,
+                    f"the band is drawn at {d['bandScale']}x; the height alone "
+                    "should decide that, so it must not track the width")
+            r.check(f"{at} — its traces keep a legible pitch",
+                    14.0 <= d["bandPitch"] <= 30.0,
+                    f"52 traces land {d['bandPitch']}px apart")
+
+        r.check(f"{at} — the cluster is drawn at its true ratio",
+                0.98 <= d["cornerAniso"] <= 1.02,
+                f"a cluster's horizontal scale is {d['cornerAniso']}x its "
+                "vertical one; a 45 degree fan must not shear")
+
         # EVERY BAND FIGURE BELOW IS GUARDED, AND NOT OUT OF TIDINESS
         # penOf() and the bandBox reads return 0 rather than raising when the
         # layer is display:none, so an unguarded assertion here would fail with
@@ -1571,8 +1638,21 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
             # Asserting only the lower bound above let a band restored to full
             # width pass every check in this section -- which is exactly what
             # it did, until this was added.
+            # THE GAP IS THE REQUIREMENT; THE PERCENTAGE IS A PROXY FOR IT
+            # Above about 2016px --hc-corner hits its 15rem cap and stops
+            # tracking the width, so the cluster falls from the artwork's 11.9%
+            # to 9.4% at 2560, 6.2% at 3840 and 3.1% at 7680, while the band
+            # grows to 82%. The gap before the cluster stays at 5.9% the whole
+            # way, so the band really does still stop short -- what drifts is
+            # the PROPORTION, and only where the cap binds.
+            #
+            # That is a pre-existing composition question about very large
+            # screens, not a fault in the tiling, and it is deliberately not
+            # being decided here. The bound is scoped to the range the
+            # artwork's own proportions were measured for so that this check
+            # keeps saying something true.
             r.check(f"{at} — the band stops short of the clusters",
-                    d["gapPct"] > 0 and d["bandPctW"] <= 75.0,
+                    d["gapPct"] > 0 and d["bandPctW"] <= (75.0 if width <= 2048 else 85.0),
                     f"the band is {d['bandPctW']}% of the width with a "
                     f"{d['gapPct']}% gap before the cluster; the artwork "
                     "composes it at 65.9% with a 5.9% gap, and a band running "
@@ -1593,7 +1673,11 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
         # Measured, not guessed: 108/348 = 31% on a 360px phone and 117/378 =
         # 31% at 390, falling to 22.3% at 800px where the 11rem cap binds. The
         # floor is 20 rather than 26 because that cap is doing its job there.
+        # Above the 15rem cap a cluster is legitimately a smaller share of a
+        # very wide banner -- see the note on the band's gap above.
         lo, hi = (10.0, 22.0) if bands else (20.0, 40.0)
+        if bands and width > 2048:
+            lo = 2.5
         r.check(f"{at} — the cluster is sized for the composition it is in",
                 lo <= d["cornerPctW"] <= hi,
                 f"a cluster is {d['cornerPctW']}% of the banner's width; wanted "
@@ -1680,6 +1764,105 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
             f"{d['marked']} marked elements inside .page-hero")
     r.check("the page title is fully opaque with the circuit behind it",
             d["titleOpacity"] == "1", f"title opacity is {d['titleOpacity']}")
+
+
+def hero_gap(b: Browser, origin: str, r: Results) -> None:
+    """
+    Is there actually a clear gap down the middle of the banner on a phone?
+
+    MEASURED IN PIXELS, BECAUSE NOTHING ELSE HERE COULD CATCH THIS
+    The gap is made by a second mask intersected with the radial one, and the
+    whole rule sits behind @supports (mask-composite: intersect). If that guard
+    ever failed to match -- an older engine, a typo in the condition, the
+    property renamed -- the rule would be skipped in silence and the clusters
+    would go back to crowding the title. Every geometric assertion in this file
+    would still pass, because the boxes do not move: only the ink does.
+
+    Asserting the arithmetic instead would be worse than nothing. It would
+    restate this file's own idea of where the mask stops and could only ever
+    agree with itself, which is exactly the failure it needs to catch.
+
+    So: photograph the banner and look at it. Scan the top of the hero, above
+    the title, where the only thing that can put marks on the page is the
+    circuitry, and find the widest run of columns with no ink in it.
+    """
+    print("\nthe gap down the middle of the banner")
+    try:
+        from PIL import Image
+    except ImportError:
+        print("    Pillow is not installed — nothing was measured.")
+        return
+
+    # 500px is the narrowest window Firefox will make (ADR 0015) and is well
+    # under the 768px the composition changes at, so it is a phone as far as
+    # the stylesheet is concerned.
+    rq("POST", b.s + "/window/rect", {"width": 500, "height": 820, "x": 0, "y": 0})
+    b.go(origin + "/pages/about/")
+    time.sleep(1.5)
+    found = rq("POST", b.s + "/elements",
+               {"using": "css selector", "value": ".page-hero"})["value"]
+    if not found:
+        r.check("the banner is there to photograph", False, "no .page-hero")
+        return
+    shot = ROOT / "tools" / "_hero-gap.png"
+    shot.write_bytes(base64.b64decode(
+        rq("GET", f"{b.s}/element/{found[0][W3C]}/screenshot")["value"]))
+    try:
+        with Image.open(shot) as im:
+            im = im.convert("RGB")
+            w, h = im.size
+            # The top of the banner only. The title is vertically centred, and
+            # its glyphs would read as ink in the very columns being asked
+            # about — so this looks at the strip above it, where the clusters
+            # are the only thing that can mark the page.
+            top, bottom = int(h * 0.04), int(h * 0.20)
+            px = im.load()
+            base = px[w // 2, top + 1]          # the middle of that strip is bare
+            inked = []
+            for x in range(w):
+                mark = False
+                for y in range(top, bottom):
+                    p = px[x, y]
+                    if (abs(p[0] - base[0]) + abs(p[1] - base[1])
+                            + abs(p[2] - base[2])) > 24:
+                        mark = True
+                        break
+                inked.append(mark)
+    finally:
+        shot.unlink(missing_ok=True)
+
+    run = best = start = 0
+    for x, mark in enumerate(inked):
+        if mark:
+            run = 0
+        else:
+            run += 1
+            if run > best:
+                best, start = run, x - run + 1
+    pct = round(100 * best / w, 1)
+    centre = start + best / 2
+    off = round(100 * abs(centre - w / 2) / w, 1)
+
+    print(f"    {w}px wide banner: widest clear run {best}px ({pct}%), "
+          f"centred {off}% off the middle")
+
+    # Before the second mask this measured about 38% and the ink did not stop
+    # at the inner edge, it thinned to 34% opacity. The floor is set below the
+    # ~55% the masks are tuned for so that antialiasing and a font that wraps
+    # differently cannot fail it, and well above the 38% it is replacing.
+    r.check("there is a significant clear gap between the two sides",
+            pct >= 45.0,
+            f"the widest ink-free run across the top of the banner is {pct}% "
+            "of its width; the clusters are crowding the title again")
+
+    # "Equal" was the word used. The masks are one gradient carried round by
+    # the existing mirrors, so this cannot drift without something structural
+    # having changed.
+    r.check("and it sits equally between them",
+            off <= 4.0,
+            f"the clear run is centred {off}% of the width off the middle")
+
+    rq("POST", b.s + "/window/rect", {"width": 1440, "height": 900, "x": 0, "y": 0})
 
 
 def hero_frame_budget(b: Browser, origin: str, r: Results) -> None:
@@ -2053,6 +2236,7 @@ def main() -> None:
         typed_terminal(browser, origin, results)
         hero_mesh(browser, origin, results)
         hero_circuit(browser, origin, results)
+        hero_gap(browser, origin, results)
         sliders(browser, origin, results)
         counters(browser, origin, results)
         alternating_rows(browser, origin, results)

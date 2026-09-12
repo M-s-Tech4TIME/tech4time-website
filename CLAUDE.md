@@ -189,12 +189,18 @@ stylesheet are one drawing — `circuit.js` reads both the ink and the pen out o
 changing a viewBox means changing `LAYERS` there too.
 
 **It is not one composition.** Below 768px wide *or* 480px tall — a phone either way up — the two
-bands stand down and the four clusters grow to carry the banner alone, because a band holds 52
-traces however narrow it is. Both conditions are needed: width alone puts the bands back the moment
-a phone is rotated. The pen is retuned there too, in a tier that must stay **after** the others in
-`layout.css` to win the cascade. `hero_circuit()` measures five viewports, and its probe takes a
-**height** as well as a width — a media query inside an iframe reads the iframe, so a fixed frame
-height silently tests the wrong branch.
+bands stand down and the four clusters grow to carry the banner alone, and a second mask clears the
+middle so they do not crowd the title. Both conditions are needed: width alone puts the bands back
+the moment a phone is rotated. The pen is retuned there too, in a tier that must stay **after** the
+others in `layout.css` to win the cascade. `hero_circuit()` measures eight viewports, and its probe
+takes a **height** as well as a width — a media query inside an iframe reads the iframe, so a fixed
+frame height silently tests the wrong branch.
+
+**The band tiles; it is never stretched.** `preserveAspectRatio="xMidYMid slice"` over a viewBox
+`BAND_TILES` wide, so its *height* sets the scale and its width never does — one trace pitch at
+768px, at 4K and at any zoom. `BAND_TILES` in `tools/build_hero_circuit.py` and `circuit.js` must
+agree, and it is **odd** so the banner's centre stays a mirror axis. The charges and nodes sit on the
+centre tile only: tiling animated elements is what cost a CPU core in 2026-09.
 
 Touched CSS, markup or motion? Also `test_motion.py`, `test_nav.py`, `test_theme.py`,
 `check_hover.py`, `check_dark_mode.py`, `check_responsive.py`, `check_focus.py` — these need
