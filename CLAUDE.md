@@ -188,6 +188,30 @@ needs no browser; only `--resolve`, which re-reads the SVG, wants Chrome. The ge
 stylesheet are one drawing — `circuit.js` reads both the ink and the pen out of `layout.css` — so
 changing a viewBox means changing `LAYERS` there too.
 
+**One composition, on every device, and every channel through it the same width.** `.hero-circuit`
+is a **grid** — cluster / band / cluster across, two rows down, one `gap`. That gap is A, B, C and D
+at once, equal by construction rather than by four numbers kept in step; the rows are `1fr`, so a
+band and a cluster are each `(banner − gap) / 2` tall, which is what makes the vertical channels
+match the horizontal ones. **`--hc-gap` must be a LENGTH:** `row-gap: %` resolves against height and
+`column-gap: %` against width, so a percentage is unequal in pixels by definition.
+
+**The band tiles; it is never stretched.** `preserveAspectRatio="xMidYMid slice"` over a viewBox
+`BAND_TILES` wide, so its *height* sets the scale and its width never does — one trace pitch at
+360px, at 4K and at any zoom. `BAND_TILES` in `tools/build_hero_circuit.py` and `circuit.js` must
+agree, and it is **odd** so the banner's centre stays a mirror axis. Charges and nodes sit on the
+centre tile only: tiling animated elements is what cost a CPU core in 2026-09. **`circuit.js` clips
+the canvas to each layer's box** — the `<svg>` crops `slice`'s overflow and the canvas does not, so
+without it charges paint straight through the channels.
+
+**Above 1280px the clusters are sized by the viewport, not the row**, so they do not shrink to
+specks on a wide screen — 2.5% of the width at 3840 otherwise, against the artwork's 11.15%. They
+then reach past their row and close **D** alone; A, B and C are untouched. The ceiling is the
+banner's height: two clusters stacked down one edge must still fit, which caps them near 154px.
+
+`hero_circuit()` measures eight viewports (its probe takes a **height** as well as a width — a media
+query inside an iframe reads the iframe), and `hero_gaps()` photographs the banner and measures all
+four channels **in pixels**, because boxes cannot see whether the ink stops.
+
 Touched CSS, markup or motion? Also `test_motion.py`, `test_nav.py`, `test_theme.py`,
 `check_hover.py`, `check_dark_mode.py`, `check_responsive.py`, `check_focus.py` — these need
 Firefox and geckodriver, and leave processes behind if interrupted (`pkill firefox geckodriver`).

@@ -192,13 +192,105 @@ a band half, each trace clipped against its own clip rectangle, because the clus
 **is** that clip and not drawn geometry. Nothing in the template is typed; `--check` refuses a
 coordinate edited by hand.
 
-**The composition is the artwork's too, and it is measured.** A band is 30.8% of the banner's
-height and stops 17.4% in from each edge with a 5.9% gap before the cluster; a cluster is 11.9% of
-the width. The banner itself is **not** reshaped to the artwork's 2.95 : 1 — an edge-anchored
-composition stretches gracefully, and at 1920px the banner already sat on those proportions while
-being 6.15 : 1. Two of them give way on a phone, and `layout.css` says which and why: a cluster is
-held at a 72px floor, below which eighteen traces cannot resolve, and the band's inset closes
-smoothly to nothing rather than stepping at a breakpoint.
+**The composition is the artwork's too, and it is measured.** Rendered at its own 2.954 : 1 and
+scanned for ink, the artwork puts a cluster at **11.15%** of the width, a gap at **5.60%**, the band
+at **63.30%**, another gap at **4.80%**, and the band's height at **29.25%**. Note that its own two
+horizontal gaps are not equal to each other.
+
+### Every channel is the same width, and a grid is what makes that true
+
+There are four channels: cluster→band on the left, band→cluster on the right, top band→bottom band,
+and top cluster→bottom cluster down each edge. They used to be four numbers arrived at four
+different ways — the horizontal pair from a share of the **width**, the vertical pair from the
+band's own height — so they agreed only by accident at one aspect ratio. Measured before this:
+**40%** of the width clear on a phone, and **5.9%** the moment a band appeared at 768px. A sevenfold
+step at one pixel of viewport, and the reason a person said they could not see the gap anywhere.
+
+`.hero-circuit` is a **grid** now: cluster / band / cluster across, two rows down, one `gap`.
+
+- **The gap is stated once.** All four are that one value, equal *by construction* rather than by
+  four numbers kept in step by hand.
+- **The rows are `1fr`**, so a band and a cluster are each `(banner − gap) / 2` tall. That is what
+  makes the vertical channels match the horizontal ones, and `hero_circuit()` asserts the two
+  heights are equal so a failure says so where it happens rather than three checks away.
+- **`--hc-gap` must be a LENGTH, never a percentage.** `row-gap: %` resolves against the container's
+  **height** and `column-gap: %` against its **width** — a percentage gap is unequal in pixels by
+  definition, which is the exact fault this exists to prevent. Falsified: setting it to `8%` fails
+  the gap check at every width.
+
+**What it costs, and where that is paid.** A cluster sized by the banner's *height* takes its share
+of the *width* from the banner's shape rather than the artwork's: 19% of a 440px banner, 11.4% at
+1024px — the artwork's own proportion — but **7.0% at 1440 and 2.5% at 3840**. On a wide screen the
+corners read as specks and the band carries the composition alone.
+
+**So above 1280px the cluster is sized by the viewport instead**, and is allowed to reach past its
+row. Three of the four channels are untouched — A and B are still the grid's column gap, and C is
+still the space between two bands that still fill their rows. Only **D**, down each edge, closes up:
+116/116/101/**53** at 1440 and 128/128/132/**22** at 1920. That is a deliberate trade, and it is the
+artwork's own shape, where the clusters very nearly meet down the sides.
+
+1280px and not 1024px because at 1024 a row-sized cluster is *already* 11.4%; starting lower would
+make it smaller, which is the opposite of the point.
+
+**The ceiling is the banner's height, not taste.** A cluster is very nearly square and the banner is
+about 332px tall at every desktop width, so two stacked down one edge cannot exceed that — above
+about 154px they meet. `hero_circuit()` asserts both ends: that the cluster reaches past its row, and
+that twice its height still fits the banner. Falsified both ways.
+
+**The band's column has no floor**, deliberately. A floor there is paid for by the clusters — the
+column takes their width, their height stays the row's, and `meet` then letterboxes the drawing in a
+box of the wrong ratio, which opens the vertical channel past the gap. Measured at 390×300 it went
+to 100px against a 32px gap. So on the narrowest phones the band is a narrow window onto the artwork
+rather than a wide one, at true scale, and every channel stays equal.
+
+**A mask that was built and then removed.** The cluster's diagonal fade leaves its ink at about a
+third of full where the band begins, so a second mask was intersected with it to end the ink
+cleanly. Measured, it widened the horizontal channels by **2–4px out of 115** and removing it failed
+no check at all — the `<svg>` already clips at the box, so the grid alone delivers the channel. It
+is recorded here because the reasoning sounded right and the measurement did not support it.
+
+### The band tiles; it is not stretched, and it used to be
+
+The bands were `preserveAspectRatio="none"` — one copy of a 1440 × 114 drawing stretched across
+whatever width the band got. The reasoning was that a band runs a fixed height across a box whose
+width is the screen's, and stretching a horizontal run only makes it a longer run. True of a run and
+false of everything around it: pads become ovals, vias ellipses, every vertical trace thins and
+every horizontal one thickens. Measured, the two scales agreed at **exactly one viewport**:
+
+| viewport | horizontal | vertical | |
+|---|---|---|---|
+| 768 | 0.34 | 0.90 | 2.6× squashed |
+| 1440 | 0.64 | 0.90 | 1.4× squashed |
+| **1920** | 0.86 | 0.90 | **1.05× — the width it was composed for** |
+| 3840 | 2.02 | 0.90 | 2.2× stretched |
+| 15360 (4K at 25% zoom) | 9.07 | 0.90 | **10× stretched** |
+
+Reported from a zoomed-out browser as stretched and old. Nothing had ever measured it, which is how
+a drawing correct at one width shipped to every width.
+
+**Now `xMidYMid slice` over a viewBox fifteen tiles wide.** `slice` scales **uniformly** and crops,
+and with a viewBox that wide the band's **height** decides the scale and its width never does — one
+scale and one trace pitch at every viewport and every zoom. `BAND_TILES` in
+`tools/build_hero_circuit.py` and `circuit.js` must agree.
+
+- **The tile count is a margin, not a correctness condition.** Fifteen covers a 5K display at
+  Chrome's minimum 25% zoom. Past that the width governs and the drawing *magnifies* — `slice` is
+  uniform by definition, so it cannot distort again.
+- **Nothing repeats on an ordinary screen.** Measured, the band fits inside *one* tile at every
+  width up to 1920px; it first repeats near 2048px, ×2.24 at 3840.
+- **Odd on purpose**, so the viewBox's centre is a mirror axis and the banner's middle is still where
+  the two halves meet.
+- **Charges and nodes are not tiled** — ninety animated elements per band under a `<use>`d group is
+  the shape that cost a CPU core on 2026-09-03. They sit on the centre tile, so with scripting off on
+  a wide screen the charges run in the middle of the band only.
+- **`circuit.js` clips the canvas to each layer's box.** The `<svg>` crops what `slice` deliberately
+  overflows and the canvas does not, so without it charges paint straight through the channels: a
+  115px channel measured 40px of clear pixels, and at 1920px the banner scanned as one unbroken
+  mass. It was not a problem while the band was `"none"`, because the drawing then exactly filled its
+  box.
+- **The band's three pen tiers are gone**, and so is the cluster's ladder. Both drawings are sized by
+  the banner's height now, so their scales vary about 1.5× rather than the 3.5× that tracked viewport
+  width — one pen each covers it, and tiers keyed to width would be measuring the wrong variable.
 
 **Pure inline SVG animated in CSS.** The charges move to a canvas when there is scripting; without
 it the SVG's own run, so there is no page that needs JavaScript for this, and the reduced-motion
@@ -253,12 +345,60 @@ on screen and **less** overall, because CSS animations keep running when scrolle
 canvas stops — measured 187 ms/s against 126 with the band visible, and 135 against 175 once
 scrolled below it.
 
+**And it draws at the screen's resolution, which it did not used to.** `MAX_DPR` was **1**, on the
+reasoning that thin strokes of one colour behind a title cannot show the difference and cost in
+direct proportion. That was decided at a desk, where the choice is between one device pixel and
+two. On a phone it is between one and three, and the layer it applies to is the brightest thing in
+the banner — the charges, in the accent colour, moving, over traces that are SVG and therefore
+always drawn at the screen's full resolution. A sharp drawing with a soft glow crawling over it was
+reported from a phone as the *whole banner* looking pixelated. It was the only part of it that was.
+
+**`check_style_budget.py` cannot see this change, and adding a flag to it would not help.** It
+measures `RecalcStyleDuration + LayoutDuration`. Canvas rasterisation is neither, so it reports the
+same figure whatever `MAX_DPR` is — a check that proves nothing while reporting success, which is
+the trap the rest of this file is shaped around. The cost lives in **main-thread task time**, and
+it has to be measured against the *same* device scale factor on both sides: forcing Chrome to 3×
+scales the whole page, so comparing an old 1× run against a new 3× one measures mostly the page.
+
+Measured on `/pages/about/`, headless Chrome, milliseconds of task time per second:
+
+| 1440×900, bands drawn | 1× | 2× | 3× |
+|---|---|---|---|
+| before (`MAX_DPR = 1`) | 135 | 139 | 137 |
+| after (`MAX_DPR = 3`) | 137 | **182** | **242** |
+
+| 390×844, bands stood down | 1× | 2× | 3× |
+|---|---|---|---|
+| before | 201 | 195 | 200 |
+| after | 197 | 208 | 221 |
+
+The before rows are flat because the canvas was pinned regardless of the screen. Run-to-run noise
+is about ±25, so read the 1× column as *unchanged* — which it is by construction:
+`Math.min(devicePixelRatio, 3)` is still 1 on a non-retina screen, and such a machine pays nothing
+for this at all.
+
+**A desktop is 1× or 2×, never 3×**, so the real worst case is the 2× desktop column: 182 against
+139, about +31%. The phone — the case this was reported from — is nearly free at +7%, because the
+bands standing down pays for most of the extra resolution. These are software-rasterised figures
+from headless Chrome; a real browser composites a canvas on the GPU, so treat them as an upper
+bound rather than as what a visitor's machine does.
+
+**The box is watched with a `ResizeObserver`, not a `resize` listener.** `measure()` computes every
+trace position, every scale and the canvas backing store in one pass, so one stale read is the
+whole layer wrong until something else moves it. A `resize` event on mobile can arrive *before*
+layout has settled after a rotation, which is exactly when the box has changed most. A
+`ResizeObserver` on `.hero-circuit` fires when that element's own box changes, after layout. It
+also covers two reflows the window listener never saw: a mobile address bar collapsing, and the
+webfont landing and rewrapping the title to a different number of lines. The listener remains as
+the fallback.
+
 Three things that were needed to make it pay, none of them optional:
 
 - **The junction dots moved onto the canvas too.** Left in the SVG they were the only thing still
   animating there, which kept the whole document rendering at 60 fps whatever the canvas did.
-- **30 frames a second at 1× device pixels.** A charge crossing a trace over four seconds is not
-  made smoother by drawing it twice as often, and this halves the cost of the layer.
+- **30 frames a second.** A charge crossing a trace over four seconds is not made smoother by
+  drawing it twice as often, and this halves the cost of the layer. It was *also* 1× device
+  pixels, and that half is gone — see below.
 - **It stops when the band is off screen**, and when the tab is hidden. Note that an
   `IntersectionObserver` measures against the *top-level* viewport, so inside an off-screen iframe
   it correctly stops — which reads as a blank canvas if you are testing through one.

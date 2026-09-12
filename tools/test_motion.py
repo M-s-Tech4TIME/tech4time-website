@@ -53,6 +53,7 @@ from top to bottom, and require every marked element to be fully opaque. If
 that holds on every page, the reveal cannot be hiding anything from anyone.
 """
 
+import base64
 import json
 import os
 import re
@@ -1227,18 +1228,29 @@ def hero_mesh(b: Browser, origin: str, r: Results) -> None:
             "colour tokens, and no other check here would notice")
 
 
-# The circuit is measured inside an <iframe> of the width being tested: the
-# artwork now renders at every width, including below the ~500px Firefox refuses
-# to make a window (ADR 0015), and the phone tier is the new part.
+# The circuit is measured inside an <iframe> of the width AND HEIGHT being
+# tested, below the ~500px Firefox refuses to make a window (ADR 0015).
+#
+# THE HEIGHT IS A PARAMETER, AND IT HAS TO BE
+# It was pinned at 900px. A media query inside a same-origin iframe evaluates
+# against the IFRAME, not the window, so layout.css's `(max-height: 30rem)` --
+# the condition that takes the bands off a phone held sideways -- read as 900px
+# here and would never once have fired. The landscape branch would have shipped
+# with nothing watching it while every check in this file stayed green. That is
+# the same shape of blindness as a suite sitting on disk and not in the
+# workflow.
+#
+# The mesh probe above keeps its fixed 900px on purpose: it measures
+# .hero-neural on the home page, which has no circuit and nothing that reads
+# the viewport's height.
 CIRCUIT_PROBE = r"""
-var width = arguments[0], url = arguments[1];
+var width = arguments[0], url = arguments[1], height = arguments[2] || 900;
 
 var frame = document.getElementById('circuit-probe');
 if (!frame) {
   frame = document.createElement('iframe');
   frame.id = 'circuit-probe';
   frame.style.border = '0';
-  frame.style.height = '900px';
   /* Pinned to the top-left of the real viewport, not merely appended. An
      IntersectionObserver inside a same-origin iframe measures against the
      TOP-LEVEL viewport, so an iframe sitting below the host page's fold makes
@@ -1253,8 +1265,9 @@ if (!frame) {
   document.body.appendChild(frame);
 }
 frame.style.width = width + 'px';
+frame.style.height = height + 'px';
 
-var want = url + '#' + width;
+var want = url + '#' + width + 'x' + height;
 if (frame.getAttribute('data-showing') !== want) {
   frame.setAttribute('data-showing', want);
   frame.src = url;
@@ -1293,6 +1306,19 @@ var cornerLayer = doc.querySelector('.hero-circuit__layer--corner-tl');
 /* The smaller of the two scales, for both: a cluster is fitted with "meet" so
    they are equal anyway, and a band is stretched, so the smaller is the one
    that decides whether its lines survive. */
+function fitOf(layer) {
+  /* ASK THE BROWSER WHAT SCALE IT IS DRAWING AT; DO NOT WORK IT OUT AGAIN.
+     getScreenCTM on a group inside the layer returns the matrix that really
+     maps user units to screen pixels -- viewBox, preserveAspectRatio and the
+     CSS mirror transforms and all. Recomputing it from the viewBox and the box
+     would restate this file's own idea of the rule, which is exactly what
+     cannot catch the rule being wrong. abs() because four of the six layers
+     are mirrored. */
+  var g = layer.querySelector('.hero-circuit__wires');
+  var m = g.getScreenCTM();
+  return {sx: Math.abs(m.a), sy: Math.abs(m.d)};
+}
+
 function penOf(layer, vw, vh) {
   var lb = layer.getBoundingClientRect();
   var pen = parseFloat(view.getComputedStyle(
@@ -1420,8 +1446,26 @@ return {
   bandPctW: Math.round(1000 * bandBox.width / hero.width) / 10,
   cornerPctW: Math.round(1000 * cornerBox.width / hero.width) / 10,
   gapPct: Math.round(1000 * (bandBox.left - cornerBox.right) / hero.width) / 10,
-  bandPen: penOf(bandLayer, 1440, 114),
-  cornerPen: penOf(cornerLayer, 200, 215),
+  bandPen: Math.round(parseFloat(view.getComputedStyle(
+    bandLayer.querySelector('.hero-circuit__wires')).strokeWidth)
+    * fitOf(bandLayer).sx * 100) / 100,
+  cornerPen: Math.round(parseFloat(view.getComputedStyle(
+    cornerLayer.querySelector('.hero-circuit__wires')).strokeWidth)
+    * fitOf(cornerLayer).sx * 100) / 100,
+  /* THE POINT OF THE TILING, STATED AS A NUMBER
+     How far each drawing's horizontal scale differs from its vertical one. Both
+     are scaled uniformly -- the clusters by "meet" and the band by "slice" --
+     so this is 1. Under the old "none" the band ran from 0.38 at 768px to over
+     4 zoomed out, and nothing anywhere measured it. */
+  bandAniso: Math.round(1000 * fitOf(bandLayer).sx / fitOf(bandLayer).sy) / 1000,
+  cornerAniso: Math.round(1000 * fitOf(cornerLayer).sx / fitOf(cornerLayer).sy) / 1000,
+  bandScale: Math.round(1000 * fitOf(bandLayer).sx) / 1000,
+  /* The grid's central promise: the rows are 1fr, so a band and a cluster are
+     the same height, which is what makes the vertical channels the same as the
+     horizontal ones. */
+  bandH: Math.round(bandBox.height),
+  cornerH: Math.round(cornerBox.height),
+  heroH: Math.round(hero.height),
   marked: doc.querySelectorAll('.page-hero [data-reveal]').length,
   titleOpacity: view.getComputedStyle(
     doc.querySelector('.page-hero__title')).opacity,
@@ -1474,80 +1518,143 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
     print("\nthe circuit around the page title")
     b.go(origin + "/404.php")          # a host for the frame; it has no band
 
-    for width in (1440, 768, 390):
+    # WIDTH AND HEIGHT, BECAUSE ROTATION IS A SECOND AXIS
+    # The last two are the same phone: upright, and turned over. A rotated
+    # phone is WIDER than the 768px breakpoint, so a width-only rule would put
+    # the bands back onto a banner half the height -- which is why layout.css
+    # carries a (max-height: 30rem) condition beside the width one, and why
+    # this suite has to be able to see it. 1024x768 is a tablet on its side and
+    # is here to prove the rule does NOT fire there: turning a tablet over must
+    # change nothing.
+    # 3840 and 7680 stand in for a desktop zoomed out, which is where the band
+    # was reported as stretched and which no suite could reach before: an iframe
+    # can be any width, a browser window cannot.
+    for width, height in ((7680, 900), (3840, 900), (1920, 900), (1440, 900),
+                          (1024, 768), (768, 900), (390, 844), (800, 360)):
+        # EXACTLY what layout.css decides, boundaries included: its condition
+        # is (max-width: 47.999em), which is 767.98px, so a 768px viewport
+        # keeps its bands -- and (max-height: 30rem), which is 480px, so a
+        # 480px-tall one loses them. Writing `width > 768` here put this one
+        # pixel out and failed at 768 against a stylesheet that was right.
+        # THE COMPOSITION IS THE SAME ON EVERY DEVICE AGAIN.
+        # For one release the bands stood down below 768px, because a stretched
+        # band put 52 traces at a 7.5px pitch on a phone. The band tiles at a
+        # constant scale now -- 18px pitch on the same phone, measured -- so the
+        # artwork's own arrangement holds everywhere, which is what it was asked
+        # to do.
+        bands = True
+        shape = "landscape" if width > height else "portrait"
         d = {"loading": True}
         for _ in range(40):
-            d = b.js(CIRCUIT_PROBE, [width, origin + "/pages/about/"])
+            d = b.js(CIRCUIT_PROBE, [width, origin + "/pages/about/", height])
             if not d.get("loading"):
                 break
             time.sleep(0.25)
 
+        at = f"{width}x{height}"
+        last_w, last_h = width, height
         if not d.get("found"):
-            r.check(f"{width}px — the circuit is in the band", False,
+            r.check(f"{at} — the circuit is in the band", False,
                     "no .hero-circuit element in the page hero")
             continue
 
-        print(f"    {width:>4}px: {d['layersDrawn']}/{d['layers']} layers drawn, "
+        print(f"    {at:>9} {shape:<9} "
+              f"{d['layersDrawn']}/{d['layers']} layers drawn, "
               f"{d['running']}/{d['charges']} charges running, "
               f"{d['nodesRunning']}/{d['nodes']} nodes")
 
-        # Six layers: two bands and four corners. The artwork now renders at
-        # every width, so a missing layer at 390px is a real regression rather
-        # than the old deliberate hiding.
-        r.check(f"{width}px — all six layers are drawn",
-                d["layers"] == 6 and d["layersDrawn"] == 6,
-                f"{d['layersDrawn']} of {d['layers']} layers painted")
-        r.check(f"{width}px — nothing overflows sideways",
+        # SIX LAYERS WHERE THE BAND CAN DRAW, FOUR WHERE IT CANNOT
+        # This asserted six at every width, with a comment calling a missing
+        # layer at 390px "a real regression rather than the old deliberate
+        # hiding". That has been reversed deliberately, and the reason is not
+        # the band's SIZE but its DENSITY: it holds 52 traces however wide it
+        # is, and preserveAspectRatio="none" squashes a 1440-unit viewBox into
+        # the width it gets. On a 360px phone that is a 7.5px pitch with a
+        # 2.4-unit stroke rendering 0.65px across and 1.18px down -- sub-pixel
+        # one way and nearly double the other. It was reported from a phone as
+        # a grey smear, which is what it was.
+        #
+        # So the assertion inverts rather than relaxes. Below the rule the
+        # bands must be GONE, not merely allowed to be: four layers exactly, so
+        # a band that comes back reads as the regression it would be.
+        want = 6 if bands else 4
+        r.check(f"{at} — {'all six layers are drawn' if bands else 'the bands stand down, four layers drawn'}",
+                d["layers"] == 6 and d["layersDrawn"] == want,
+                f"{d['layersDrawn']} of {d['layers']} layers painted, wanted {want}")
+        r.check(f"{at} — nothing overflows sideways",
                 not d["overflows"],
                 "the document scrolls horizontally with the circuit in place")
 
-        # The artwork's own proportion, held to a point either side. The band
-        # is the one the whole composition hangs off, so it is the tight one.
-        r.check(f"{width}px — the band keeps its share of the banner",
-                28.0 <= d["bandPctH"] <= 34.0,
-                f"the band is {d['bandPctH']}% of the banner's height; the "
-                "artwork composes it at 30.8%")
+        # THE DRAWING IS NEVER DISTORTED, WHICH IS THE WHOLE POINT OF TILING
+        # Both layers are scaled uniformly: the clusters have always been
+        # "meet", and the band is "xMidYMid slice" over a viewBox fifteen tiles
+        # wide, so its HEIGHT decides the scale and its width never does.
+        #
+        # It was "none" -- one copy of the drawing stretched across whatever
+        # width the band got. The two scales then agreed at exactly ONE
+        # viewport, 1920px, and disagreed everywhere else: 0.38 at 768px, 0.71
+        # at 1440, 2.2 at 3840, over 10 on a 4K screen at 25% zoom. Pads became
+        # ovals and vias ellipses. Nothing measured it, which is how a drawing
+        # correct at one width shipped to every width.
+        for part, aniso in (("band", d["bandAniso"]), ("cluster", d["cornerAniso"])):
+            r.check(f"{at} — the {part} is drawn at its true ratio",
+                    0.98 <= aniso <= 1.02,
+                    f"its horizontal scale is {aniso}x its vertical one; "
+                    "anything but 1 is the drawing being stretched or squashed")
 
-        # A cluster is 11.9% of the width in the artwork and is held at a floor
-        # on a phone, where 11.9% would be 43px and eighteen traces cannot
-        # resolve in that. Both are legitimate; a cluster back at 20vw is not.
-        r.check(f"{width}px — the corner cluster is not oversized",
-                10.0 <= d["cornerPctW"] <= 22.0,
-                f"a cluster is {d['cornerPctW']}% of the banner's width; the "
-                "artwork composes it at 11.9%, and the phone floor takes it to "
-                "about 21% at 360px")
+        # AND THE GRID'S OWN PROMISE, WHICH IS WHAT MAKES THE GAPS EQUAL
+        # The rows are 1fr, so a band and a cluster are each (banner - gap) / 2
+        # tall. If that ever stopped being true the vertical channels would stop
+        # matching the horizontal ones and hero_gaps would fail somewhere far
+        # from the cause; this says it where it happens.
+        # ABOVE 1280px THE CLUSTER IS DELIBERATELY TALLER THAN ITS ROW
+        # Sizing it by the row is what makes all four channels equal, and on a
+        # wide banner it also makes the cluster tiny -- 2.5% of the width at
+        # 3840 against the artwork's 11.15%. So above 1280 it is sized by the
+        # viewport and reaches past its row, which closes the channel down each
+        # edge and leaves the other three untouched. Both halves are asserted
+        # here so neither can drift silently.
+        if width < 1280:
+            r.check(f"{at} — the band and the cluster are the same height",
+                    abs(d["bandH"] - d["cornerH"]) <= 2,
+                    f"band {d['bandH']}px against cluster {d['cornerH']}px; "
+                    "below 1280px the row sizes both")
+        else:
+            r.check(f"{at} — the cluster reaches past its row",
+                    d["cornerH"] > d["bandH"] + 8,
+                    f"cluster {d['cornerH']}px against band {d['bandH']}px; "
+                    "above 1280px it is sized by the viewport so the corners do "
+                    "not shrink to specks on a wide screen")
+            # And not so far that the two on one edge meet. A cluster is very
+            # nearly square and the banner is about 332px tall at every desktop
+            # width, so twice its height has to leave something.
+            r.check(f"{at} — and not so far that they collide",
+                    2 * d["cornerH"] < d["heroH"] - 10,
+                    f"two clusters are {2 * d['cornerH']}px against a "
+                    f"{d['heroH']}px banner")
 
-        # The band must also still have room to draw 52 traces in.
-        r.check(f"{width}px — the band has room to be a band",
-                d["bandPctW"] >= 55.0,
+        # The band still has to be a band. The share it takes varies a great
+        # deal now -- 46% of a 440px banner against 88% of a 3840px one --
+        # because the clusters are sized by the banner's HEIGHT and the band
+        # absorbs whatever width is left. That is the composition following the
+        # gap rule rather than a proportion of its own.
+        r.check(f"{at} — the band has room to be a band",
+                d["bandPctW"] >= 22.0,
                 f"the band is {d['bandPctW']}% of the banner's width; below "
-                "about 55% its traces land under four pixels apart")
+                "about a fifth it stops reading as a band at all")
 
-        # AND IT HAS TO STOP, WHICH IS THE OTHER HALF AND WAS MISSED
-        # The band ran the full width underneath the clusters before this
-        # artwork, and with clusters at their drawn size that reads as one
-        # undifferentiated field rather than as corners and a band. Asserting
-        # only the lower bound above let a band restored to full width pass
-        # every check in this section -- which is exactly what it did, until
-        # this was added. Below about 605px the inset closes on purpose,
-        # because the cluster is held at a floor there and the band would
-        # otherwise have nothing left, so the gap is only required where the
-        # artwork's own composition governs.
-        if width >= 768:
-            r.check(f"{width}px — the band stops short of the clusters",
-                    d["gapPct"] > 0 and d["bandPctW"] <= 75.0,
-                    f"the band is {d['bandPctW']}% of the width with a "
-                    f"{d['gapPct']}% gap before the cluster; the artwork "
-                    "composes it at 65.9% with a 5.9% gap, and a band running "
-                    "the full width under the clusters is the arrangement this "
-                    "artwork replaced")
-
-        for part, pen in (("band", d["bandPen"]), ("corner", d["cornerPen"])):
-            r.check(f"{width}px — the {part}'s pen lands between one and two "
-                    "device pixels",
-                    0.8 <= pen <= 2.4,
-                    f"a {part} line renders at {pen}px: under one and it is "
-                    "haze, over two and it is a fence in front of the title")
+        # THE ONE FIGURE THAT HOLDS AT EVERY SIZE
+        # An SVG stroke scales with its drawing, and a line under a device pixel
+        # does not disappear -- it turns to haze. The stylesheet answers that
+        # with a ladder of pens that widen as the drawing shrinks, so this has
+        # to be checked at both ends: growing the cluster without bringing that
+        # ladder back down rendered the corner at 2.46px on a phone held
+        # sideways, which is the other failure mode -- a fence, not a haze.
+        r.check(f"{at} — the corner's pen lands between one and two "
+                "device pixels",
+                0.8 <= d["cornerPen"] <= 2.4,
+                f"a corner line renders at {d['cornerPen']}px: under one and it "
+                "is haze, over two and it is a fence in front of the title")
 
     # WITH SCRIPTING, THE CANVAS IS THE ONE THAT MOVES
     # circuit.js paints a charge on every one of the 216 drawn traces and then
@@ -1579,12 +1686,27 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
 
     # A still canvas is a canvas that has stopped, and it would pass everything
     # above. Two reads a moment apart is the only way to tell.
+    #
+    # THE SECOND READ MUST BE THE SAME VIEWPORT AS THE FIRST
+    # The probe caches on width AND height now, so asking for a different size
+    # here reloads the frame and answers {loading: true} -- canvasInk 0, which
+    # differs from `first` and passes this check for the worst possible reason:
+    # a blank canvas reading as a moving one. It is spelt out because the bug
+    # is invisible, the check goes green, and the thing it exists to catch is
+    # precisely a canvas that has stopped.
     first = d["canvasInk"]
     time.sleep(0.6)
-    again = b.js(CIRCUIT_PROBE, [390, origin + "/pages/about/"])
+    again = {"loading": True}
+    for _ in range(20):
+        again = b.js(CIRCUIT_PROBE, [last_w, origin + "/pages/about/", last_h])
+        if not again.get("loading"):
+            break
+        time.sleep(0.25)
     r.check("and the charges on it are moving",
-            again.get("canvasInk", 0) != first,
-            f"the same {first} lit samples on two reads 0.6s apart")
+            not again.get("loading") and again.get("canvasInk", 0) != first,
+            f"the same {first} lit samples on two reads 0.6s apart"
+            if not again.get("loading") else
+            "the second read never finished loading, so nothing was compared")
 
     # Constraint that check_focus only catches second-hand, one page at a time.
     r.check("the circuit cannot be clicked or hovered",
@@ -1601,6 +1723,191 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
             f"{d['marked']} marked elements inside .page-hero")
     r.check("the page title is fully opaque with the circuit behind it",
             d["titleOpacity"] == "1", f"title opacity is {d['titleOpacity']}")
+
+
+def hero_gaps(b: Browser, origin: str, r: Results) -> None:
+    """
+    Are all four channels through the banner the same width — in ink, not in
+    boxes — at every screen size?
+
+    THE FOUR GAPS
+        A  left cluster -> band          B  band -> right cluster
+        C  top band -> bottom band       D  top cluster -> bottom cluster
+
+    They were four numbers arrived at four different ways: the horizontal pair
+    from a share of the WIDTH and the vertical pair from the band's own height,
+    so they only ever agreed by accident at one aspect ratio. The artwork's own
+    two horizontal gaps are not even equal to each other (5.60% against 4.80%).
+    A grid states the gap once and all four follow.
+
+    MEASURED IN PIXELS, BECAUSE BOXES CANNOT SEE THIS
+    Half of the work is the grid, which moves the boxes, and the other half is a
+    mask that stops the cluster's ink before its inner edge -- the diagonal fade
+    alone only thins it to about a third, so a channel that is geometrically
+    there reads as filled in. That mask sits behind @supports; if the guard ever
+    stopped matching, every box in this file would still be exactly where it
+    belongs and the banner would look wrong. Only a photograph catches that.
+
+    Asserting the arithmetic would be worse than useless -- it would restate
+    this file's own idea of the rule and could only ever agree with itself.
+    """
+    print("\nthe four channels through the banner")
+    try:
+        from PIL import Image
+    except ImportError:
+        print("    Pillow is not installed — nothing was measured.")
+        return
+
+    # 500px is the narrowest window Firefox will make (ADR 0015).
+    for width, height in ((500, 820), (834, 900), (1440, 900), (1920, 900)):
+        rq("POST", b.s + "/window/rect",
+           {"width": width, "height": height, "x": 0, "y": 0})
+        b.go(origin + "/pages/about/")
+        time.sleep(1.4)
+        found = rq("POST", b.s + "/elements",
+                   {"using": "css selector", "value": ".page-hero"})["value"]
+        if not found:
+            r.check(f"{width}px — the banner is there to photograph", False, "no .page-hero")
+            continue
+        shot = ROOT / "tools" / "_hero-gaps.png"
+        shot.write_bytes(base64.b64decode(
+            rq("GET", f"{b.s}/element/{found[0][W3C]}/screenshot")["value"]))
+        try:
+            with Image.open(shot) as im:
+                im = im.convert("RGB")
+                w, h = im.size
+                px = im.load()
+                # THE BACKGROUND IS THE COMMONEST COLOUR, NOT A SAMPLED POINT.
+                # Sampling the middle of the banner picked up the TITLE at any
+                # width where it reaches the centre, which made the background
+                # "dark grey" and every actual pixel read as ink -- one
+                # unbroken mass, no channels found, at three widths out of
+                # four. The mode cannot be fooled that way: most of a banner is
+                # empty.
+                small = im.resize((min(w, 400), min(h, 200)))
+                base = max(small.getcolors(400 * 200), key=lambda c: c[0])[1]
+
+                def inked(x, y):
+                    p = px[x, y]
+                    return (abs(p[0] - base[0]) + abs(p[1] - base[1])
+                            + abs(p[2] - base[2])) > 24
+
+                # A and B: scan the strip ACROSS the top, above the title.
+                top, bot = int(h * 0.03), int(h * 0.22)
+                cols = [any(inked(x, y) for y in range(top, bot)) for x in range(w)]
+                # D: a vertical strip at the very edge, where only clusters draw.
+                rows_edge = [any(inked(x, y) for x in range(0, max(3, int(w * 0.03))))
+                             for y in range(h)]
+        finally:
+            shot.unlink(missing_ok=True)
+
+        def runs(flags, merge):
+            rs, cur = [], None
+            for i, m in enumerate(flags):
+                if m and cur is None:
+                    cur = i
+                if not m and cur is not None:
+                    rs.append([cur, i - 1]); cur = None
+            if cur is not None:
+                rs.append([cur, len(flags) - 1])
+            out = []
+            for x in rs:
+                if out and x[0] - out[-1][1] <= merge:
+                    out[-1][1] = x[1]
+                else:
+                    out.append(x)
+            return [x for x in out if x[1] - x[0] > 2]
+
+        def edge_gap(rs):
+            """The space between the FIRST mass and the LAST one.
+
+            For a vertical scan those two are always the bands, or the two
+            clusters, because they are the only things that reach the banner's
+            top and bottom edges. Anything between them is the title, and
+            anything between them is inside the channel being measured.
+            """
+            if len(rs) < 2:
+                return None
+            return rs[-1][0] - rs[0][1] - 1
+
+        def measure_c(lo, hi):
+            keep = [x for x in range(b0, b1 + 1, 3)
+                    if not any(inked(x, y) for y in range(lo, hi, 2))]
+            if not keep:
+                return []
+            rows = [any(inked(x, y) for x in keep) for y in range(h)]
+            return runs(rows, 4)
+
+        masses = runs(cols, max(4, int(w * 0.02)))
+        gapsH = [masses[i + 1][0] - masses[i][1] - 1 for i in range(len(masses) - 1)]
+        if len(masses) < 3:
+            print(f"      masses across the top: "
+                  f"{[[m[0], m[1]] for m in masses]} (wanted three)")
+
+        gapC = None
+        if len(masses) >= 3:
+            b0, b1 = masses[1]
+            # Pass one: a window too narrow to overlap a band whatever shape
+            # the banner takes, which is enough to find where the bands are.
+            v1 = measure_c(int(h * 0.46), int(h * 0.54))
+            gapC = edge_gap(v1)
+            if len(v1) >= 2:
+                # Pass two: filter on everything between the two bands, not on
+                # the widest gap. The title's glyphs occupy DIFFERENT rows in
+                # different columns -- ascenders in one, a subtitle baseline in
+                # another -- so a narrow window never removes them all, and C
+                # read 55px where the channel was 115. The first and last
+                # masses are always the bands themselves, because those are the
+                # only things that touch the banner's top and bottom edges.
+                second = edge_gap(measure_c(v1[0][1] + 1, v1[-1][0]))
+                if second is not None:
+                    gapC = second
+
+        vedge = runs(rows_edge, 4)
+        gapD = edge_gap(vedge)
+
+        if len(masses) < 3:
+            print(f"      masses across the top: "
+                  f"{[[m[0], m[1]] for m in masses]} (wanted three)")
+        got = {"A": gapsH[0] if len(gapsH) >= 1 else None,
+               "B": gapsH[-1] if len(gapsH) >= 2 else None,
+               "C": gapC, "D": gapD}
+        print(f"    {width:>4}px  " + "  ".join(
+            f"{k}={'--' if v is None else v}" for k, v in got.items()))
+
+        have = [v for v in got.values() if v is not None]
+        r.check(f"{width}px — all four channels are found",
+                len(have) == 4,
+                f"only found {got}; a channel that cannot be seen is the fault "
+                "this measures")
+        if len(have) != 4:
+            continue
+
+        # ABOVE 1280px, D IS DELIBERATELY NOT ONE OF THEM
+        # The clusters are sized by the viewport there rather than by their row,
+        # so they reach past it and close the channel down each edge. That is a
+        # trade taken on purpose: a row-sized cluster is 2.5% of the width at
+        # 3840 against the artwork's 11.15%, and the corners read as specks.
+        # A, B and C are untouched -- the grid's column gap and the space
+        # between two bands that still fill their rows.
+        wide = width >= 1280
+        same = [got["A"], got["B"], got["C"]] if wide else have
+        # Antialiasing, a sparse outermost trace and the band's own fade put a
+        # few pixels either way; a real mismatch is tens.
+        spread = max(same) - min(same)
+        r.check(f"{width}px — {'the side and middle channels' if wide else 'all four channels'} "
+                "are the same width",
+                spread <= max(10, 0.22 * max(same)),
+                f"A={got['A']} B={got['B']} C={got['C']} D={got['D']} — "
+                f"{spread}px between the widest and the narrowest")
+        if wide:
+            # It still has to BE a channel. If the clusters ever met, the edges
+            # would read as two solid columns rather than four corner fans.
+            r.check(f"{width}px — and the channel down each edge is still open",
+                    got["D"] is not None and got["D"] >= 12,
+                    f"D={got['D']}px; the top and bottom clusters are meeting")
+
+    rq("POST", b.s + "/window/rect", {"width": 1440, "height": 900, "x": 0, "y": 0})
 
 
 def hero_frame_budget(b: Browser, origin: str, r: Results) -> None:
@@ -1866,6 +2173,53 @@ def scripting_off(drv_port: int, origin: str, r: Results) -> None:
                 "a canvas exists with scripting disabled, which is impossible "
                 "unless it is in the markup rather than built by the module")
 
+        # AND THE SAME PAGE NARROW, WHERE THE DRAWING IS SMALLEST
+        # Everything above is read at 1440px. A narrow banner is where the
+        # composition is most strained -- the grid is fitting a 2.95:1 drawing
+        # into something near square -- so it is where "works without
+        # JavaScript" could quietly stop being true. circuit.js skips a
+        # zero-sized layer by itself, so the scripted page looks right either
+        # way and the fallback is the half that can rot unseen.
+        #
+        # 520px: Firefox refuses a window below about 500px (ADR 0015) and there
+        # is no script engine here to build an iframe in.
+        rq("POST", b.s + "/window/rect",
+           {"width": 520, "height": 760, "x": 0, "y": 0})
+        b.go(origin + "/pages/about/")
+
+        def one(sel):
+            found = rq("POST", b.s + "/elements",
+                       {"using": "css selector", "value": sel})["value"]
+            return found[0][W3C] if found else None
+
+        # THE WHOLE COMPOSITION, NOT A REDUCED ONE.
+        # For one release the bands stood down below 768px and this asserted
+        # that. They are back on every device, because the band tiles at a
+        # constant scale now instead of being squashed, so what has to be true
+        # here is the opposite: all six layers drawn, narrow and unscripted.
+        bands = [one(f".hero-circuit__layer--band-{e}") for e in ("top", "bottom")]
+        r.check("narrow and unscripted, both bands are still drawn",
+                all(i and css(i, "display") != "none" for i in bands),
+                "a band is missing under 768px with scripting off")
+
+        corner_charges = [e[W3C] for e in rq(
+            "POST", b.s + "/elements",
+            {"using": "css selector",
+             "value": ".hero-circuit__layer--corner-tl .hero-circuit__charge, "
+                      ".hero-circuit__layer--corner-tr .hero-circuit__charge, "
+                      ".hero-circuit__layer--corner-bl .hero-circuit__charge, "
+                      ".hero-circuit__layer--corner-br .hero-circuit__charge"})["value"]]
+        alive = [i for i in corner_charges
+                 if css(i, "display") != "none"
+                 and css(i, "animation-name") == "hero-charge"]
+        r.check("and the four clusters are still a live drawing on their own",
+                len(alive) == len(corner_charges) == 12,
+                f"{len(alive)} of {len(corner_charges)} cluster charges are "
+                "drawn and animated; the clusters are all a visitor has here")
+
+        rq("POST", b.s + "/window/rect",
+           {"width": 1440, "height": 900, "x": 0, "y": 0})
+
         for path in ("/", "/pages/about/", "/pages/services/"):
             b.go(origin + path)
             ids = [e[W3C] for e in rq(
@@ -1930,6 +2284,7 @@ def main() -> None:
         typed_terminal(browser, origin, results)
         hero_mesh(browser, origin, results)
         hero_circuit(browser, origin, results)
+        hero_gaps(browser, origin, results)
         sliders(browser, origin, results)
         counters(browser, origin, results)
         alternating_rows(browser, origin, results)

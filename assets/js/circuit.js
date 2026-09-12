@@ -44,10 +44,35 @@
      finer than the elbows buys nothing and costs a lineTo per point per frame
      for as long as the page is open. */
   var SAMPLE = 12;
-  /* This is decoration behind a title, drawn in thin strokes of a single
-     colour. Rasterising it at two or three device pixels per CSS pixel buys
-     nothing anybody can see here and costs in direct proportion. */
-  var MAX_DPR = 1;
+  /* THE CANVAS DRAWS AT THE SCREEN'S RESOLUTION, AND IT DID NOT USED TO
+     This was 1, on the reasoning that thin strokes of a single colour behind a
+     title cannot show the difference and cost in direct proportion. That was
+     decided at a desk, where the choice is between one device pixel and two.
+     On a phone it is between one and three, and the layer it applies to is the
+     brightest thing in the banner -- the charges, in the accent colour, moving,
+     over traces that are SVG and therefore always drawn at the full resolution
+     of the screen. The result was a sharp drawing with a soft glow crawling
+     over it, and it was reported from a phone as the whole banner looking
+     pixelated. It was the only part of it that was.
+
+     So: the device's own ratio, capped at 3 because nothing above that is a
+     real screen. Every width set after the transform below -- ctx.lineWidth,
+     CHARGE_MIN/MAX, the dot radii -- is in CSS pixels, so this sharpens the
+     layer and changes no weight.
+
+     It is not free: fill rate goes with the square of the ratio, so a 2x
+     desktop is four times the pixels of this at 1x. Measured at 182ms of
+     main-thread task time per second against 139 before, on /pages/about/ at
+     2x -- the realistic worst case, since a desktop is 1x or 2x and never 3x.
+     At 1x it is 137 against 135, which is to say nothing at all, and on a
+     phone 208 against 195, because the bands standing down there pay for most
+     of the extra resolution.
+
+     NOT measured with tools/check_style_budget.py, which cannot see it:
+     that reads RecalcStyleDuration + LayoutDuration, and rasterising a canvas
+     is neither, so it reports the same figure whatever this is set to. The
+     table and the method are in docs/10-development/frontend/motion.md. */
+  var MAX_DPR = 3;
   /* And it does not need sixty frames a second. A charge crossing a trace over
      four seconds is not made smoother by drawing it twice as often; halving
      the rate halves the cost of the whole layer, which is the difference
@@ -78,9 +103,21 @@
   /* Which way each layer is turned. The SVG mirrors are done in CSS, and the
      canvas has to arrive at the same picture, so they are stated once here
      rather than read back out of a computed transform. */
+  /* ONE TILE OF THE BAND, AND HOW MANY OF THEM
+     Must match BAND_VIEW and BAND_TILES in tools/build_hero_circuit.py, which
+     emits the viewBox as the product. The band is "xMidYMid slice" over that,
+     so its HEIGHT decides the scale and its width never does: one constant
+     scale and one constant trace pitch at every viewport and every zoom. It was
+     "none" -- one copy stretched -- which agreed with itself at exactly one
+     viewport and distorted everywhere else. */
+  var BAND_TILE = 1440;
+  var BAND_TILES = 15;
+
   var LAYERS = {
-    "band-top": {view: [1440, 114], fit: "none", flipX: false, flipY: false},
-    "band-bottom": {view: [1440, 114], fit: "none", flipX: false, flipY: true},
+    "band-top": {view: [BAND_TILE * BAND_TILES, 114], fit: "slice", tile: BAND_TILE,
+                 flipX: false, flipY: false},
+    "band-bottom": {view: [BAND_TILE * BAND_TILES, 114], fit: "slice", tile: BAND_TILE,
+                    flipX: false, flipY: true},
     "corner-tl": {view: [200, 215], fit: "meet", flipX: false, flipY: false},
     "corner-tr": {view: [200, 215], fit: "meet", flipX: true, flipY: false},
     "corner-bl": {view: [200, 215], fit: "meet", flipX: false, flipY: true},
@@ -119,6 +156,20 @@
       last = p;
     }
     return {pts: pts, run: run, total: run[run.length - 1] || total};
+  }
+
+  /* How far a node's own group has been translated along x, in viewBox units.
+     The generator writes translate(N,0) and nothing else on these groups, so
+     this reads that and answers 0 for anything it does not recognise. */
+  function groupShift(el) {
+    var node = el.parentNode, shift = 0, m;
+    while (node && node.getAttribute) {
+      m = /translate\(\s*(-?[\d.]+)/.exec(node.getAttribute("transform") || "");
+      if (m) { shift += parseFloat(m[1]) || 0; }
+      if (node.tagName && node.tagName.toLowerCase() === "svg") { break; }
+      node = node.parentNode;
+    }
+    return shift;
   }
 
   function Circuit(root, still) {
@@ -165,14 +216,17 @@
     if (name.indexOf("band") === 0) {
       var down = spec.flipY ? (lb.height - ly) : ly;
       var t = down / lb.height;
-      return t <= 0.72 ? 1 : Math.max(0, 1 - (t - 0.72) / 0.28);
+      /* Matches the band's mask in layout.css, which begins at 94% now that the
+         grid's channel keeps the title clear rather than the fade doing it. */
+      return t <= 0.94 ? 1 : Math.max(0, 1 - (t - 0.94) / 0.06);
     }
     var cx = spec.flipX ? lb.width : 0;
     var cy = spec.flipY ? lb.height : 0;
     var r = Math.max(lb.width, lb.height) * 1.3;
     var d = Math.sqrt((lx - cx) * (lx - cx) + (ly - cy) * (ly - cy)) / r;
-    if (d <= 0.4) { return 1; }
-    return Math.max(0, 1 - (d - 0.4) / 0.56);
+    var fade = d <= 0.4 ? 1 : Math.max(0, 1 - (d - 0.4) / 0.56);
+
+    return fade;
   };
 
   Circuit.prototype.measure = function () {
@@ -203,11 +257,30 @@
       if (spec.fit === "none") {
         sx = lb.width / vw;
         sy = lb.height / vh;
+      } else if (spec.fit === "slice") {
+        /* slice covers the box and crops; meet fits inside it. Both scale
+           uniformly -- which is the whole reason one is used here -- so the
+           only difference between them is max against min. */
+        sx = sy = Math.max(lb.width / vw, lb.height / vh);
       } else {
         sx = sy = Math.min(lb.width / vw, lb.height / vh);
       }
       ox = lb.left - box.left;
       oy = lb.top - box.top;
+      /* THE BAND IS CENTRED AND THE CORNERS ARE NOT, WHICH IS NOT A DETAIL
+         The band is xMidYMid slice: whatever the scale leaves over, half goes
+         each side. That overflow is NEGATIVE here -- the drawing is wider than
+         the box and the box shows the middle of it.
+
+         The corners are xMinYMin meet, pinned to the corner they grow out of,
+         so they take no offset at all. Centring them would slide all four
+         inward by half their slack and quietly unpin the fan. The two
+         preserveAspectRatio values in the template are the authority; this must
+         not become one branch serving both. */
+      if (spec.fit === "slice") {
+        ox += (lb.width - vw * sx) / 2;
+        oy += (lb.height - vh * sy) / 2;
+      }
 
       var band = name.indexOf("band") === 0;
       var set = self.geometry[band ? "b" : "c"] || [];
@@ -218,14 +291,33 @@
       var pen = wires
         ? parseFloat(global.getComputedStyle(wires).strokeWidth) || 2
         : 2;
+      /* Where the stylesheet ends this layer's ink, as a fraction of its width
+         in from its own outer edge. 1 means "not at all", which is what the
+         bands declare by saying nothing. */
+      /* THE LAYER'S OWN BOX, BECAUSE THE CANVAS IS NOT CLIPPED AND THE SVG IS
+         The band is "slice": its drawing is WIDER than its box and the <svg>
+         element crops the overflow. This canvas sits across the whole banner
+         and crops nothing, so without this it paints band charges straight
+         through the channels either side of the band -- moving ink in the gaps
+         the composition exists to keep empty. Measured before it was added:
+         a 115px channel came back as 40px of clear pixels, and at 1920px the
+         banner scanned as one unbroken mass.
+
+         It was not a problem while the band was "none", because the drawing
+         then exactly filled its box and there was nothing to overflow. */
+      var clipBox = [lb.left - box.left, lb.top - box.top, lb.width, lb.height];
       var lit = pen * Math.min(sx, sy) * CHARGE_OVER_WIRE;
       lit = Math.max(CHARGE_MIN, Math.min(CHARGE_MAX, lit));
       lit = Math.round(lit * 4) / 4;
 
-      function place(s, mirrorInView) {
+      function place(s, mirrorInView, tileAt) {
         var pts = new Float32Array(s.pts.length), i, x, y;
+        var span = spec.tile || vw;
         for (i = 0; i < s.pts.length; i += 2) {
-          x = mirrorInView ? (vw - s.pts[i]) : s.pts[i];
+          /* The mirror is taken about the TILE, not the viewBox: every tile is
+             a half plus its own reflection, which is what makes the joins
+             seamless and keeps the viewBox's centre line a mirror axis. */
+          x = (mirrorInView ? (span - s.pts[i]) : s.pts[i]) + (tileAt || 0);
           y = s.pts[i + 1];
           x = spec.flipX ? (lb.width - x * sx) : x * sx;
           y = spec.flipY ? (lb.height - y * sy) : y * sy;
@@ -246,6 +338,7 @@
         self.traces.push({
           alpha: Math.round(fade * BUCKETS) / BUCKETS,
           width: lit,
+          clip: clipBox,
           pts: pts,
           run: s.run,
           total: s.total,
@@ -259,8 +352,31 @@
         });
       }
 
-      set.forEach(function (s) { place(s, false); });
-      if (band) { set.forEach(function (s) { place(s, true); }); }
+      if (!band) {
+        set.forEach(function (s) { place(s, false, 0); });
+      } else {
+        /* ONLY THE TILES THAT ARE ON SCREEN, WHICH IS NOT AN OPTIMISATION
+           The band's viewBox is fifteen tiles wide and a 1440px desktop shows
+           about six per cent of it. Placing all fifteen would sample and then
+           iterate roughly twelve hundred polylines every frame in place of the
+           hundred and seventy-six this layer is budgeted for, nearly all of
+           them off the canvas entirely. The visible range is arithmetic, so it
+           is worked out rather than drawn and thrown away.
+
+           A tile of margin each side, because a trace is placed by its points
+           and a stroke reaches half a pen width past them. */
+        var tileW = (spec.tile || vw) * sx;
+        var from = Math.floor(-ox / tileW) - 1;
+        var to = Math.ceil((lb.width - ox) / tileW) + 1;
+        if (from < 0) { from = 0; }
+        if (to > BAND_TILES) { to = BAND_TILES; }
+        for (var t = from; t < to; t += 1) {
+          (function (at) {
+            set.forEach(function (s) { place(s, false, at); });
+            set.forEach(function (s) { place(s, true, at); });
+          })(t * (spec.tile || vw));
+        }
+      }
 
       /* The junction dots come across as well. Left in the SVG they are the
          only thing still animating there, which keeps the whole document
@@ -269,7 +385,15 @@
          them here, nothing in the band animates except this one element. */
       Array.prototype.forEach.call(
         layer.querySelectorAll(".hero-circuit__node"), function (dot) {
-          var x = parseFloat(dot.getAttribute("cx"));
+          /* READ THE GROUP'S OWN OFFSET; DO NOT TAKE cx AT FACE VALUE
+             The band's nodes are emitted once and carried onto the centre tile
+             by a translate on the group around them, because tiling animated
+             elements is the shape that cost a CPU core in 2026-09. Their cx is
+             a TILE coordinate and the group says which tile. Ignoring it drops
+             every band node ten thousand units to the left of the drawing, off
+             the canvas, in silence -- there would simply be no pulsing dots,
+             and nothing measures where a dot is. */
+          var x = parseFloat(dot.getAttribute("cx")) + groupShift(dot);
           var y = parseFloat(dot.getAttribute("cy"));
           var px = spec.flipX ? (lb.width - x * sx) : x * sx;
           var py = spec.flipY ? (lb.height - y * sy) : y * sy;
@@ -279,7 +403,7 @@
           if (fade < 0.06) { return; }
           seed += 1;
           self.dots.push({
-            x: px, y: py,
+            x: px, y: py, clip: clipBox,
             r: parseFloat(dot.getAttribute("r") || 3.6) * sy,
             alpha: fade,
             seconds: 7 + (seed % 9) * 4,
@@ -300,11 +424,16 @@
     var by = {}, i, t, key;
     for (i = 0; i < this.traces.length; i += 1) {
       t = this.traces[i];
-      key = t.alpha + "@" + t.width;
-      if (!by[key]) { by[key] = {alpha: t.alpha, width: t.width, traces: []}; }
+      /* The clip comes first in the key so that one save/clip/restore covers
+         every bucket of a layer: six clips a frame rather than one per bucket
+         per layer. */
+      key = t.clip.join(",") + "|" + t.alpha + "@" + t.width;
+      if (!by[key]) {
+        by[key] = {alpha: t.alpha, width: t.width, clip: t.clip, traces: []};
+      }
       by[key].traces.push(t);
     }
-    this.groups = Object.keys(by).map(function (k) { return by[k]; });
+    this.groups = Object.keys(by).sort().map(function (k) { return by[k]; });
   };
 
   /* The ink follows the theme, so it is read from the stylesheet rather than
@@ -330,9 +459,25 @@
     ctx.lineJoin = "miter";
     ctx.strokeStyle = this.ink;
 
+    /* EACH LAYER IS CLIPPED TO ITS OWN BOX, AS THE <svg> BESIDE IT IS
+       Groups are keyed with the clip first and the list is sorted, so every
+       bucket of a layer arrives together and one save/clip/restore serves all
+       of them -- six clips a frame, not one per bucket. Without it the band's
+       overflow, which "slice" deliberately creates, is painted across the
+       channels the composition exists to keep empty. */
+    var clip = null;
     for (g = 0; g < groups.length; g += 1) {
       list = groups[g].traces;
       if (!list.length) { continue; }
+      if (!clip || clip !== groups[g].clip.join(",")) {
+        if (clip) { ctx.restore(); }
+        clip = groups[g].clip.join(",");
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(groups[g].clip[0], groups[g].clip[1],
+                 groups[g].clip[2], groups[g].clip[3]);
+        ctx.clip();
+      }
       ctx.globalAlpha = groups[g].alpha;
       ctx.lineWidth = groups[g].width;
       ctx.beginPath();
@@ -349,6 +494,7 @@
       }
       ctx.stroke();
     }
+    if (clip) { ctx.restore(); }
 
     /* The junctions: one fill for all of them, breathing on their own cycles.
        opacity and radius both move, as the CSS keyframes did. */
@@ -356,6 +502,10 @@
     ctx.fillStyle = this.ink;
     for (i = 0; i < dots.length; i += 1) {
       d = dots[i];
+      /* A dot is a single small circle, so its own box is cheaper to test than
+         a clip would be. */
+      if (d.x < d.clip[0] || d.x > d.clip[0] + d.clip[2] ||
+          d.y < d.clip[1] || d.y > d.clip[1] + d.clip[3]) { continue; }
       pulse = 0.5 + 0.5 * Math.sin(
         ((seconds / d.seconds + d.offset) % 1) * Math.PI * 2);
       ctx.globalAlpha = d.alpha * (0.16 + 0.34 * pulse);
@@ -450,10 +600,34 @@
       this.start();
     }
 
-    global.addEventListener("resize", this.onResize);
-    this.watchers.push(function () {
-      global.removeEventListener("resize", self.onResize);
-    });
+    /* THE ELEMENT IS WATCHED, NOT THE WINDOW, AND ROTATION IS WHY
+       This was a resize listener, which is enough for a dragged desktop window
+       and not enough for a phone being turned over: on mobile the resize can
+       arrive before layout has settled, so measure() reads the box the banner
+       had in the OLD orientation and every trace position, every scale and the
+       canvas backing store are computed from it. One stale read is the whole
+       layer wrong, and it stays wrong until something else moves.
+
+       A ResizeObserver fires when .hero-circuit's own box changes, after
+       layout, which is exactly the question measure() asks. It also covers two
+       things the listener never did: the reflow when a mobile address bar
+       collapses, and the reflow when the webfont lands and the title rewraps
+       to a different number of lines. Both change the banner's height without
+       changing the window's.
+
+       The listener stays as the fallback. Nothing in this file needs a
+       polyfill; a browser without ResizeObserver still gets the old
+       behaviour rather than none. */
+    if (global.ResizeObserver) {
+      var ro = new global.ResizeObserver(this.onResize);
+      ro.observe(this.root);
+      this.watchers.push(function () { ro.disconnect(); });
+    } else {
+      global.addEventListener("resize", this.onResize);
+      this.watchers.push(function () {
+        global.removeEventListener("resize", self.onResize);
+      });
+    }
     doc.addEventListener("visibilitychange", this.onVisibility);
     this.watchers.push(function () {
       doc.removeEventListener("visibilitychange", self.onVisibility);
