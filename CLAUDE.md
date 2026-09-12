@@ -222,7 +222,10 @@ repository in front: `tech4time-website-backend/lib/auth.php`. `check_docs.py` e
 
 ## Status
 
-Work happens on `dev`; pull requests to `main` need explicit approval.
+Work happens on `dev`; pull requests to `main` need explicit approval, are merged with **Create a
+merge commit**, and are followed by merging `main` back into `dev` -- which fast-forwards, so the two
+branches end a release on the same commit instead of drifting one apart each time.
+[ci-cd.md](docs/20-deployment/ci-cd.md)
 
 **Live** at `https://tech4time.bd` — cPanel, LiteSpeed, PHP 8.2.33. **A push to `main` deploys it.**
 Checks run, rsync over SSH, and the site is asked afterwards whether `lib/`, `content/` and dotted
