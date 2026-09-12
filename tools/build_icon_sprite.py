@@ -57,6 +57,13 @@ EXTRA_NAMES = {
     # The admin's Settings rail row and its Overview tile. Resolved through the
     # FA6 alias index like every FA5 name here: cog -> gear.
     "cog",
+    # The show/hide switch the admin puts on every password field. "eye" was
+    # already here for the sections that preview a page; its struck-through
+    # counterpart was not, and a toggle needs both or it cannot say which
+    # state it is in. Nothing on the PUBLIC site draws it -- this sprite is
+    # byte-identical with the backend's, which is the whole reason EXTRA_NAMES
+    # exists.
+    "eye-slash",
 }
 
 # Icons whose style is not "solid" in the source markup.
