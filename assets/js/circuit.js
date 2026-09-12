@@ -103,21 +103,9 @@
   /* Which way each layer is turned. The SVG mirrors are done in CSS, and the
      canvas has to arrive at the same picture, so they are stated once here
      rather than read back out of a computed transform. */
-  /* HOW WIDE ONE TILE OF THE BAND IS, AND HOW MANY THERE ARE
-     Must match BAND_TILES in tools/build_hero_circuit.py, which emits the
-     viewBox as BAND_TILE * BAND_TILES. The band is "xMidYMid slice" over that,
-     so the HEIGHT decides the scale and the width never does: one constant
-     scale and one constant trace pitch at every viewport and every zoom. It
-     was "none" -- one copy stretched -- which agreed with itself at exactly
-     one viewport and distorted everywhere else. */
-  var BAND_TILE = 1440;
-  var BAND_TILES = 15;
-
   var LAYERS = {
-    "band-top": {view: [BAND_TILE * BAND_TILES, 114], fit: "slice", tile: BAND_TILE,
-                 flipX: false, flipY: false},
-    "band-bottom": {view: [BAND_TILE * BAND_TILES, 114], fit: "slice", tile: BAND_TILE,
-                    flipX: false, flipY: true},
+    "band-top": {view: [1440, 114], fit: "none", flipX: false, flipY: false},
+    "band-bottom": {view: [1440, 114], fit: "none", flipX: false, flipY: true},
     "corner-tl": {view: [200, 215], fit: "meet", flipX: false, flipY: false},
     "corner-tr": {view: [200, 215], fit: "meet", flipX: true, flipY: false},
     "corner-bl": {view: [200, 215], fit: "meet", flipX: false, flipY: true},
@@ -158,20 +146,6 @@
     return {pts: pts, run: run, total: run[run.length - 1] || total};
   }
 
-  /* How far a node's own group has been translated along x, in viewBox units.
-     The generator writes translate(N,0) and nothing else on these groups, so
-     this reads that and answers 0 for anything it does not recognise. */
-  function groupShift(el) {
-    var node = el.parentNode, shift = 0, m;
-    while (node && node.getAttribute) {
-      m = /translate\(\s*(-?[\d.]+)/.exec(node.getAttribute("transform") || "");
-      if (m) { shift += parseFloat(m[1]) || 0; }
-      if (node.tagName && node.tagName.toLowerCase() === "svg") { break; }
-      node = node.parentNode;
-    }
-    return shift;
-  }
-
   function Circuit(root, still) {
     this.root = root;
     this.still = !!still;
@@ -210,7 +184,7 @@
 
   /* The same fades the stylesheet puts on the layers, evaluated at a point:
      linear down the bands, radial away from each corner. */
-  Circuit.prototype.fadeAt = function (name, spec, lb, box, x, y, clear) {
+  Circuit.prototype.fadeAt = function (name, spec, lb, box, x, y) {
     var lx = x - (lb.left - box.left);
     var ly = y - (lb.top - box.top);
     if (name.indexOf("band") === 0) {
@@ -222,26 +196,8 @@
     var cy = spec.flipY ? lb.height : 0;
     var r = Math.max(lb.width, lb.height) * 1.3;
     var d = Math.sqrt((lx - cx) * (lx - cx) + (ly - cy) * (ly - cy)) / r;
-    var fade = d <= 0.4 ? 1 : Math.max(0, 1 - (d - 0.4) / 0.56);
-
-    /* AND THE COLUMN THE STYLESHEET CLEARS DOWN THE MIDDLE
-       On a phone the clusters are the whole drawing and they were crowding the
-       title, so layout.css intersects a second mask that stops the ink before
-       the inner edge. The canvas has to stop in the same place or the charges
-       go on running through a gap the traces have left -- moving ink with
-       nothing under it, which is the more conspicuous half.
-
-       Where it stops is READ from --hc-clear-from/to rather than written here
-       as well. Outside that media query they are 1 and this is a no-op, so the
-       breakpoint itself lives in exactly one file. */
-    if (clear && clear.to < 1) {
-      var inward = (spec.flipX ? (lb.width - lx) : lx) / lb.width;
-      if (inward >= clear.to) { return 0; }
-      if (inward > clear.from) {
-        fade *= 1 - (inward - clear.from) / (clear.to - clear.from);
-      }
-    }
-    return fade;
+    if (d <= 0.4) { return 1; }
+    return Math.max(0, 1 - (d - 0.4) / 0.56);
   };
 
   Circuit.prototype.measure = function () {
@@ -272,62 +228,29 @@
       if (spec.fit === "none") {
         sx = lb.width / vw;
         sy = lb.height / vh;
-      } else if (spec.fit === "slice") {
-        /* slice covers the box and crops; meet fits inside it. Both scale
-           uniformly -- that is the whole point of using one here -- so the
-           only difference is max against min. */
-        sx = sy = Math.max(lb.width / vw, lb.height / vh);
       } else {
         sx = sy = Math.min(lb.width / vw, lb.height / vh);
       }
       ox = lb.left - box.left;
       oy = lb.top - box.top;
-      /* THE BAND IS CENTRED AND THE CORNERS ARE NOT, WHICH IS NOT A DETAIL
-         The band is xMidYMid slice: whatever the scale leaves over, half goes
-         each side. That overflow is NEGATIVE here -- the drawing is wider than
-         the box, and the box shows the middle of it.
-
-         The corners are xMinYMin meet, pinned to their own corner, so they get
-         no offset at all. Centring them would slide all four inward by half
-         their slack and quietly unpin the fan from the corner it grows out of.
-         The two preserveAspectRatio values in the template are the authority;
-         this must not be turned into one branch for both. */
-      if (spec.fit === "slice") {
-        ox += (lb.width - vw * sx) / 2;
-        oy += (lb.height - vh * sy) / 2;
-      }
 
       var band = name.indexOf("band") === 0;
       var set = self.geometry[band ? "b" : "c"] || [];
 
-      /* A stroke is scaled with its drawing. Both layers are scaled uniformly
-         now -- the band tiles under "slice" rather than being stretched under
-         "none" -- so the two are equal and the min is which of them to believe
-         rather than a choice between them. It is kept as a min because nothing
-         here should quietly start depending on that. */
+      /* A stroke is scaled with its drawing, and a band is scaled unevenly --
+         so the weight that decides legibility is the smaller of the two. */
       var wires = layer.querySelector(".hero-circuit__wires");
-      var wireStyle = wires ? global.getComputedStyle(wires) : null;
-      var pen = wireStyle ? parseFloat(wireStyle.strokeWidth) || 2 : 2;
-      /* Where the stylesheet stops the ink across the layer, as a fraction of
-         its width out from its own outer edge. 1 means "not at all", which is
-         every case except a phone. */
-      var layerStyle = global.getComputedStyle(layer);
-      var clear = {
-        from: parseFloat(layerStyle.getPropertyValue("--hc-clear-from")) || 1,
-        to: parseFloat(layerStyle.getPropertyValue("--hc-clear-to")) || 1
-      };
+      var pen = wires
+        ? parseFloat(global.getComputedStyle(wires).strokeWidth) || 2
+        : 2;
       var lit = pen * Math.min(sx, sy) * CHARGE_OVER_WIRE;
       lit = Math.max(CHARGE_MIN, Math.min(CHARGE_MAX, lit));
       lit = Math.round(lit * 4) / 4;
 
-      function place(s, mirrorInView, tileAt) {
+      function place(s, mirrorInView) {
         var pts = new Float32Array(s.pts.length), i, x, y;
-        var span = spec.tile || vw;
         for (i = 0; i < s.pts.length; i += 2) {
-          /* The mirror is taken about the TILE, not the viewBox: every tile is
-             a half plus its own reflection, which is what makes the joins
-             seamless and keeps the viewBox's centre line a mirror axis. */
-          x = (mirrorInView ? (span - s.pts[i]) : s.pts[i]) + (tileAt || 0);
+          x = mirrorInView ? (vw - s.pts[i]) : s.pts[i];
           y = s.pts[i + 1];
           x = spec.flipX ? (lb.width - x * sx) : x * sx;
           y = spec.flipY ? (lb.height - y * sy) : y * sy;
@@ -343,7 +266,7 @@
            does not either: quantised into a few buckets, it costs one alpha
            change per bucket per frame instead. */
         var mid = Math.floor(pts.length / 4) * 2;
-        var fade = self.fadeAt(name, spec, lb, box, pts[mid], pts[mid + 1], clear);
+        var fade = self.fadeAt(name, spec, lb, box, pts[mid], pts[mid + 1]);
         if (fade < 0.06) { return; }
         self.traces.push({
           alpha: Math.round(fade * BUCKETS) / BUCKETS,
@@ -361,31 +284,8 @@
         });
       }
 
-      if (!band) {
-        set.forEach(function (s) { place(s, false, 0); });
-      } else {
-        /* ONLY THE TILES THAT ARE ON SCREEN, WHICH IS NOT AN OPTIMISATION
-           The band's viewBox is fifteen tiles wide and a 1440px desktop shows
-           about six per cent of it. Placing all fifteen would sample and then
-           iterate roughly twelve hundred polylines every frame in place of the
-           hundred and seventy-six this layer is budgeted for, nearly all of
-           them off the canvas entirely. The visible range is arithmetic, so it
-           is worked out rather than drawn and discarded.
-
-           One tile of margin each side, because a trace is placed by its
-           points and a stroke reaches half a pen width past them. */
-        var tileW = (spec.tile || vw) * sx;
-        var from = Math.floor(-ox / tileW) - 1;
-        var to = Math.ceil((lb.width - ox) / tileW) + 1;
-        if (from < 0) { from = 0; }
-        if (to > BAND_TILES) { to = BAND_TILES; }
-        for (var t = from; t < to; t += 1) {
-          (function (at) {
-            set.forEach(function (s) { place(s, false, at); });
-            set.forEach(function (s) { place(s, true, at); });
-          })(t * (spec.tile || vw));
-        }
-      }
+      set.forEach(function (s) { place(s, false); });
+      if (band) { set.forEach(function (s) { place(s, true); }); }
 
       /* The junction dots come across as well. Left in the SVG they are the
          only thing still animating there, which keeps the whole document
@@ -394,24 +294,13 @@
          them here, nothing in the band animates except this one element. */
       Array.prototype.forEach.call(
         layer.querySelectorAll(".hero-circuit__node"), function (dot) {
-          /* READ THE GROUP'S OWN OFFSET; DO NOT ASSUME THE DOT IS AT ITS cx
-             The band's nodes are emitted once and carried onto the centre tile
-             by a translate on the group around them, because tiling animated
-             elements is the shape that cost a CPU core in 2026-09. Their cx is
-             therefore a TILE coordinate and the group says which tile. Taking
-             cx at face value drops every band node ten thousand units to the
-             left of the drawing, off the canvas, silently -- there would just
-             be no pulsing dots, and nothing measures a dot's position.
-
-             Read from the template rather than recomputing the centre tile
-             here, so the offset has one source and not two. */
-          var x = parseFloat(dot.getAttribute("cx")) + groupShift(dot);
+          var x = parseFloat(dot.getAttribute("cx"));
           var y = parseFloat(dot.getAttribute("cy"));
           var px = spec.flipX ? (lb.width - x * sx) : x * sx;
           var py = spec.flipY ? (lb.height - y * sy) : y * sy;
           px += ox;
           py += oy;
-          var fade = self.fadeAt(name, spec, lb, box, px, py, clear);
+          var fade = self.fadeAt(name, spec, lb, box, px, py);
           if (fade < 0.06) { return; }
           seed += 1;
           self.dots.push({
