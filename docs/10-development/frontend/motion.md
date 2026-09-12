@@ -192,39 +192,93 @@ a band half, each trace clipped against its own clip rectangle, because the clus
 **is** that clip and not drawn geometry. Nothing in the template is typed; `--check` refuses a
 coordinate edited by hand.
 
-**The composition is the artwork's too, and it is measured.** A band is 30.8% of the banner's
-height and stops 17.4% in from each edge with a 5.9% gap before the cluster; a cluster is 11.9% of
-the width. The banner itself is **not** reshaped to the artwork's 2.95 : 1 — an edge-anchored
-composition stretches gracefully, and at 1920px the banner already sat on those proportions while
-being 6.15 : 1.
+**The composition is the artwork's too, and it is measured.** Rendered at its own 2.954 : 1 and
+scanned for ink, the artwork puts a cluster at **11.15%** of the width, a gap at **5.60%**, the band
+at **63.30%**, another gap at **4.80%**, and the band's height at **29.25%**. Note that its own two
+horizontal gaps are not equal to each other.
 
-**On a phone the bands stand down and the clusters take the banner.** Everything else here is
-fluid on purpose — `clamp()` and `min()` rather than breakpoints, so nothing steps while a tablet
-is being turned over. This is the one thing that could not be solved by resizing, because what
-fails is not the band's size but its **density**: it carries 52 traces however wide it is, and
-`preserveAspectRatio="none"` squashes a 1440-unit viewBox into whatever width it gets. On a 360px
-phone that is a 7.5px pitch with a 2.4-unit stroke rendering **0.65px across and 1.18px down** —
-sub-pixel one way and nearly double the other. It was reported from a phone as a congested grey
-smear, which is what it was. The clusters then grow from a 72px floor to 30vw, so four 45-degree
-fans put circuitry on all four edges and the banner reads as a frame rather than a field.
+### Every channel is the same width, and a grid is what makes that true
 
-**Two conditions decide it, and neither works alone, because rotation is a second axis.** Width
-alone would restore the bands the instant a phone is turned sideways — 800×360 is wider than 768px,
-onto a banner half the height. Height alone would take them off a tablet stood upright. Together
-they split on device class rather than on the act of rotating:
+There are four channels: cluster→band on the left, band→cluster on the right, top band→bottom band,
+and top cluster→bottom cluster down each edge. They used to be four numbers arrived at four
+different ways — the horizontal pair from a share of the **width**, the vertical pair from the
+band's own height — so they agreed only by accident at one aspect ratio. Measured before this:
+**40%** of the width clear on a phone, and **5.9%** the moment a band appeared at 768px. A sevenfold
+step at one pixel of viewport, and the reason a person said they could not see the gap anywhere.
 
-| | portrait | landscape | bands |
+`.hero-circuit` is a **grid** now: cluster / band / cluster across, two rows down, one `gap`.
+
+- **The gap is stated once.** All four are that one value, equal *by construction* rather than by
+  four numbers kept in step by hand.
+- **The rows are `1fr`**, so a band and a cluster are each `(banner − gap) / 2` tall. That is what
+  makes the vertical channels match the horizontal ones, and `hero_circuit()` asserts the two
+  heights are equal so a failure says so where it happens rather than three checks away.
+- **`--hc-gap` must be a LENGTH, never a percentage.** `row-gap: %` resolves against the container's
+  **height** and `column-gap: %` against its **width** — a percentage gap is unequal in pixels by
+  definition, which is the exact fault this exists to prevent. Falsified: setting it to `8%` fails
+  the gap check at every width.
+
+**What it costs, stated plainly.** A cluster is sized by the banner's *height* now, so its share of
+the *width* follows the banner's shape rather than the artwork's — about 19% of a 440px banner and
+2.5% of a 3840px one, against the artwork's 11.15%. On a wide screen the clusters are small marks at
+the edges and the band carries the composition. That is forced rather than chosen: the artwork's
+cluster is half its height, and a banner proportionally wider than 2.95 : 1 has no room for one that
+size *and* two equal channels.
+
+**The band's column has no floor**, deliberately. A floor there is paid for by the clusters — the
+column takes their width, their height stays the row's, and `meet` then letterboxes the drawing in a
+box of the wrong ratio, which opens the vertical channel past the gap. Measured at 390×300 it went
+to 100px against a 32px gap. So on the narrowest phones the band is a narrow window onto the artwork
+rather than a wide one, at true scale, and every channel stays equal.
+
+**A mask that was built and then removed.** The cluster's diagonal fade leaves its ink at about a
+third of full where the band begins, so a second mask was intersected with it to end the ink
+cleanly. Measured, it widened the horizontal channels by **2–4px out of 115** and removing it failed
+no check at all — the `<svg>` already clips at the box, so the grid alone delivers the channel. It
+is recorded here because the reasoning sounded right and the measurement did not support it.
+
+### The band tiles; it is not stretched, and it used to be
+
+The bands were `preserveAspectRatio="none"` — one copy of a 1440 × 114 drawing stretched across
+whatever width the band got. The reasoning was that a band runs a fixed height across a box whose
+width is the screen's, and stretching a horizontal run only makes it a longer run. True of a run and
+false of everything around it: pads become ovals, vias ellipses, every vertical trace thins and
+every horizontal one thickens. Measured, the two scales agreed at **exactly one viewport**:
+
+| viewport | horizontal | vertical | |
 |---|---|---|---|
-| Phone | 360×800, caught by width | 800×360, caught by height | **off in both** |
-| 8" tablet | 600×960, caught by width | 960×600, caught by neither | off / on |
-| iPad | 768×1024, caught by neither | 1024×768, caught by neither | **on in both** |
-| Desktop | any window | | on |
+| 768 | 0.34 | 0.90 | 2.6× squashed |
+| 1440 | 0.64 | 0.90 | 1.4× squashed |
+| **1920** | 0.86 | 0.90 | **1.05× — the width it was composed for** |
+| 3840 | 2.02 | 0.90 | 2.2× stretched |
+| 15360 (4K at 25% zoom) | 9.07 | 0.90 | **10× stretched** |
 
-`30rem` sits deliberately between a phone on its side (360–430px tall) and a tablet on its side
-(768px and up). `hero_circuit()` measures all five of those viewports, which is why its probe takes
-a **height** as well as a width: a media query inside a same-origin iframe evaluates against the
-**iframe**, so with the frame pinned at 900px the landscape condition would never once have fired
-and the branch would have shipped unwatched.
+Reported from a zoomed-out browser as stretched and old. Nothing had ever measured it, which is how
+a drawing correct at one width shipped to every width.
+
+**Now `xMidYMid slice` over a viewBox fifteen tiles wide.** `slice` scales **uniformly** and crops,
+and with a viewBox that wide the band's **height** decides the scale and its width never does — one
+scale and one trace pitch at every viewport and every zoom. `BAND_TILES` in
+`tools/build_hero_circuit.py` and `circuit.js` must agree.
+
+- **The tile count is a margin, not a correctness condition.** Fifteen covers a 5K display at
+  Chrome's minimum 25% zoom. Past that the width governs and the drawing *magnifies* — `slice` is
+  uniform by definition, so it cannot distort again.
+- **Nothing repeats on an ordinary screen.** Measured, the band fits inside *one* tile at every
+  width up to 1920px; it first repeats near 2048px, ×2.24 at 3840.
+- **Odd on purpose**, so the viewBox's centre is a mirror axis and the banner's middle is still where
+  the two halves meet.
+- **Charges and nodes are not tiled** — ninety animated elements per band under a `<use>`d group is
+  the shape that cost a CPU core on 2026-09-03. They sit on the centre tile, so with scripting off on
+  a wide screen the charges run in the middle of the band only.
+- **`circuit.js` clips the canvas to each layer's box.** The `<svg>` crops what `slice` deliberately
+  overflows and the canvas does not, so without it charges paint straight through the channels: a
+  115px channel measured 40px of clear pixels, and at 1920px the banner scanned as one unbroken
+  mass. It was not a problem while the band was `"none"`, because the drawing then exactly filled its
+  box.
+- **The band's three pen tiers are gone**, and so is the cluster's ladder. Both drawings are sized by
+  the banner's height now, so their scales vary about 1.5× rather than the 3.5× that tracked viewport
+  width — one pen each covers it, and tiers keyed to width would be measuring the wrong variable.
 
 **Pure inline SVG animated in CSS.** The charges move to a canvas when there is scripting; without
 it the SVG's own run, so there is no page that needs JavaScript for this, and the reduced-motion
