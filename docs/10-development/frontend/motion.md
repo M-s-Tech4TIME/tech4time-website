@@ -181,17 +181,34 @@ is in the page at all.
 ## The circuit around the page title
 
 `tools/templates/hero-circuit.html` + `assets/css/layout.css`. Every interior page opens with a
-title band, and the band is framed by circuitry drawn in the company's own idiom — the one its
-printed material uses. Six layers: a chevron band across the top and the bottom, and a cluster
-emerging from each of the four corners.
+title band, and the band is framed by circuitry. Six layers: a band across the top and the bottom,
+and a cluster emerging from each of the four corners.
 
-**Pure inline SVG animated in CSS. No JavaScript at all**, which is why it has no "without
-JavaScript" story to tell and why the reduced-motion block in `base.css` freezes it for free.
+**It is the company's own artwork, extracted rather than interpreted.** It used to be drawn from a
+description of the printed material — diagonal chevrons in the bands, typed by hand as path
+coordinates. The artwork itself is now in `references/`, and
+`tools/build_hero_circuit.py` reads it: 18 traces, 50 pads and 7 vias in a cluster, 26 / 77 / 11 in
+a band half, each trace clipped against its own clip rectangle, because the cluster's diagonal edge
+**is** that clip and not drawn geometry. Nothing in the template is typed; `--check` refuses a
+coordinate edited by hand.
+
+**The composition is the artwork's too, and it is measured.** A band is 30.8% of the banner's
+height and stops 17.4% in from each edge with a 5.9% gap before the cluster; a cluster is 11.9% of
+the width. The banner itself is **not** reshaped to the artwork's 2.95 : 1 — an edge-anchored
+composition stretches gracefully, and at 1920px the banner already sat on those proportions while
+being 6.15 : 1. Two of them give way on a phone, and `layout.css` says which and why: a cluster is
+held at a 72px floor, below which eighteen traces cannot resolve, and the band's inset closes
+smoothly to nothing rather than stepping at a breakpoint.
+
+**Pure inline SVG animated in CSS.** The charges move to a canvas when there is scripting; without
+it the SVG's own run, so there is no page that needs JavaScript for this, and the reduced-motion
+block in `base.css` freezes either.
 
 **One set of geometry.** Everything is declared once, in the first layer's `<defs>`, and the other
 five reference it and are mirrored in CSS. That is not tidiness: a duplicate `id` is a hard
 failure in `tools/audit_pages.py`, so four corners cannot each carry their own copy. Change the
-template, then `python3 tools/propagate_shared.py` — never a page by hand.
+**artwork**, then `python3 tools/build_hero_circuit.py`, then `python3 tools/propagate_shared.py` —
+never the template by hand, and never a page.
 
 **The two bands are one current.** The flow runs left to right along the top and right to left
 along the bottom, at a single shared duration, so the two edges read as one circuit going round the
@@ -208,14 +225,29 @@ from that same origin uncovers each trace from its root outward. Six animated el
 the two hundred it would take to draw every trace on individually. The four corners are given no
 stagger: they emerge together.
 
+That is a property of the geometry, not a hope about it. Inkscape stores a polyline in whatever
+order it was drawn and the artwork ran about two to one the wrong way — eighteen of the band's
+twenty-six went from the pad back up to the edge. Invisible in the still drawing and very visible
+once a charge is on it, because both the canvas and the CSS fallback take a trace's direction as
+given. `build_hero_circuit.py` turns every trace outward before emitting it.
+
 **The charges are painted on a canvas, and the SVG's own are the fallback.** `circuit.js` reads
 every trace's geometry out of the SVG that is already in the page — there is no second copy of the
-drawing — and paints a charge on **all 216** of them on a single `<canvas>`. Once it is measured
+drawing — and paints a charge on **all 176** of them on a single `<canvas>`. Once it is measured
 and drawing it adds `hero-circuit--canvas`, which switches the SVG's charges and junction dots off.
 Until then, and for ever without JavaScript, the SVG's **24** CSS charges run instead. The two are
 never both live, and `hero_circuit()` checks that in both directions.
 
-Why the trouble: a charge in CSS is a style recalculation per animated trace per frame, and 216 of
+**And it paints them at the weight the drawing is.** That was a flat 2.6 device pixels on every
+layer at every size, which was survivable while the band was full-bleed and is not now: a band's box
+runs from about 1,220px down to 345px for the same 1,440-unit viewBox, so the drawing under the
+charge renders from 2.2px down to 0.9px. Measured at 768px, a charge held at 2.6 over a trace at
+0.74 stopped being the lit part of a line and became the only part — a smear of moving white over a
+drawing nobody could see. `circuit.js` now reads `.hero-circuit__wires`' own `stroke-width` off the
+stylesheet and scales it the way the browser does, for the same reason it reads the ink there: one
+source, and a stylesheet change carries across by itself.
+
+Why the trouble: a charge in CSS is a style recalculation per animated trace per frame, and 176 of
 those is a CPU core. A canvas has no style to recalculate. It costs slightly more while the band is
 on screen and **less** overall, because CSS animations keep running when scrolled past and the
 canvas stops — measured 187 ms/s against 126 with the band visible, and 135 against 175 once
@@ -273,7 +305,8 @@ nothing clicked or scrolled. This is what the page costs simply by being open:
 | before the circuit was replaced | 38 ms/s | 35 ms/s |
 | **charges on groups (shipped 2026-09-03)** | **895 ms/s** | **842 ms/s** |
 | 24 charges, flattened, 12 durations | 55 ms/s | — |
-| **24 charges, flattened, 3 durations (now)** | **38 ms/s** | **29 ms/s** |
+| 24 charges, flattened, 3 durations | 38 ms/s | 29 ms/s |
+| **the same, redrawn from the artwork — 176 traces, not 216 (now)** | **33 ms/s** | **28 ms/s** |
 
 895 ms of style recalculation per second is most of a CPU core, spent forever, on fourteen pages.
 Three things are worth keeping from that table. Flattening was the larger half of the fault, not a
@@ -293,15 +326,38 @@ That gap is now covered by **`tools/check_style_budget.py`**, which asks Chrome 
 than counting frames. Run it whenever you change how much of this drawing moves — and note that a
 frame counter, including the ones in this file, will tell you nothing.
 
-**The pen is widened as the drawing shrinks.** An SVG stroke scales with its drawing. A corner
-renders at `width / 260` — 0.92 on a desktop, 0.40 on a phone — and the band is worse, because
-`preserveAspectRatio="none"` squashes it unevenly and a diagonal ends up at roughly the geometric
-mean of the two scales, 0.89 wide against 0.29 narrow. Left alone every line falls under a pixel
-below about 800px and the drawing turns to haze, which is not the same failure as being absent and
-no check would have called it. Three tiers in `layout.css` widen the stroke to hold the rendered
-weight between about one and two pixels at every width; the numbers there are that arithmetic, not
-taste. The corner layer carries `aspect-ratio: 13 / 10` so its scale stays exactly `width / 260`
-and the arithmetic has something fixed to stand on.
+**The pen is widened as the drawing shrinks.** An SVG stroke scales with its drawing, and the two
+drawings here shrink at very different rates. Read off a browser rather than derived on paper:
+
+| viewport | band box | scale | cluster box | scale |
+|---|---|---|---|---|
+| 1920px | 1223px | 0.85 | 228 × 246 | 1.14 |
+| 1440px | 914px | 0.63 | 171 × 184 | 0.86 |
+| 1024px | 646px | 0.45 | 122 × 131 | 0.61 |
+| 768px | 481px | 0.33 | 91 × 98 | 0.46 |
+| 360px | 345px | 0.24 | 72 × 77 | 0.36 |
+
+Left alone at one weight every line falls under a pixel below about 1024px and the drawing turns to
+haze — which is not the same failure as being absent, and no check would have called it. Two tiers
+in `layout.css` widen the stroke to hold the rendered weight between about one and two device pixels
+throughout, measured at 0.86 to 2.04 across that table; the numbers there are that arithmetic, not
+taste. The corner layer carries `aspect-ratio: 200 / 215` — the cluster's own ratio, so `meet`
+leaves no margin and the scale stays exactly `width / 200`.
+
+**A mark is not a stroke, and the pen cannot rescue it.** The artwork carries about three times the
+component marks the drawing it replaced did — 77 in each band half against roughly 24. Widening a
+stroke does nothing for a filled shape, so below a tablet they stop reading as components and start
+reading as speckle over the traces. The narrow tier carries them lighter instead.
+
+**And `hero_circuit()` now measures all of it**, which nothing did before. The band's share of the
+banner's height and width, the cluster's share of its width, the gap between them, and the rendered
+weight of both pens — read off `getBoundingClientRect()` at 1440, 768 and 390, not estimated. Every
+one of those is a number in a `clamp()` that some other change could retune for some other reason,
+on every interior page, with no other check saying anything. Falsified against four deliberate
+breaks before it was trusted: the cluster back at `20vw`, the band back to full width, the old pen,
+and a band squeezed to a third. The first draft caught three of the four — a band restored to full
+width passed everything, because only the lower bound on its width was asserted. That is what the
+gap check is for.
 
 **Every animation must rest on its declared value.** `base.css` sets no `animation-fill-mode`, so
 when reduced motion collapses an animation the element reverts to its *specified* value, not to

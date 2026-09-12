@@ -37,7 +37,7 @@ jobs:
     name: checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # check_cache_bust.py compares this commit against origin/main, and a
           # shallow clone has neither the ref nor the history to do it.
@@ -57,9 +57,21 @@ jobs:
       - run: python3 tools/check_content_model.py
       - run: python3 tools/check_secrets.py
       - run: python3 tools/check_docs.py
+
+      # An icon name the sprite does not carry paints NOTHING, with no error and
+      # no console line, so a blank box ships and reads as a design choice. That
+      # is how the admin's Settings row and its Overview tile were empty for a
+      # release: ADMIN_SECTIONS named 'cog' and the sprite had only 'cogs'.
+      - run: python3 tools/check_icons.py
       - run: python3 tools/audit_pages.py
       - run: python3 tools/inject_icons.py --check
       - run: python3 tools/build_deploy_set.py --check
+
+      # The hero circuit is generated from the artwork in references/, and this
+      # is the half of that which needs no browser: it redraws the template from
+      # the committed geometry and refuses if what is on disk differs. Catches a
+      # coordinate edited by hand, and a geometry re-resolved and never rebuilt.
+      - run: python3 tools/build_hero_circuit.py --check
 
       # Filenames here are not content-hashed and .htaccess caches CSS, JS and
       # fonts for a year, so a changed asset behind an unchanged URL reaches
@@ -90,7 +102,7 @@ jobs:
     name: php
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # These drive a real PHP server, and the private store lands beside the
       # checkout the same way it lands beside the document root on the host.
@@ -148,7 +160,7 @@ jobs:
     name: firefox
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # From Mozilla's tarball rather than apt. On Ubuntu 24.04 `apt install
       # firefox` is a transitional package that pulls the snap, which does not

@@ -116,6 +116,75 @@ const SERVICES_RING_LARGE = 15;
 const SERVICES_RING_MAX = 24;
 
 /**
+ * The spokes and the ring a node map is drawn on.
+ *
+ * WHY THIS IS SVG AND NOT A GRADIENT
+ * The spokes used to be a repeating-conic-gradient masked to a ring, which is
+ * clever and was wrong in three ways at once, all of them one fault:
+ *
+ *   - A conic wedge is an ANGLE, so its width in pixels grows with the radius.
+ *     Measured on the shipped page: 0.4deg is 1.20px out at the nodes and
+ *     0.39px at the hub. Under a pixel a line does not thin, it dissolves --
+ *     so every spoke faded out before it reached the hub, worst on the four
+ *     cardinal ones, where a sub-pixel horizontal or vertical line antialiases
+ *     to almost nothing. That is the "broken, unconnected" line.
+ *   - A gradient is rasterised. A 0.4deg wedge drawn into pixels is a
+ *     staircase, which is why the diagonals looked jagged next to everything
+ *     else on the page.
+ *   - Both pseudo-elements paint after the <li>s that are the nodes, so the
+ *     dashed ring sat ON TOP of the icons.
+ *
+ * Real geometry fixes all three: a line is a line at any radius, vector at any
+ * angle, and an element that can be put underneath the nodes.
+ *
+ * THE VIEWBOX IS THE RING, WHICH IS WHY THERE ARE NO SIZE CONSTANTS HERE
+ * The stylesheet sizes this box to the ring the nodes sit on, so in here the
+ * ring is always the inscribed circle and a node is always at radius 50. The
+ * three ring sizes and the hub diameter live in ONE place -- the stylesheet --
+ * and this function needs to know none of them. The alternative was to
+ * duplicate --size, --radius and --node here and keep them in step by
+ * remembering.
+ *
+ * A spoke therefore runs from the centre to the node's own centre. It cannot
+ * fall short of a node whatever size the ring is, which is the bug being
+ * fixed; the inner half is covered by the hub, which is opaque and painted
+ * after this. Give the hub a transparent background and the spokes will show
+ * through it.
+ */
+function services_map_wires(int $n): string
+{
+    $ring = min(max($n, 1), SERVICES_RING_MAX);
+    /* The ring is drawn a shade inside the box so that its stroke is not
+       clipped by the viewport at the four extremes. A spoke ends exactly on
+       the edge, where its node's centre is, and a butt cap adds nothing past
+       it. */
+    $out = '<circle class="soc-map__ring" cx="50" cy="50" r="49.8"/>';
+    for ($i = 0; $i < $ring; $i++) {
+        /* Node 0 sits at twelve o'clock and they run clockwise, which is what
+           the stylesheet's rotate(--i / --n * 360deg) does. */
+        $angle = 2 * M_PI * $i / $ring;
+        $x = 50 + 50 * sin($angle);
+        $y = 50 - 50 * cos($angle);
+        $out .= '<line class="soc-map__spoke" x1="50" y1="50"'
+              . ' x2="' . services_map_coord($x) . '"'
+              . ' y2="' . services_map_coord($y) . '"/>';
+    }
+    /* No preserveAspectRatio: the default keeps the drawing circular. The box
+       is square today, and stating "none" would say the opposite -- stretch me
+       -- so a box that stopped being square would pull the ring into an
+       ellipse and the spokes off their nodes, silently. */
+    return '<svg class="soc-map__wires" viewBox="0 0 100 100"'
+         . ' focusable="false" aria-hidden="true">'
+         . $out . '</svg>';
+}
+
+/** A coordinate, short enough to read and precise enough to land. */
+function services_map_coord(float $value): string
+{
+    return rtrim(rtrim(number_format($value, 3, '.', ''), '0'), '.');
+}
+
+/**
  * The services document as it should be rendered.
  *
  * Never throws. A missing, unreadable or damaged file falls back field by
@@ -361,6 +430,11 @@ function services_layer(array $layer, array $labels): string
               : ($n >= SERVICES_RING_LARGE ? ' soc-map--lg' : '');
         $out .= '          <ul class="soc-map soc-map--n' . min($n, SERVICES_RING_MAX)
               . $size . "\">\n";
+        /* First, so it paints under the hub and the nodes: this is the one
+           thing in the ring that must never be on top of an icon. The slots'
+           :nth-child() rules in the stylesheet count from here. */
+        $out .= '            <li class="soc-map__wires-slot" aria-hidden="true">'
+              . services_map_wires($n) . "</li>\n";
         $out .= "            <li class=\"soc-map__hub\">\n";
         $out .= '              ' . services_icon($layer['icon']) . "\n";
         $out .= '              <span class="soc-map__hub-label">' . h($layer['hub_label']) . "</span>\n";

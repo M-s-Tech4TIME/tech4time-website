@@ -64,7 +64,8 @@ what they did with them.
 
 | File | Purpose |
 |---|---|
-| `hero-circuit.html` | The hero's circuit artwork. Identical on every page that has one. Decoration: aria-hidden, no text, sixty lines of path coordinates — nothing anybody should be offered a form for, which is why it did not become a document with the rest. |
+| `hero-circuit.html` | The hero's circuit artwork. Identical on every page that has one. Decoration: aria-hidden, no text, path coordinates — nothing anybody should be offered a form for, which is why it did not become a document with the rest. **Generated**, so do not edit it: `python3 tools/build_hero_circuit.py` draws it from the geometry below, and `--check` refuses a version edited by hand. |
+| `hero-circuit.geometry.json` | What that is drawn from: the traces, pads and vias of the company's own banner artwork in `references/`, resolved out of it and clipped. Committed so the template can be rebuilt, and `--check` run, without a browser. Re-read the artwork with `build_hero_circuit.py --resolve`, which needs Chrome. |
 | `scripts.html` | Deferred script tags, in dependency order. Identical on every page. |
 
 ## Editing rules

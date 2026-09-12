@@ -392,6 +392,11 @@ def audit_page(path: Path, seen_titles: dict, seen_descriptions: dict,
     parser = PageParser()
     parser.feed(html)
 
+    # The widest ring the stylesheet can place. Read, not typed: a ring past it
+    # is clamped, so the spoke count is clamped with it.
+    ring_max = int(php_value(
+        "require 'lib/services.php'; echo SERVICES_RING_MAX;") or 24)
+
     def fail(msg):
         problems.append(f"{rel}: {msg}")
 
@@ -551,6 +556,32 @@ def audit_page(path: Path, seen_titles: dict, seen_descriptions: dict,
             continue
         if not (el.get("sizes") or "").strip():
             fail(f"<{tag} srcset> of widths with no sizes=: {srcset[:90]}")
+
+    # --- the node ring on a services page --------------------------------
+    # THE SPOKES AND THE NODES ARE TWO DRAWINGS THAT HAVE TO AGREE
+    # The ring's spokes are SVG emitted by services_map_wires(); the nodes are
+    # <li>s placed by :nth-child() rules in the stylesheet. Nothing connects
+    # them but a count and an order, and both fail silently:
+    #
+    #   - one spoke too few and a node has no line to the hub, which is the
+    #     defect this drawing was rebuilt to fix;
+    #   - the wires <li> anywhere but first and it paints OVER the icons, which
+    #     is what the dashed ring used to do, and it shifts every node's
+    #     :nth-child() index at the same time, so the whole ring rotates.
+    #
+    # Neither shows up in a rendered-page check that is not looking for it, and
+    # neither is something a person reports as "broken" -- they report it as
+    # the drawing looking wrong.
+    for block in re.findall(r'<ul class="soc-map[^"]*">(.*?)</ul>', html, re.S):
+        nodes = block.count('class="soc-map__node"')
+        if not nodes:
+            continue
+        if not block.lstrip().startswith('<li class="soc-map__wires-slot"'):
+            fail("a node ring does not open with its spokes: they would paint "
+                 "over the icons, and every node's :nth-child() index is out by one")
+        spokes = block.count('class="soc-map__spoke"')
+        if spokes != min(nodes, ring_max):
+            fail(f"a node ring has {nodes} nodes and {spokes} spokes")
 
     # --- links -----------------------------------------------------------
     for link in parser.links:

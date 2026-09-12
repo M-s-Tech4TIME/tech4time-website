@@ -1273,6 +1273,35 @@ function drawn(el) {
          parseFloat(view.getComputedStyle(el).opacity) > 0.05;
 }
 
+/* WHAT THE DRAWING IS SHAPED LIKE, AND HOW HEAVY ITS LINES ARE
+   The artwork this is extracted from composes the banner in proportions, and
+   they are the only part of it that lives in the stylesheet rather than in the
+   geometry: a band is 30.8% of the banner's height, a cluster 11.9% of its
+   width. Nothing here watched either, so a clamp retuned for some other reason
+   could have quietly put the drawing back to the undifferentiated field it was
+   before, on every interior page, and every check would still have passed.
+
+   The pen is the same kind of silence. An SVG stroke scales with its drawing,
+   a band's box runs from about 1,220px to 345px for one fixed viewBox, and a
+   line under a device pixel does not disappear -- it turns to haze. That is
+   what shipped once already and what a person, not a suite, reported. The
+   first measurement of this artwork had the band's traces at 0.74px with the
+   charges at 2.6 running over them. */
+var hero = doc.querySelector('.page-hero').getBoundingClientRect();
+var bandLayer = doc.querySelector('.hero-circuit__layer--band-top');
+var cornerLayer = doc.querySelector('.hero-circuit__layer--corner-tl');
+/* The smaller of the two scales, for both: a cluster is fitted with "meet" so
+   they are equal anyway, and a band is stretched, so the smaller is the one
+   that decides whether its lines survive. */
+function penOf(layer, vw, vh) {
+  var lb = layer.getBoundingClientRect();
+  var pen = parseFloat(view.getComputedStyle(
+    layer.querySelector('.hero-circuit__wires')).strokeWidth);
+  return Math.round(pen * Math.min(lb.width / vw, lb.height / vh) * 100) / 100;
+}
+var bandBox = bandLayer.getBoundingClientRect();
+var cornerBox = cornerLayer.getBoundingClientRect();
+
 var layers = Array.prototype.slice.call(
   doc.querySelectorAll('.hero-circuit__layer'));
 var charges = doc.querySelectorAll('.hero-circuit__charge');
@@ -1387,6 +1416,12 @@ return {
   events: cs.pointerEvents,
   zIndex: cs.zIndex,
   position: cs.position,
+  bandPctH: Math.round(1000 * bandBox.height / hero.height) / 10,
+  bandPctW: Math.round(1000 * bandBox.width / hero.width) / 10,
+  cornerPctW: Math.round(1000 * cornerBox.width / hero.width) / 10,
+  gapPct: Math.round(1000 * (bandBox.left - cornerBox.right) / hero.width) / 10,
+  bandPen: penOf(bandLayer, 1440, 114),
+  cornerPen: penOf(cornerLayer, 200, 215),
   marked: doc.querySelectorAll('.page-hero [data-reveal]').length,
   titleOpacity: view.getComputedStyle(
     doc.querySelector('.page-hero__title')).opacity,
@@ -1465,6 +1500,54 @@ def hero_circuit(b: Browser, origin: str, r: Results) -> None:
         r.check(f"{width}px — nothing overflows sideways",
                 not d["overflows"],
                 "the document scrolls horizontally with the circuit in place")
+
+        # The artwork's own proportion, held to a point either side. The band
+        # is the one the whole composition hangs off, so it is the tight one.
+        r.check(f"{width}px — the band keeps its share of the banner",
+                28.0 <= d["bandPctH"] <= 34.0,
+                f"the band is {d['bandPctH']}% of the banner's height; the "
+                "artwork composes it at 30.8%")
+
+        # A cluster is 11.9% of the width in the artwork and is held at a floor
+        # on a phone, where 11.9% would be 43px and eighteen traces cannot
+        # resolve in that. Both are legitimate; a cluster back at 20vw is not.
+        r.check(f"{width}px — the corner cluster is not oversized",
+                10.0 <= d["cornerPctW"] <= 22.0,
+                f"a cluster is {d['cornerPctW']}% of the banner's width; the "
+                "artwork composes it at 11.9%, and the phone floor takes it to "
+                "about 21% at 360px")
+
+        # The band must also still have room to draw 52 traces in.
+        r.check(f"{width}px — the band has room to be a band",
+                d["bandPctW"] >= 55.0,
+                f"the band is {d['bandPctW']}% of the banner's width; below "
+                "about 55% its traces land under four pixels apart")
+
+        # AND IT HAS TO STOP, WHICH IS THE OTHER HALF AND WAS MISSED
+        # The band ran the full width underneath the clusters before this
+        # artwork, and with clusters at their drawn size that reads as one
+        # undifferentiated field rather than as corners and a band. Asserting
+        # only the lower bound above let a band restored to full width pass
+        # every check in this section -- which is exactly what it did, until
+        # this was added. Below about 605px the inset closes on purpose,
+        # because the cluster is held at a floor there and the band would
+        # otherwise have nothing left, so the gap is only required where the
+        # artwork's own composition governs.
+        if width >= 768:
+            r.check(f"{width}px — the band stops short of the clusters",
+                    d["gapPct"] > 0 and d["bandPctW"] <= 75.0,
+                    f"the band is {d['bandPctW']}% of the width with a "
+                    f"{d['gapPct']}% gap before the cluster; the artwork "
+                    "composes it at 65.9% with a 5.9% gap, and a band running "
+                    "the full width under the clusters is the arrangement this "
+                    "artwork replaced")
+
+        for part, pen in (("band", d["bandPen"]), ("corner", d["cornerPen"])):
+            r.check(f"{width}px — the {part}'s pen lands between one and two "
+                    "device pixels",
+                    0.8 <= pen <= 2.4,
+                    f"a {part} line renders at {pen}px: under one and it is "
+                    "haze, over two and it is a fence in front of the title")
 
     # WITH SCRIPTING, THE CANVAS IS THE ONE THAT MOVES
     # circuit.js paints a charge on every one of the 216 drawn traces and then

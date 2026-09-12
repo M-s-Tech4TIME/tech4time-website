@@ -100,7 +100,7 @@ off. [javascript.md](frontend/javascript.md) · [motion.md](frontend/motion.md)
 | I want to change | Where |
 |---|---|
 | **The header, footer or dock** | **`https://admin.tech4time.bd/?s=chrome`** — every link, label, heading and contact row. The markup is `lib/body.php`; **never a page file** |
-| The hero circuit around a page title | `tools/templates/hero-circuit.html`, then `python3 tools/propagate_shared.py` — **never one page** |
+| The hero circuit around a page title | `references/t4t_circuitry_6000_2031_300.svg` is the drawing; `python3 tools/build_hero_circuit.py` redraws the template from it, then `python3 tools/propagate_shared.py` — **never one page, and never the template by hand** |
 | A page's content | `pages/<name>/index.php` — its **words** are in the admin, above |
 | The homepage | `index.php`, at the repository root — likewise |
 | The 404 page | `404.php` — its markup here, its title and description in the admin |

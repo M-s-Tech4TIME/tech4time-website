@@ -80,7 +80,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Layout, components | `assets/css/layout.css`, `components.css` |
 | Browser behaviour | `assets/js/` — modules register on `window.Tech4Time` |
 | Header / footer / dock | **`https://admin.tech4time.bd/?s=chrome`** if it is words or links; `lib/body.php` if it is markup. Never a page file |
-| The hero circuit around a page title | `tools/templates/hero-circuit.html` → `propagate_shared.py` |
+| The hero circuit around a page title | the artwork in `references/` → `build_hero_circuit.py` → `propagate_shared.py`. **Never the template by hand** |
 | Anything in a page's `<head>` | `lib/head.php` if it is code, **`https://admin.tech4time.bd/?s=seo`** if it is words. Never a page file |
 | A title, description, keywords, share card, crawl setting, the sitemap, `robots.txt`, the manifest | **`https://admin.tech4time.bd/?s=seo`** |
 | Whether Google Analytics runs, and against which property | **`https://admin.tech4time.bd/?s=seo&site=crawl`** — a field, not a deploy |
@@ -134,6 +134,8 @@ python3 tools/check_shared_markup.py   python3 tools/check_docs.py
 python3 tools/check_shared_facts.py     python3 tools/check_form_dom.py
 python3 tools/audit_pages.py           python3 tools/check_shared_lib.py
 python3 tools/build_deploy_set.py --check
+python3 tools/build_hero_circuit.py --check
+python3 tools/check_icons.py
 ```
 
 Touched anything under `assets/`? Also **`python3 tools/check_cache_bust.py`** — filenames are not
@@ -178,6 +180,14 @@ improvement — without it the browser takes the widest rung on every screen. A 
 **measured, not estimated**: two of the seven are widest on a phone or a tablet rather than a
 desktop.
 
+Touched the circuitry around a page title? It is **generated**: the drawing is the company's own
+artwork in `references/`, `python3 tools/build_hero_circuit.py` redraws
+`tools/templates/hero-circuit.html` from it and `propagate_shared.py` carries it to every page
+that has a title band. `build_hero_circuit.py --check` refuses a template edited by hand and
+needs no browser; only `--resolve`, which re-reads the SVG, wants Chrome. The geometry and the
+stylesheet are one drawing — `circuit.js` reads both the ink and the pen out of `layout.css` — so
+changing a viewBox means changing `LAYERS` there too.
+
 Touched CSS, markup or motion? Also `test_motion.py`, `test_nav.py`, `test_theme.py`,
 `check_hover.py`, `check_dark_mode.py`, `check_responsive.py`, `check_focus.py` — these need
 Firefox and geckodriver, and leave processes behind if interrupted (`pkill firefox geckodriver`).
@@ -212,7 +222,10 @@ repository in front: `tech4time-website-backend/lib/auth.php`. `check_docs.py` e
 
 ## Status
 
-Work happens on `dev`; pull requests to `main` need explicit approval.
+Work happens on `dev`; pull requests to `main` need explicit approval, are merged with **Create a
+merge commit**, and are followed by merging `main` back into `dev` -- which fast-forwards, so the two
+branches end a release on the same commit instead of drifting one apart each time.
+[ci-cd.md](docs/20-deployment/ci-cd.md)
 
 **Live** at `https://tech4time.bd` — cPanel, LiteSpeed, PHP 8.2.33. **A push to `main` deploys it.**
 Checks run, rsync over SSH, and the site is asked afterwards whether `lib/`, `content/` and dotted
